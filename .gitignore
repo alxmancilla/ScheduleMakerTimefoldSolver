@@ -1,0 +1,24 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.orig
+release.properties
+.flattened-pom.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.class
+
+# Build artifacts
+*.jar
+*.zip
+
+# Logs
+*.log
