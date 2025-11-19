@@ -133,8 +133,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && !"lab".equalsIgnoreCase(assignment.getGroup().getPreferredRoom().getType())
                         && (assignment.getRoom() == null
                                 || !assignment.getRoom().equals(assignment.getGroup().getPreferredRoom())))
-                .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Group has a pre-assigned preferred room (excludes lab rooms)");
+                .penalize(HardSoftScore.ofSoft(3))
+                .asConstraint("Prefer group's pre-assigned room (weight 3)");
     }
 
     // ==================== SOFT CONSTRAINTS ====================
