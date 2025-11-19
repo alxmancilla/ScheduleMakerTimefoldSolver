@@ -26,7 +26,7 @@ public class DemoDataGenerator {
                                 Set.of("LENGUA Y COMUNICACIÓN I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 11));
+                                7, 11));
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
@@ -34,7 +34,7 @@ public class DemoDataGenerator {
                                 Set.of("INGLÉS I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 14));
+                                7, 14));
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
@@ -42,7 +42,7 @@ public class DemoDataGenerator {
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 14));
+                                7, 14));
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
@@ -58,7 +58,7 @@ public class DemoDataGenerator {
                                 Set.of("LA MATERIA Y SUS INTERACCIONES", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 14));
+                                7, 14));
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
@@ -66,7 +66,7 @@ public class DemoDataGenerator {
                                 Set.of("CLUB DE AJEDREZ"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 14));
+                                7, 14));
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
