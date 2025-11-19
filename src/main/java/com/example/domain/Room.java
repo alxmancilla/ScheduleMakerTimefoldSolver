@@ -28,7 +28,7 @@ public class Room {
     public boolean satisfiesRequirement(String requirement) {
         if ("standard".equals(requirement)) {
             return "standard".equals(type);
-        } else if ("science_lab".equals(requirement)) {
+        } else if ("lab".equals(requirement)) {
             return "lab".equals(type);
         }
         return false;

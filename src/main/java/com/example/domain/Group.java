@@ -7,11 +7,19 @@ public class Group {
     private final String id;
     private final String name;
     private final Set<String> courseNames;
+    // Optional preferred (pre-assigned) room for this group. When non-null,
+    // assignments for this group should use this room.
+    private final Room preferredRoom;
 
     public Group(String id, String name, Set<String> courseNames) {
+        this(id, name, courseNames, null);
+    }
+
+    public Group(String id, String name, Set<String> courseNames, Room preferredRoom) {
         this.id = id;
         this.name = name;
         this.courseNames = courseNames;
+        this.preferredRoom = preferredRoom;
     }
 
     public String getId() {
@@ -24,6 +32,10 @@ public class Group {
 
     public Set<String> getCourseNames() {
         return courseNames;
+    }
+
+    public Room getPreferredRoom() {
+        return preferredRoom;
     }
 
     @Override

@@ -11,21 +11,20 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     @Override
     public Constraint[] defineConstraints(ConstraintFactory constraintFactory) {
         return new Constraint[] {
-                // Hard constraints
+                // Hard constraints (infeasibility: must be satisfied)
                 teacherMustBeQualified(constraintFactory),
                 teacherMustBeAvailable(constraintFactory),
                 noTeacherDoubleBooking(constraintFactory),
                 noRoomDoubleBooking(constraintFactory),
                 roomTypeMustSatisfyRequirement(constraintFactory),
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
-                // noLunchTimeAssignments(constraintFactory),
-                sameTeacherForAllCourseHours(constraintFactory),
-                groupNonLabCoursesInSameRoom(constraintFactory),
+                groupPreferredRoomConstraint(constraintFactory),
+                // groupNonLabCoursesInSameRoom(constraintFactory),
 
-                // Soft constraints
-                minimizeTeacherBuildingChanges(constraintFactory),
-                minimizeTeacherIdleGaps(constraintFactory),
-                // preferEarlierTimeslots(constraintFactory)
+                // Soft constraints (quality optimization: weighted preferences)
+                sameTeacherForAllCourseHours(constraintFactory), // weight 3 (high priority: continuity)
+                minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
+                minimizeTeacherBuildingChanges(constraintFactory), // weight 1 (comfort: minimize travel)
         };
     }
 
@@ -85,14 +84,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Group cannot have two courses at same time");
     }
 
-    private Constraint noLunchTimeAssignments(ConstraintFactory constraintFactory) {
-        return constraintFactory
-                .forEach(CourseAssignment.class)
-                .filter(assignment -> assignment.getTimeslot() != null && assignment.getTimeslot().isLunchTime())
-                .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("No class during lunch (12-1)");
-    }
-
     private Constraint sameTeacherForAllCourseHours(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEachUniquePair(CourseAssignment.class)
@@ -100,30 +91,50 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && a1.getCourse().equals(a2.getCourse())
                         && a1.getTeacher() != null && a2.getTeacher() != null
                         && !a1.getTeacher().equals(a2.getTeacher()))
-                .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Same teacher for all course hours");
+                .penalize(HardSoftScore.ofSoft(3))
+                .asConstraint("Prefer same teacher for all course hours (continuity)");
     }
 
     private Constraint groupNonLabCoursesInSameRoom(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEachUniquePair(CourseAssignment.class)
                 .filter((a1, a2) -> {
+                    // Basic null/group guards
+                    if (a1.getGroup() == null || a2.getGroup() == null)
+                        return false;
                     if (!a1.getGroup().equals(a2.getGroup()))
                         return false;
                     if (a1.getRoom() == null || a2.getRoom() == null)
                         return false;
 
-                    boolean a1IsLab = "science_lab".equals(a1.getCourse().getRoomRequirement());
-                    boolean a2IsLab = "science_lab".equals(a2.getCourse().getRoomRequirement());
+                    // Treat roomRequirement defensively (case/whitespace tolerant)
+                    String req1 = a1.getCourse() == null ? null : a1.getCourse().getRoomRequirement();
+                    String req2 = a2.getCourse() == null ? null : a2.getCourse().getRoomRequirement();
+                    boolean a1IsLab = req1 != null && "lab".equalsIgnoreCase(req1.trim());
+                    boolean a2IsLab = req2 != null && "lab".equalsIgnoreCase(req2.trim());
 
-                    // Both non-lab courses must be in same room
-                    if (!a1IsLab && !a2IsLab && !a1.getRoom().equals(a2.getRoom())) {
-                        return true;
+                    // Allow lab exception: if either course is a lab, do not enforce same-room rule
+                    if (a1IsLab || a2IsLab) {
+                        return false;
                     }
-                    return false;
+
+                    // Both non-lab courses for the same group: enforce same room (hard)
+                    return !a1.getRoom().equals(a2.getRoom());
                 })
                 .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Group non-lab courses must use same room");
+                .asConstraint("Group non-lab courses must use same room (except labs)");
+    }
+
+    private Constraint groupPreferredRoomConstraint(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEach(CourseAssignment.class)
+                .filter(assignment -> assignment.getGroup() != null
+                        && assignment.getGroup().getPreferredRoom() != null
+                        && !"lab".equalsIgnoreCase(assignment.getGroup().getPreferredRoom().getType())
+                        && (assignment.getRoom() == null
+                                || !assignment.getRoom().equals(assignment.getGroup().getPreferredRoom())))
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Group has a pre-assigned preferred room (excludes lab rooms)");
     }
 
     // ==================== SOFT CONSTRAINTS ====================
@@ -144,7 +155,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                             && !a1.getRoom().getBuilding().equals(a2.getRoom().getBuilding());
                 })
                 .penalize(HardSoftScore.ofSoft(1))
-                .asConstraint("Minimize teacher building changes");
+                .asConstraint("Minimize teacher building changes (comfort)");
     }
 
     private Constraint minimizeTeacherIdleGaps(ConstraintFactory constraintFactory) {
@@ -156,20 +167,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (a1.getTimeslot() == null || a2.getTimeslot() == null)
                         return false;
 
-                    // Same day with gap
+                    // Same day with gap > 1 hour
                     return a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())
                             && Math.abs(a1.getTimeslot().getHour() - a2.getTimeslot().getHour()) > 1;
                 })
                 .penalize(HardSoftScore.ofSoft(1))
-                .asConstraint("Minimize teacher idle gaps");
+                .asConstraint("Minimize teacher idle gaps (efficiency)");
     }
 
-    private Constraint preferEarlierTimeslots(ConstraintFactory constraintFactory) {
-        return constraintFactory
-                .forEach(CourseAssignment.class)
-                .filter(assignment -> assignment.getTimeslot() != null)
-                .penalize(HardSoftScore.ofSoft(1),
-                        assignment -> assignment.getTimeslot().getHour() - 8)
-                .asConstraint("Prefer earlier timeslots");
-    }
 }

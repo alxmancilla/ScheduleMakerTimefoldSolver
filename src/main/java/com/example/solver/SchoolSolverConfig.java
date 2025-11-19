@@ -13,6 +13,6 @@ public class SchoolSolverConfig {
                 .withSolutionClass(SchoolSchedule.class)
                 .withConstraintProviderClass(SchoolConstraintProvider.class)
                 .withTerminationConfig(new TerminationConfig()
-                        .withSecondsSpentLimit(600L)));
+                        .withSecondsSpentLimit(300L)));
     }
 }
