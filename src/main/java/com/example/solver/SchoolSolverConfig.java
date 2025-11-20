@@ -13,6 +13,8 @@ public class SchoolSolverConfig {
                 .withSolutionClass(SchoolSchedule.class)
                 .withConstraintProviderClass(SchoolConstraintProvider.class)
                 .withTerminationConfig(new TerminationConfig()
-                        .withSecondsSpentLimit(300L)));
+                        .withUnimprovedMinutesSpentLimit(5L)
+                        .withMinutesSpentLimit(15L)
+                        .withBestScoreLimit("0hard/*soft")));
     }
 }

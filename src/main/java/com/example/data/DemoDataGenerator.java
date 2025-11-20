@@ -26,12 +26,28 @@ public class DemoDataGenerator {
                                 Set.of("LENGUA Y COMUNICACIÓN I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 11));
+                                7, 14));
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
                                 "MONICA E. DIEGO",
                                 Set.of("INGLÉS I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "QUESIA ALONDRA RAMIREZ",
+                                Set.of("INGLÉS I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "LUIS SANCHEZ",
+                                Set.of("PENSAMIENTO MATEMÁTICO I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
                                 7, 14));
@@ -46,7 +62,44 @@ public class DemoDataGenerator {
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
+                                "JUAN A. ACEVEDO",
+                                Set.of("PENSAMIENTO MATEMÁTICO I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "HUGO GARCIA",
+                                Set.of("PENSAMIENTO MATEMÁTICO I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "JOSÉ CARLOS RETANA",
+                                Set.of("CULTURA DIGITAL I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                10, 14)); // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
+
+                teachers.add(new Teacher(
                                 "BALBINA CATALAN",
+                                Set.of("CULTURA DIGITAL I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                10, 14));
+
+                teachers.add(new Teacher(
+                                "MARIO VERDIGUEL",
+                                Set.of("CULTURA DIGITAL I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                10, 14));
+
+                teachers.add(new Teacher(
+                                "ISRAEL SANTANA",
                                 Set.of("CULTURA DIGITAL I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
@@ -54,16 +107,72 @@ public class DemoDataGenerator {
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
+                                "ALFREDO SALAS",
+                                Set.of("LA MATERIA Y SUS INTERACCIONES"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "ANDRES BARRIOS",
+                                Set.of("RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                8, 11));
+
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
                                 "ITZEL URIBE",
                                 Set.of("LA MATERIA Y SUS INTERACCIONES", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
                                 7, 14));
 
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "YASIR HERRERA",
+                                Set.of("LA MATERIA Y SUS INTERACCIONES", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "YAMEL A. MARTÍNEZ",
+                                Set.of("CIENCIAS SOCIALES I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "LETICIA DE LOS SANTOS",
+                                Set.of("HUMANIDADES I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "JOSE BAHENA",
+                                Set.of("RECURSOS SOCIOEMOCIONALES I", "HUMANIDADES I", "TUTORIAS I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
+                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
+                teachers.add(new Teacher(
+                                "LUCIA DANIELA NUÑEZ",
+                                Set.of("RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
+                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                                7, 14));
+
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
-                                "PABLO B. ROSET",
-                                Set.of("CLUB DE AJEDREZ"),
+                                "PABLO B. ROSETE",
+                                Set.of("CLUB DE AJEDREZ", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
                                 7, 14));
@@ -78,56 +187,11 @@ public class DemoDataGenerator {
 
                 // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
                 teachers.add(new Teacher(
-                                "JOSE BAHENA WENCES",
-                                Set.of("HUMANIDADES I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14));
-
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
                                 "MIGUEL A. GUZMAN CONTRERAS",
                                 Set.of("CIENCIAS SOCIALES I"),
                                 Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14));
-
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "Ms. Smith",
-                                Set.of("Math 101", "Math 102", "Calculus"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 11));
-
-                // Mr. Jones: Math 101, Physics 101, Physics - Mon-Thu
-                teachers.add(new Teacher(
-                                "Mr. Jones",
-                                Set.of("Math 101", "Physics 101", "Physics"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY),
-                                8, 17));
-
-                // Dr. Brown: Physics 101, Chemistry 101 - Mon-Wed
-                teachers.add(new Teacher(
-                                "Dr. Brown",
-                                Set.of("Physics 101", "Chemistry 101"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY),
-                                8, 17));
-
-                // Ms. Davis: English 101 - Mon-Fri from 11am on
-                teachers.add(new Teacher(
-                                "Ms. Davis",
-                                Set.of("English 101"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                11, 17));
-
-                // Dr. Lee: Biology 101, Chemistry 101 - Tue-Fri
-                teachers.add(new Teacher(
-                                "Dr. Lee",
-                                Set.of("Biology 101", "Chemistry 101"),
-                                Set.of(DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 17));
+                                7, 14));
 
                 System.out.println("Generated " + teachers.size() + " teachers.");
 
@@ -145,7 +209,7 @@ public class DemoDataGenerator {
                 courses.add(new Course("LENGUA Y COMUNICACIÓN I", "standard", 3));
                 courses.add(new Course("INGLÉS I", "standard", 3));
                 courses.add(new Course("CULTURA DIGITAL I", "lab", 3));
-                courses.add(new Course("LA MATERIA Y SUS INTERACCIONES", "lab", 3));
+                courses.add(new Course("LA MATERIA Y SUS INTERACCIONES", "standard", 3));
                 courses.add(new Course("HUMANIDADES I", "standard", 4));
                 courses.add(new Course("PENSAMIENTO MATEMÁTICO I", "standard", 4));
                 // courses.add(new Course("Math 101", "standard", 3));
@@ -164,11 +228,16 @@ public class DemoDataGenerator {
         private static List<Room> generateRooms() {
                 List<Room> rooms = new ArrayList<>();
 
-                rooms.add(new Room("Room 101", "A", "standard"));
-                rooms.add(new Room("Room 102", "A", "standard"));
-                rooms.add(new Room("Lab 201", "A", "lab"));
+                rooms.add(new Room("Room 05", "A", "standard"));
+                rooms.add(new Room("Room 06", "A", "standard"));
+                rooms.add(new Room("Room 07", "A", "standard"));
+                rooms.add(new Room("Room 08", "A", "standard"));
+                rooms.add(new Room("Room 09", "A", "standard"));
+                rooms.add(new Room("Room 10", "A", "standard"));
+                rooms.add(new Room("Room 11", "A", "standard"));
+                rooms.add(new Room("Lab CC3", "A", "lab"));
                 rooms.add(new Room("Room 301", "B", "standard"));
-                rooms.add(new Room("Lab 302", "B", "lab"));
+                rooms.add(new Room("Lab CC4", "B", "lab"));
                 rooms.add(new Room("Room 401", "C", "standard"));
 
                 System.out.println("Generated " + rooms.size() + " rooms.");
@@ -211,14 +280,75 @@ public class DemoDataGenerator {
         private static List<Group> generateGroups(List<Room> rooms) {
                 List<Group> groups = new ArrayList<>();
 
-                // Group 1o C: Math 101, Physics 101, English 101
+                // Group 1o A: Math 101, Physics 101, English 101
                 // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
                 Room preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 101"))
+                                .filter(r -> r.getName().equals("Room 08"))
                                 .findFirst()
                                 .orElse(null);
 
-                groups.add(new Group("group_1C", "Grupo 1o C",
+                groups.add(new Group("g_1A", "Gpo 1oA",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 1o C: Math 101, Physics 101, English 101
+                // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
+
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 05"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1B", "Gpo 1oB",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 1o C: Math 101, Physics 101, English 101
+                // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 06"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1C", "Gpo 1oC",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 1o C: Math 101, Physics 101, English 101
+                // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 09"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1D", "Gpo 1oD",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 1o C: Math 101, Physics 101, English 101
+                // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 10"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1E", "Gpo 1oE",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
                                                 "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
                                                 "CIENCIAS SOCIALES I",
@@ -229,11 +359,25 @@ public class DemoDataGenerator {
                 // Group 10 G: Math 101, Physics 101, English 101
 
                 preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 102"))
+                                .filter(r -> r.getName().equals("Room 11"))
                                 .findFirst()
                                 .orElse(null);
 
-                groups.add(new Group("group_1G", "Grupo 1o G",
+                groups.add(new Group("g_1F", "Gpo 1oF",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 10 G: Math 101, Physics 101, English 101
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 07"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1G", "Gpo 1oG",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
                                                 "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
                                                 "CIENCIAS SOCIALES I",
