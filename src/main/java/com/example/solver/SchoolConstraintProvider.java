@@ -4,6 +4,7 @@ import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
+import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
 import com.example.domain.CourseAssignment;
 
 public class SchoolConstraintProvider implements ConstraintProvider {
@@ -18,13 +19,16 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 noRoomDoubleBooking(constraintFactory),
                 roomTypeMustSatisfyRequirement(constraintFactory),
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
-                groupPreferredRoomConstraint(constraintFactory),
+                sameTeacherForAllCourseHours(constraintFactory),
+                teacherMaxHoursPerWeek(constraintFactory),
                 // groupNonLabCoursesInSameRoom(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
-                sameTeacherForAllCourseHours(constraintFactory), // weight 3 (high priority: continuity)
+                // Prefer group's pre-assigned room is a soft preference (weight 3)
+                groupPreferredRoomConstraint(constraintFactory),
                 minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
                 minimizeTeacherBuildingChanges(constraintFactory), // weight 1 (comfort: minimize travel)
+                preferTeachersWithLessCapacity(constraintFactory),
         };
     }
 
@@ -91,8 +95,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && a1.getCourse().equals(a2.getCourse())
                         && a1.getTeacher() != null && a2.getTeacher() != null
                         && !a1.getTeacher().equals(a2.getTeacher()))
-                .penalize(HardSoftScore.ofSoft(3))
-                .asConstraint("Prefer same teacher for all course hours (continuity)");
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Same teacher for all course hours (hard constraint)");
     }
 
     private Constraint groupNonLabCoursesInSameRoom(ConstraintFactory constraintFactory) {
@@ -123,6 +127,20 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 })
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Group non-lab courses must use same room (except labs)");
+    }
+
+    private Constraint teacherMaxHoursPerWeek(ConstraintFactory constraintFactory) {
+        // Count the number of assigned CourseAssignment objects per teacher and
+        // penalize
+        // when the count exceeds Teacher.maxHoursPerWeek. This is a hard constraint.
+        return constraintFactory
+                .forEach(CourseAssignment.class)
+                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
+                .groupBy(a -> a.getTeacher(), ConstraintCollectors.count())
+                .filter((teacher, count) -> count > teacher.getMaxHoursPerWeek())
+                // Penalize by the number of excess hours (hard penalty per extra hour)
+                .penalize(HardSoftScore.ONE_HARD, (teacher, count) -> (int) (count - teacher.getMaxHoursPerWeek()))
+                .asConstraint("Teacher exceeds max hours per week (hard)");
     }
 
     private Constraint groupPreferredRoomConstraint(ConstraintFactory constraintFactory) {
@@ -173,6 +191,26 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 })
                 .penalize(HardSoftScore.ofSoft(1))
                 .asConstraint("Minimize teacher idle gaps (efficiency)");
+    }
+
+    private Constraint preferTeachersWithLessCapacity(ConstraintFactory constraintFactory) {
+        // Dynamic soft reward favoring teachers with lower maxHoursPerWeek and with
+        // remaining capacity.
+        // Reward formula (int): round( (max - assigned) * SCALE / (max * max) )
+        final int SCALE = 1000;
+
+        return constraintFactory
+                .forEach(CourseAssignment.class)
+                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
+                .groupBy(a -> a.getTeacher(), ConstraintCollectors.count())
+                .reward(HardSoftScore.ONE_SOFT, (teacher, count) -> {
+                    int assigned = (int) (long) count;
+                    int max = Math.max(1, teacher.getMaxHoursPerWeek());
+                    int remaining = Math.max(0, max - assigned);
+                    double value = ((double) remaining * SCALE) / (double) (max * max);
+                    return (int) Math.round(value);
+                })
+                .asConstraint("Prefer assigning to lower-capacity teachers (dynamic)");
     }
 
 }

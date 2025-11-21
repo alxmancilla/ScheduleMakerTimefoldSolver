@@ -20,182 +20,167 @@ public class DemoDataGenerator {
         private static List<Teacher> generateTeachers() {
                 List<Teacher> teachers = new ArrayList<>();
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "GUSTAVO MELO",
+                // Build teachers with per-day availability maps (Mon-Fri ranges)
+                teachers.add(new Teacher("GUSTAVO MELO",
                                 Set.of("LENGUA Y COMUNICACIÓN I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "MONICA E. DIEGO",
+                teachers.add(new Teacher("MONICA E. DIEGO",
                                 Set.of("INGLÉS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "QUESIA ALONDRA RAMIREZ",
+                teachers.add(new Teacher("QUESIA ALONDRA RAMIREZ",
                                 Set.of("INGLÉS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "LUIS SANCHEZ",
+                teachers.add(new Teacher("LUIS SANCHEZ",
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "DIANA R. LLUCK",
+                teachers.add(new Teacher("DIANA R. LLUCK",
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "JUAN A. ACEVEDO",
+                teachers.add(new Teacher("JUAN A. ACEVEDO",
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 11, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "HUGO GARCIA",
+                teachers.add(new Teacher("HUGO GARCIA",
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "JOSÉ CARLOS RETANA",
+                teachers.add(new Teacher("JOSÉ CARLOS RETANA",
                                 Set.of("CULTURA DIGITAL I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14)); // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                teachers.add(new Teacher(
-                                "BALBINA CATALAN",
+                teachers.add(new Teacher("BALBINA CATALAN",
                                 Set.of("CULTURA DIGITAL I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                20));
 
-                teachers.add(new Teacher(
-                                "MARIO VERDIGUEL",
+                teachers.add(new Teacher("MARIO VERDIGUEL",
                                 Set.of("CULTURA DIGITAL I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                20));
 
-                teachers.add(new Teacher(
-                                "ISRAEL SANTANA",
+                teachers.add(new Teacher("ISRAEL SANTANA",
                                 Set.of("CULTURA DIGITAL I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 10, 14),
+                                20));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "ALFREDO SALAS",
+                teachers.add(new Teacher("ALFREDO SALAS",
                                 Set.of("LA MATERIA Y SUS INTERACCIONES"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "ANDRES BARRIOS",
+                teachers.add(new Teacher("ANDRES BARRIOS",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                8, 11));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                40));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "ITZEL URIBE",
+                teachers.add(new Teacher("ITZEL URIBE",
                                 Set.of("LA MATERIA Y SUS INTERACCIONES", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 17),
+                                30));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "YASIR HERRERA",
+                teachers.add(new Teacher("YASIR HERRERA",
                                 Set.of("LA MATERIA Y SUS INTERACCIONES", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 14),
+                                30));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "YAMEL A. MARTÍNEZ",
+                teachers.add(new Teacher("YAMEL A. MARTÍNEZ",
                                 Set.of("CIENCIAS SOCIALES I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 10, 15),
+                                30));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "LETICIA DE LOS SANTOS",
+                teachers.add(new Teacher("LETICIA DE LOS SANTOS",
                                 Set.of("HUMANIDADES I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 12),
+                                30));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "JOSE BAHENA",
+                teachers.add(new Teacher("JOSE BAHENA",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "HUMANIDADES I", "TUTORIAS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101 - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "LUCIA DANIELA NUÑEZ",
+                teachers.add(new Teacher("LUCIA DANIELA NUÑEZ",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 12),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "PABLO B. ROSETE",
+                teachers.add(new Teacher("PABLO B. ROSETE",
                                 Set.of("CLUB DE AJEDREZ", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "CARLOS IVAN ADAME",
+                teachers.add(new Teacher("CARLOS IVAN ADAME",
                                 Set.of("ACTIVACIÓN FÍSICA"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                10, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 10, 15),
+                                30));
 
-                // Ms. Smith: Math 101, Math 102, Calculus - Mon-Fri mornings (8-11)
-                teachers.add(new Teacher(
-                                "MIGUEL A. GUZMAN CONTRERAS",
+                teachers.add(new Teacher("MIGUEL A. GUZMAN CONTRERAS",
                                 Set.of("CIENCIAS SOCIALES I"),
-                                Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
-                                7, 14));
+                                availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                40));
+
+                // Ensure all demo teachers have a reasonable default max hours/week
+                for (Teacher t : teachers) {
+                        if (t.getMaxHoursPerWeek() <= 0) {
+                                t.setMaxHoursPerWeek(20);
+                        }
+                }
+
+                // Sort teachers so teachers with smaller maxHoursPerWeek come first
+                teachers.sort(java.util.Comparator.comparingInt(Teacher::getMaxHoursPerWeek));
 
                 System.out.println("Generated " + teachers.size() + " teachers.");
 
                 return teachers;
+        }
+
+        private static java.util.Map<DayOfWeek, java.util.Set<Integer>> availability(Set<DayOfWeek> days, int startHour,
+                        int endHour) {
+                java.util.Map<DayOfWeek, java.util.Set<Integer>> map = new java.util.HashMap<>();
+                if (days == null)
+                        return map;
+                for (DayOfWeek d : days) {
+                        java.util.Set<Integer> hours = new java.util.HashSet<>();
+                        for (int h = startHour; h < endHour; h++) {
+                                hours.add(h);
+                        }
+                        map.put(d, hours);
+                }
+                return map;
         }
 
         private static List<Course> generateCourses() {
@@ -235,10 +220,9 @@ public class DemoDataGenerator {
                 rooms.add(new Room("Room 09", "A", "standard"));
                 rooms.add(new Room("Room 10", "A", "standard"));
                 rooms.add(new Room("Room 11", "A", "standard"));
+                rooms.add(new Room("Room 12", "A", "standard"));
+                rooms.add(new Room("Room 13", "A", "standard"));
                 rooms.add(new Room("Lab CC3", "A", "lab"));
-                rooms.add(new Room("Room 301", "B", "standard"));
-                rooms.add(new Room("Lab CC4", "B", "lab"));
-                rooms.add(new Room("Room 401", "C", "standard"));
 
                 System.out.println("Generated " + rooms.size() + " rooms.");
 
@@ -378,6 +362,34 @@ public class DemoDataGenerator {
                                 .orElse(null);
 
                 groups.add(new Group("g_1G", "Gpo 1oG",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 10 G: Math 101, Physics 101, English 101
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 12"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1H", "Gpo 1oH",
+                                Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
+                                                "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
+                                                "CIENCIAS SOCIALES I",
+                                                "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I", "CLUB DE AJEDREZ",
+                                                "ACTIVACIÓN FÍSICA"),
+                                preferred));
+
+                // Group 10 G: Math 101, Physics 101, English 101
+                preferred = rooms.stream()
+                                .filter(r -> r.getName().equals("Room 13"))
+                                .findFirst()
+                                .orElse(null);
+
+                groups.add(new Group("g_1I", "Gpo 1oI",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
                                                 "CULTURA DIGITAL I", "LA MATERIA Y SUS INTERACCIONES", "HUMANIDADES I",
                                                 "CIENCIAS SOCIALES I",

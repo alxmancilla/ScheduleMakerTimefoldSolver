@@ -36,12 +36,16 @@ Generate a weekly school timetable that assigns:
 
 ## Features
 
-- **Flexible Teacher Management**: Teachers with qualifications, day/hour availability
-- **Multi-Room Scheduling**: Support for standard classrooms and specialized labs
-- **Group Constraints**: Prevent concurrent course scheduling for student groups
-- **Pre-assigned Preferences**: Optional preferred room assignment per group (soft constraint)
-- **Scalable Architecture**: Timefold Constraint Streams for efficient solving
-- **Comprehensive Reporting**: Violation analysis, schedule by day/teacher/group
+- **Flexible Teacher Management**: Teachers have a stable `id`, qualifications, a per-day availability map (hours available per DayOfWeek), and a `maxHoursPerWeek` workload limit.
+- **Multi-Room Scheduling**: Support for standard classrooms and specialized labs (room `type` and `building`).
+- **Group Constraints**: Prevent concurrent course scheduling for student groups and support optional preferred rooms.
+- **Pre-filled Excel Template**: `ExcelTemplateGenerator` now pre-fills a workbook from the demo data (teachers, courses, rooms, timeslots, groups, assignments) and includes teacher `id` and serialized per-day availability.
+- **PDF Reports**: `MainApp` uses `PdfReporter` to write three paginated PDF reports: violations, schedule-by-teacher, and schedule-by-group.
+- **Prioritization Strategies for Teachers**: Two strategies implemented to prefer assigning teachers with smaller weekly capacity:
+  - Heuristic bias: demo teachers are sorted ascending by `maxHoursPerWeek` (affects solver value ordering).
+  - Dynamic soft reward: a constraint (`preferTeachersWithLessCapacity`) rewards assignments to teachers with remaining capacity (scaled by a tunable `SCALE`).
+- **Scalable Architecture**: Timefold Constraint Streams for declarative, composable constraints.
+- **Comprehensive Reporting**: Console analysis and PDF outputs (violations and schedules).
 
 ## Project Structure
 
@@ -157,22 +161,24 @@ MONDAY:
 ```
 
 ## Recent Changes
+### Recent Changes (November 2025)
 
-### Constraint Improvements (November 2025)
-1. **`groupNonLabCoursesInSameRoom`** — Hard constraint with lab exception
-   - Enforces all non-lab courses for a group to use the same room
-   - Allows lab courses to use lab rooms (exception)
-   
-2. **`groupPreferredRoomConstraint`** — Converted to soft (weight 3)
-   - Was: Hard constraint forcing groups into pre-assigned rooms
-   - Now: Soft preference (weight 3) allowing flexibility when needed
-   - Excludes lab-type rooms from enforcement
-   - **Result:** Achieves full feasibility (0 hard violations)
+- Domain model refactor
+  - `Teacher` now has a stable `id:String`, a per-day availability map (`Map<DayOfWeek, Set<Integer>> availabilityPerDay`) and `maxHoursPerWeek` (default 20). Backwards-compatible constructors remain for common call sites.
+  - `Course` now has an `id:String` and retains `requiredHoursPerWeek`.
 
-3. **Pre-assigned Rooms** — Group.preferredRoom field
-   - Groups can have optional preferred room assignment
-   - `Grupo 1o C` assigned to `Room 101` (as soft preference)
-   - Other groups have flexible room assignment
+- Excel & Reporting
+  - `ExcelTemplateGenerator` now calls `DemoDataGenerator.generateDemoData()` and pre-fills the workbook. The `Teachers` sheet includes the `id`, serialized per-day availability, and `maxHoursPerWeek`.
+  - `MainApp` writes three paginated PDF reports via `PdfReporter`: `schedule-report-violations.pdf`, `schedule-report-by-teacher.pdf`, and `schedule-report-by-group.pdf`.
+
+- Constraint and behavior changes
+  - `groupNonLabCoursesInSameRoom` — Hard constraint with a lab exception (non-lab courses for the same group should use the same room). Labs are exempted.
+  - `groupPreferredRoomConstraint` — Converted from hard → soft (weight 3) and excludes lab-type rooms; this reduces infeasibility in practice.
+  - `teacherMaxHoursPerWeek` — Hard constraint enforcing teacher weekly capacity (currently counts assignments; see note below about summing course hours).
+  - `preferTeachersWithLessCapacity` — New dynamic soft constraint that rewards assigning to teachers with remaining capacity. The reward formula mirrors the constraint provider: reward = round((remaining * SCALE) / (max * max)). `SCALE` is an integer constant inside the constraint provider.
+  - Value-ordering bias: demo teachers are sorted by ascending `maxHoursPerWeek` to bias the solver toward smaller-capacity teachers when exploring values.
+
+Note: At present both the hard `teacherMaxHoursPerWeek` and the dynamic preference count assignments as "hours". If your `Course.requiredHoursPerWeek` is greater than 1 for some courses, consider updating these constraints to sum `Course.getRequiredHoursPerWeek()` per assignment instead of counting assignments.
 
 ## Architecture
 
