@@ -136,10 +136,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         return constraintFactory
                 .forEach(CourseAssignment.class)
                 .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
-                .groupBy(a -> a.getTeacher(), ConstraintCollectors.count())
-                .filter((teacher, count) -> count > teacher.getMaxHoursPerWeek())
-                // Penalize by the number of excess hours (hard penalty per extra hour)
-                .penalize(HardSoftScore.ONE_HARD, (teacher, count) -> (int) (count - teacher.getMaxHoursPerWeek()))
+                .groupBy(CourseAssignment::getTeacher,
+                        ConstraintCollectors.sum(a -> a.getCourse().getRequiredHoursPerWeek()))
+                .filter((teacher, totalHours) -> totalHours > teacher.getMaxHoursPerWeek())
+                .penalize(HardSoftScore.ONE_HARD, (teacher, totalHours) -> totalHours - teacher.getMaxHoursPerWeek())
                 .asConstraint("Teacher exceeds max hours per week (hard)");
     }
 
@@ -193,24 +193,46 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Minimize teacher idle gaps (efficiency)");
     }
 
-    private Constraint preferTeachersWithLessCapacity(ConstraintFactory constraintFactory) {
-        // Dynamic soft reward favoring teachers with lower maxHoursPerWeek and with
-        // remaining capacity.
-        // Reward formula (int): round( (max - assigned) * SCALE / (max * max) )
-        final int SCALE = 1000;
+    /***
+     * private Constraint preferTeachersWithLessCapacity(ConstraintFactory
+     * constraintFactory) {
+     * // Dynamic soft reward favoring teachers with lower maxHoursPerWeek and with
+     * // remaining capacity.
+     * // Reward formula (int): round( (max - assigned) * SCALE / (max * max) )
+     * final int SCALE = 1000;
+     * 
+     * return constraintFactory
+     * .forEach(CourseAssignment.class)
+     * .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
+     * .groupBy(CourseAssignment::getTeacher,
+     * ConstraintCollectors.sum(a -> a.getCourse().getRequiredHoursPerWeek()))
+     * .reward(HardSoftScore.ONE_SOFT, (teacher, totalHours) -> {
+     * int assigned = totalHours;
+     * int max = Math.max(1, teacher.getMaxHoursPerWeek());
+     * int remaining = Math.max(0, max - assigned);
+     * double value = ((double) remaining * SCALE) / (double) (max * max);
+     * return (int) Math.round(value);
+     * })
+     * .asConstraint("Prefer assigning to lower-capacity teachers (dynamic)");
+     * }
+     ***/
 
+    private Constraint preferTeachersWithLessCapacity(ConstraintFactory constraintFactory) {
+        // Penalize based on utilization percentage - prefers filling up low-capacity
+        // teachers (only for qualified teachers - unqualified handled by hard
+        // constraint)
         return constraintFactory
                 .forEach(CourseAssignment.class)
-                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
-                .groupBy(a -> a.getTeacher(), ConstraintCollectors.count())
-                .reward(HardSoftScore.ONE_SOFT, (teacher, count) -> {
-                    int assigned = (int) (long) count;
+                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null
+                        && a.getTeacher().isQualifiedFor(a.getCourse().getName()))
+                .groupBy(CourseAssignment::getTeacher,
+                        ConstraintCollectors.sum(a -> a.getCourse().getRequiredHoursPerWeek()))
+                .penalize(HardSoftScore.ONE_SOFT, (teacher, totalHours) -> {
                     int max = Math.max(1, teacher.getMaxHoursPerWeek());
-                    int remaining = Math.max(0, max - assigned);
-                    double value = ((double) remaining * SCALE) / (double) (max * max);
-                    return (int) Math.round(value);
+                    // Reward higher utilization - fills low-capacity teachers first
+                    return (totalHours * 100) / max;
                 })
-                .asConstraint("Prefer assigning to lower-capacity teachers (dynamic)");
+                .asConstraint("Balance load favoring lower-capacity teachers");
     }
 
 }

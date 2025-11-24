@@ -25,19 +25,19 @@ public class DemoDataGenerator {
                                 Set.of("LENGUA Y COMUNICACIÓN I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("MONICA E. DIEGO",
                                 Set.of("INGLÉS I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("QUESIA ALONDRA RAMIREZ",
                                 Set.of("INGLÉS I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("LUIS SANCHEZ",
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
@@ -61,13 +61,13 @@ public class DemoDataGenerator {
                                 Set.of("PENSAMIENTO MATEMÁTICO I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("JOSÉ CARLOS RETANA",
                                 Set.of("CULTURA DIGITAL I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("BALBINA CATALAN",
                                 Set.of("CULTURA DIGITAL I"),
@@ -79,7 +79,7 @@ public class DemoDataGenerator {
                                 Set.of("CULTURA DIGITAL I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                20));
+                                40));
 
                 teachers.add(new Teacher("ISRAEL SANTANA",
                                 Set.of("CULTURA DIGITAL I"),
@@ -91,7 +91,7 @@ public class DemoDataGenerator {
                                 Set.of("LA MATERIA Y SUS INTERACCIONES"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("ANDRES BARRIOS",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
@@ -102,7 +102,7 @@ public class DemoDataGenerator {
                 teachers.add(new Teacher("ITZEL URIBE",
                                 Set.of("LA MATERIA Y SUS INTERACCIONES", "RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 17),
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
                                 30));
 
                 teachers.add(new Teacher("YASIR HERRERA",
@@ -114,25 +114,25 @@ public class DemoDataGenerator {
                 teachers.add(new Teacher("YAMEL A. MARTÍNEZ",
                                 Set.of("CIENCIAS SOCIALES I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 10, 15),
-                                30));
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                40));
 
                 teachers.add(new Teacher("LETICIA DE LOS SANTOS",
                                 Set.of("HUMANIDADES I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 12),
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 13),
                                 30));
 
                 teachers.add(new Teacher("JOSE BAHENA",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "HUMANIDADES I", "TUTORIAS I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 13),
                                 30));
 
                 teachers.add(new Teacher("LUCIA DANIELA NUÑEZ",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "TUTORIAS I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 12),
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 13),
                                 30));
 
                 teachers.add(new Teacher("PABLO B. ROSETE",
@@ -144,7 +144,7 @@ public class DemoDataGenerator {
                 teachers.add(new Teacher("CARLOS IVAN ADAME",
                                 Set.of("ACTIVACIÓN FÍSICA"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 10, 15),
+                                                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 9, 15),
                                 30));
 
                 teachers.add(new Teacher("MIGUEL A. GUZMAN CONTRERAS",
