@@ -25,13 +25,13 @@ public class DemoDataGenerator {
                                 Set.of("LENGUA Y COMUNICACIÓN I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                40));
+                                30));
 
                 teachers.add(new Teacher("MONICA E. DIEGO",
                                 Set.of("INGLÉS I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                40));
+                                30));
 
                 teachers.add(new Teacher("QUESIA ALONDRA RAMIREZ",
                                 Set.of("INGLÉS I"),
@@ -121,7 +121,7 @@ public class DemoDataGenerator {
                                 Set.of("HUMANIDADES I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 13),
-                                30));
+                                40));
 
                 teachers.add(new Teacher("JOSE BAHENA",
                                 Set.of("RECURSOS SOCIOEMOCIONALES I", "HUMANIDADES I", "TUTORIAS I"),
@@ -223,6 +223,7 @@ public class DemoDataGenerator {
                 rooms.add(new Room("Room 12", "A", "standard"));
                 rooms.add(new Room("Room 13", "A", "standard"));
                 rooms.add(new Room("Lab CC3", "A", "lab"));
+                rooms.add(new Room("Lab CC4", "A", "lab"));
 
                 System.out.println("Generated " + rooms.size() + " rooms.");
 
