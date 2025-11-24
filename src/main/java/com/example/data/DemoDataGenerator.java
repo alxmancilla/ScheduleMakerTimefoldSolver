@@ -67,7 +67,7 @@ public class DemoDataGenerator {
                                 Set.of("CULTURA DIGITAL I"),
                                 availability(Set.of(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
                                                 DayOfWeek.THURSDAY, DayOfWeek.FRIDAY), 7, 15),
-                                40));
+                                30));
 
                 teachers.add(new Teacher("BALBINA CATALAN",
                                 Set.of("CULTURA DIGITAL I"),
