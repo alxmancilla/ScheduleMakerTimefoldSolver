@@ -21,14 +21,15 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 sameTeacherForAllCourseHours(constraintFactory),
                 teacherMaxHoursPerWeek(constraintFactory),
-                // groupNonLabCoursesInSameRoom(constraintFactory),
+                groupCoursesInSameRoomByType(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
                 // Prefer group's pre-assigned room is a soft preference (weight 3)
                 groupPreferredRoomConstraint(constraintFactory),
                 minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
                 minimizeTeacherBuildingChanges(constraintFactory), // weight 1 (comfort: minimize travel)
-                preferTeachersWithLessCapacity(constraintFactory),
+                balanceTeacherWorkload(constraintFactory),
+                encourageAlternativeQualifiedTeachers(constraintFactory),
         };
     }
 
@@ -99,47 +100,52 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Same teacher for all course hours (hard constraint)");
     }
 
-    private Constraint groupNonLabCoursesInSameRoom(ConstraintFactory constraintFactory) {
+    private Constraint groupCoursesInSameRoomByType(ConstraintFactory constraintFactory) {
+        // All courses with the same room requirement for a group must use the same
+        // room.
+        // This consolidates standard and lab room consistency into a single constraint
+        // and automatically handles any new room types (e.g., "auditorium", "gym").
         return constraintFactory
                 .forEachUniquePair(CourseAssignment.class)
                 .filter((a1, a2) -> {
                     // Basic null/group guards
-                    if (a1.getGroup() == null || a2.getGroup() == null)
-                        return false;
-                    if (!a1.getGroup().equals(a2.getGroup()))
+                    if (a1.getGroup() == null || !a1.getGroup().equals(a2.getGroup()))
                         return false;
                     if (a1.getRoom() == null || a2.getRoom() == null)
                         return false;
-
-                    // Treat roomRequirement defensively (case/whitespace tolerant)
-                    String req1 = a1.getCourse() == null ? null : a1.getCourse().getRoomRequirement();
-                    String req2 = a2.getCourse() == null ? null : a2.getCourse().getRoomRequirement();
-                    boolean a1IsLab = req1 != null && "lab".equalsIgnoreCase(req1.trim());
-                    boolean a2IsLab = req2 != null && "lab".equalsIgnoreCase(req2.trim());
-
-                    // Allow lab exception: if either course is a lab, do not enforce same-room rule
-                    if (a1IsLab || a2IsLab) {
+                    if (a1.getCourse() == null || a2.getCourse() == null)
                         return false;
-                    }
 
-                    // Both non-lab courses for the same group: enforce same room (hard)
+                    // Get room requirements
+                    String req1 = a1.getCourse().getRoomRequirement();
+                    String req2 = a2.getCourse().getRoomRequirement();
+
+                    if (req1 == null || req2 == null)
+                        return false;
+
+                    // Only enforce if both courses have the same room requirement type
+                    if (!req1.trim().equalsIgnoreCase(req2.trim()))
+                        return false;
+
+                    // Same group + same room type requirement: must use same room
                     return !a1.getRoom().equals(a2.getRoom());
                 })
                 .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Group non-lab courses must use same room (except labs)");
+                .asConstraint("Group courses with same room type must use same room");
     }
 
     private Constraint teacherMaxHoursPerWeek(ConstraintFactory constraintFactory) {
         // Count the number of assigned CourseAssignment objects per teacher and
-        // penalize
-        // when the count exceeds Teacher.maxHoursPerWeek. This is a hard constraint.
+        // penalize when the count exceeds Teacher.maxHoursPerWeek.
+        // Each CourseAssignment represents exactly 1 hour of teaching.
         return constraintFactory
                 .forEach(CourseAssignment.class)
                 .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
                 .groupBy(CourseAssignment::getTeacher,
-                        ConstraintCollectors.sum(a -> a.getCourse().getRequiredHoursPerWeek()))
-                .filter((teacher, totalHours) -> totalHours > teacher.getMaxHoursPerWeek())
-                .penalize(HardSoftScore.ONE_HARD, (teacher, totalHours) -> totalHours - teacher.getMaxHoursPerWeek())
+                        ConstraintCollectors.count())
+                .filter((teacher, totalAssignments) -> totalAssignments > teacher.getMaxHoursPerWeek())
+                .penalize(HardSoftScore.ONE_HARD,
+                        (teacher, totalAssignments) -> totalAssignments - teacher.getMaxHoursPerWeek())
                 .asConstraint("Teacher exceeds max hours per week (hard)");
     }
 
@@ -189,50 +195,65 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     return a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())
                             && Math.abs(a1.getTimeslot().getHour() - a2.getTimeslot().getHour()) > 1;
                 })
-                .penalize(HardSoftScore.ofSoft(1))
+                .penalize(HardSoftScore.ONE_SOFT, (a1, a2) -> {
+                    // Penalize proportionally to gap size (minus 1 for consecutive hours)
+                    // 2-hour gap (7am, 9am) = 1 penalty, 6-hour gap (7am, 1pm) = 5 penalty
+                    int gap = Math.abs(a1.getTimeslot().getHour() - a2.getTimeslot().getHour()) - 1;
+                    return gap;
+                })
                 .asConstraint("Minimize teacher idle gaps (efficiency)");
     }
 
-    /***
-     * private Constraint preferTeachersWithLessCapacity(ConstraintFactory
-     * constraintFactory) {
-     * // Dynamic soft reward favoring teachers with lower maxHoursPerWeek and with
-     * // remaining capacity.
-     * // Reward formula (int): round( (max - assigned) * SCALE / (max * max) )
-     * final int SCALE = 1000;
-     * 
-     * return constraintFactory
-     * .forEach(CourseAssignment.class)
-     * .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
-     * .groupBy(CourseAssignment::getTeacher,
-     * ConstraintCollectors.sum(a -> a.getCourse().getRequiredHoursPerWeek()))
-     * .reward(HardSoftScore.ONE_SOFT, (teacher, totalHours) -> {
-     * int assigned = totalHours;
-     * int max = Math.max(1, teacher.getMaxHoursPerWeek());
-     * int remaining = Math.max(0, max - assigned);
-     * double value = ((double) remaining * SCALE) / (double) (max * max);
-     * return (int) Math.round(value);
-     * })
-     * .asConstraint("Prefer assigning to lower-capacity teachers (dynamic)");
-     * }
-     ***/
-
-    private Constraint preferTeachersWithLessCapacity(ConstraintFactory constraintFactory) {
-        // Penalize based on utilization percentage - prefers filling up low-capacity
-        // teachers (only for qualified teachers - unqualified handled by hard
-        // constraint)
+    private Constraint balanceTeacherWorkload(ConstraintFactory constraintFactory) {
+        // Very gentle progressive penalty as teachers approach their max hours.
+        // Encourages distribution without blocking feasibility during construction.
+        // Only activates near capacity to guide the solver toward better solutions.
         return constraintFactory
                 .forEach(CourseAssignment.class)
                 .filter(a -> a.getTeacher() != null && a.getTimeslot() != null
                         && a.getTeacher().isQualifiedFor(a.getCourse().getName()))
                 .groupBy(CourseAssignment::getTeacher,
-                        ConstraintCollectors.sum(a -> a.getCourse().getRequiredHoursPerWeek()))
-                .penalize(HardSoftScore.ONE_SOFT, (teacher, totalHours) -> {
+                        ConstraintCollectors.count())
+                .penalize(HardSoftScore.ONE_SOFT, (teacher, totalAssignments) -> {
                     int max = Math.max(1, teacher.getMaxHoursPerWeek());
-                    // Reward higher utilization - fills low-capacity teachers first
-                    return (totalHours * 100) / max;
+                    double utilization = (double) totalAssignments / max;
+
+                    // Very gentle curve: no penalty until 90%, then light increase
+                    // 50% = 0, 80% = 0, 90% = 1, 95% = 3, 100% = 5, >100% = higher
+                    if (utilization < 0.9) {
+                        return 0; // No penalty below 90% utilization
+                    } else if (utilization <= 1.0) {
+                        // Light quadratic curve from 90-100%: (utilization - 0.9)^2 * 50
+                        double excess = utilization - 0.9;
+                        return (int) Math.round(excess * excess * 50);
+                    } else {
+                        // Over capacity: moderate penalty (hard constraint handles enforcement)
+                        return (int) Math.round(5 + (utilization - 1.0) * 20);
+                    }
                 })
-                .asConstraint("Balance load favoring lower-capacity teachers");
+                .asConstraint("Balance teacher workload gently");
+    }
+
+    private Constraint encourageAlternativeQualifiedTeachers(ConstraintFactory constraintFactory) {
+        // Extremely gentle encouragement to prefer lower-capacity teachers.
+        // This is a very weak preference that only provides minor guidance.
+        // Works with balanceTeacherWorkload to prevent overloading while distributing
+        // evenly.
+        return constraintFactory
+                .forEach(CourseAssignment.class)
+                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null
+                        && a.getTeacher().isQualifiedFor(a.getCourse().getName()))
+                .groupBy(CourseAssignment::getTeacher,
+                        ConstraintCollectors.count())
+                .penalize(HardSoftScore.ONE_SOFT, (teacher, totalAssignments) -> {
+                    int max = Math.max(1, teacher.getMaxHoursPerWeek());
+                    int remaining = Math.max(0, max - totalAssignments);
+
+                    // Extremely gentle linear penalty on remaining capacity
+                    // Divided by 5 to make this a very weak preference
+                    return remaining / 5;
+                })
+                .asConstraint("Encourage distribution among qualified teachers");
     }
 
 }
