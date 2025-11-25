@@ -8,6 +8,7 @@ import java.util.UUID;
 public class Teacher {
     private final String id;
     private final String name;
+    private final String lastName;
     private final Set<String> qualifications;
     // Availability expressed as a map from DayOfWeek -> set of available hours
     // (each hour is an int)
@@ -15,10 +16,11 @@ public class Teacher {
     // Maximum teaching hours per week for this teacher. Default will be 20.
     private int maxHoursPerWeek = 40;
 
-    public Teacher(String id, String name, Set<String> qualifications, Set<DayOfWeek> availableDays,
+    public Teacher(String id, String name, String lastName, Set<String> qualifications, Set<DayOfWeek> availableDays,
             int startHour, int endHour) {
         this.id = id;
         this.name = name;
+        this.lastName = lastName;
         this.qualifications = qualifications;
         // Build availability map from provided days and hour range [startHour, endHour)
         for (DayOfWeek d : availableDays) {
@@ -33,32 +35,33 @@ public class Teacher {
     // Backwards-compatible constructor that generates an id from the name
     public Teacher(String name, Set<String> qualifications, Set<DayOfWeek> availableDays,
             int startHour, int endHour) {
-        this(sanitizeId("t", name), name, qualifications, availableDays, startHour, endHour);
+        this(sanitizeId("t", name), name, "", qualifications, availableDays, startHour, endHour);
     }
 
     /**
      * Constructor that also sets the maximum teaching hours per week.
      */
-    public Teacher(String id, String name, Set<String> qualifications, Set<DayOfWeek> availableDays,
+    public Teacher(String id, String name, String lastName, Set<String> qualifications, Set<DayOfWeek> availableDays,
             int startHour, int endHour, int maxHoursPerWeek) {
-        this(id, name, qualifications, availableDays, startHour, endHour);
+        this(id, name, lastName, qualifications, availableDays, startHour, endHour);
         this.maxHoursPerWeek = maxHoursPerWeek;
     }
 
     // Backwards-compatible constructor with maxHoursPerWeek parameter
     public Teacher(String name, Set<String> qualifications, Set<DayOfWeek> availableDays,
             int startHour, int endHour, int maxHoursPerWeek) {
-        this(sanitizeId("t", name), name, qualifications, availableDays, startHour, endHour, maxHoursPerWeek);
+        this(sanitizeId("t", name), name, "", qualifications, availableDays, startHour, endHour, maxHoursPerWeek);
     }
 
     /**
      * Construct a teacher with explicit availability per day.
      */
-    public Teacher(String id, String name, Set<String> qualifications,
+    public Teacher(String id, String name, String lastName, Set<String> qualifications,
             java.util.Map<DayOfWeek, java.util.Set<Integer>> availabilityPerDay,
             int maxHoursPerWeek) {
         this.id = id;
         this.name = name;
+        this.lastName = lastName;
         this.qualifications = qualifications;
         if (availabilityPerDay != null) {
             // copy to internal map
@@ -70,10 +73,10 @@ public class Teacher {
     }
 
     // Backwards-compatible explicit-availability constructor without id
-    public Teacher(String name, Set<String> qualifications,
+    public Teacher(String name, String lastName, Set<String> qualifications,
             java.util.Map<DayOfWeek, java.util.Set<Integer>> availabilityPerDay,
             int maxHoursPerWeek) {
-        this(sanitizeId("t", name), name, qualifications, availabilityPerDay, maxHoursPerWeek);
+        this(sanitizeId("t", lastName), name, lastName, qualifications, availabilityPerDay, maxHoursPerWeek);
     }
 
     /**
@@ -96,6 +99,10 @@ public class Teacher {
 
     public String getName() {
         return name;
+    }
+
+    public String getLastName() {
+        return lastName;
     }
 
     public Set<String> getQualifications() {

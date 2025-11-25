@@ -5,6 +5,24 @@
 -- scheduling constraint optimization system.
 -- ============================================================================
 
+-- ============================================================================
+-- DATABASE CREATION (Optional - run as superuser if database doesn't exist)
+-- ============================================================================
+-- Uncomment these lines if you want to create the database from this script:
+--
+-- DROP DATABASE IF EXISTS school_schedule;
+-- CREATE DATABASE school_schedule
+--     WITH ENCODING='UTF8'
+--     LC_COLLATE='en_US.UTF-8'
+--     LC_CTYPE='en_US.UTF-8'
+--     TEMPLATE=template0
+--     OWNER=postgres;
+--
+-- \c school_schedule
+
+-- Set client encoding to UTF-8
+SET client_encoding = 'UTF8';
+
 -- Drop tables if they exist (for clean reinstalls)
 DROP TABLE IF EXISTS course_assignment CASCADE;
 DROP TABLE IF EXISTS group_course CASCADE;
@@ -23,6 +41,7 @@ DROP TABLE IF EXISTS teacher CASCADE;
 CREATE TABLE teacher (
     id VARCHAR(100) PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
+    last_name VARCHAR(200) NOT NULL,
     max_hours_per_week INTEGER NOT NULL DEFAULT 40,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -30,10 +49,13 @@ CREATE TABLE teacher (
 );
 
 CREATE INDEX idx_teacher_name ON teacher(name);
+CREATE INDEX idx_teacher_last_name ON teacher(last_name);
+CREATE INDEX idx_teacher_full_name ON teacher(name, last_name);
 
 COMMENT ON TABLE teacher IS 'Teachers who can be assigned to teach courses';
-COMMENT ON COLUMN teacher.id IS 'Unique identifier for teacher (sanitized from name)';
-COMMENT ON COLUMN teacher.name IS 'Full name of the teacher';
+COMMENT ON COLUMN teacher.id IS 'Unique identifier for teacher (sanitized from last name)';
+COMMENT ON COLUMN teacher.name IS 'First name(s) of the teacher';
+COMMENT ON COLUMN teacher.last_name IS 'Last name(s) of the teacher';
 COMMENT ON COLUMN teacher.max_hours_per_week IS 'Maximum teaching hours per week allowed for this teacher';
 
 -- ============================================================================
@@ -220,13 +242,15 @@ CREATE VIEW v_teacher_summary AS
 SELECT
     t.id,
     t.name,
+    t.last_name,
+    CONCAT(t.name, ' ', t.last_name) AS full_name,
     t.max_hours_per_week,
     STRING_AGG(DISTINCT tq.qualification, ', ' ORDER BY tq.qualification) AS qualifications,
     COUNT(DISTINCT CONCAT(ta.day_of_week, '-', ta.hour)) AS availability_hours
 FROM teacher t
 LEFT JOIN teacher_qualification tq ON t.id = tq.teacher_id
 LEFT JOIN teacher_availability ta ON t.id = ta.teacher_id
-GROUP BY t.id, t.name, t.max_hours_per_week;
+GROUP BY t.id, t.name, t.last_name, t.max_hours_per_week;
 
 COMMENT ON VIEW v_teacher_summary IS 'Summarized teacher information with qualifications and availability count';
 
@@ -238,7 +262,7 @@ SELECT
     c.name AS course_name,
     c.required_hours_per_week AS course_hours,
     ca.sequence_index,
-    t.name AS teacher_name,
+    CONCAT(t.name, ' ', t.last_name) AS teacher_name,
     ts.display_name AS timeslot,
     ts.day_of_week,
     ts.hour,
@@ -260,13 +284,15 @@ CREATE VIEW v_teacher_workload AS
 SELECT
     t.id,
     t.name,
+    t.last_name,
+    CONCAT(t.name, ' ', t.last_name) AS full_name,
     t.max_hours_per_week,
     COUNT(DISTINCT ca.id) AS assigned_hours,
     t.max_hours_per_week - COUNT(DISTINCT ca.id) AS remaining_capacity,
     ROUND(100.0 * COUNT(DISTINCT ca.id) / t.max_hours_per_week, 2) AS utilization_percent
 FROM teacher t
 LEFT JOIN course_assignment ca ON t.id = ca.teacher_id
-GROUP BY t.id, t.name, t.max_hours_per_week
+GROUP BY t.id, t.name, t.last_name, t.max_hours_per_week
 ORDER BY utilization_percent DESC;
 
 COMMENT ON VIEW v_teacher_workload IS 'Teacher workload and capacity utilization';

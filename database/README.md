@@ -52,12 +52,18 @@ course_assignment (M) >---- (1) room [nullable, assigned by solver]
 # Connect to PostgreSQL
 psql -U postgres
 
-# Create database
-CREATE DATABASE school_schedule;
+# Create database with UTF-8 encoding (important for special characters)
+CREATE DATABASE school_schedule
+    WITH ENCODING='UTF8'
+    LC_COLLATE='en_US.UTF-8'
+    LC_CTYPE='en_US.UTF-8'
+    TEMPLATE=template0;
 
 # Connect to the new database
 \c school_schedule
 ```
+
+**Note**: UTF-8 encoding is required to properly handle Spanish characters (á, é, í, ó, ú, ñ, etc.) in teacher names and course titles.
 
 ### 2. Create Schema
 
@@ -76,10 +82,13 @@ psql -U postgres -d school_schedule -f load_demo_data.sql
 ## Data Mapping from Java Domain Model
 
 ### Teacher
-- Java: `Teacher` class with `Map<DayOfWeek, Set<Integer>> availabilityPerDay`
-- Database: `teacher` table + `teacher_availability` (normalized)
+- Java: `Teacher` class with `name`, `lastName` fields
+- Database: `teacher` table with `name` (first name) and `last_name` (last name) columns
+- Java: `Map<DayOfWeek, Set<Integer>> availabilityPerDay`
+- Database: `teacher_availability` table (normalized)
 - Java: `Set<String> qualifications`
-- Database: `teacher_qualification` (normalized many-to-many)
+- Database: `teacher_qualification` table (normalized many-to-many)
+- Note: `id` is generated from `lastName` (sanitized)
 
 ### Course
 - Java: `Course` class with `roomRequirement` and `requiredHoursPerWeek`
@@ -184,6 +193,14 @@ SELECT * FROM v_room_utilization ORDER BY assignments_count DESC;
 
 ## Notes
 
+### Character Encoding
+
+The database uses UTF-8 encoding to properly handle Spanish characters:
+- Both `schema.sql` and `load_demo_data.sql` set `client_encoding = 'UTF8'`
+- Teacher names include special characters: JOSÉ, MARTÍNEZ, NUÑEZ, etc.
+- Course names include accented characters: COMUNICACIÓN, FÍSICA, etc.
+- Always ensure your PostgreSQL client is configured for UTF-8
+
 ### DayOfWeek Mapping
 
 Java `DayOfWeek` enum values are stored as integers:
@@ -197,8 +214,11 @@ Java `DayOfWeek` enum values are stored as integers:
 
 ### ID Generation
 
-Teacher and course IDs are sanitized versions of their names:
-- Original: "GUSTAVO MELO" → ID: "t_gustavo_melo"
+Teacher IDs are sanitized from their last names:
+- Teacher: name="GUSTAVO", lastName="MELO" → ID: "t_melo"
+- Teacher: name="MONICA E. ", lastName="DIEGO" → ID: "t_diego"
+
+Course IDs are sanitized from their names:
 - Original: "LENGUA Y COMUNICACIÓN I" → ID: "c_lengua_y_comunicaci_n_i"
 
 ### Planning Variables
@@ -212,26 +232,68 @@ These fields are NULL initially and should be populated by the constraint solver
 
 ## Integration with Java Application
 
-To integrate this database with the Java application:
+The project includes a `DataLoader` class (`com.example.data.DataLoader`) that loads the initial scheduling dataset from PostgreSQL and returns a `SchoolSchedule` object ready for the Timefold solver.
 
-1. Add PostgreSQL JDBC driver to `pom.xml`
-2. Create data access layer (DAO/Repository classes)
-3. Load data from database instead of `DemoDataGenerator`
-4. After solver completes, persist assignments back to database
+### Using DataLoader
 
-### Example Dependencies (pom.xml)
+**1. Configure database connection**
+
+Create a `database.properties` file (copy from `database.properties.example`):
+
+```properties
+db.url=jdbc:postgresql://localhost:5432/school_schedule
+db.username=postgres
+db.password=your_password_here
+```
+
+**2. Load data from database**
+
+```java
+import com.example.data.DataLoader;
+import com.example.domain.SchoolSchedule;
+
+// Create DataLoader with connection parameters
+DataLoader loader = new DataLoader(
+    "jdbc:postgresql://localhost:5432/school_schedule",
+    "postgres",
+    "password"
+);
+
+// Load complete dataset
+SchoolSchedule schedule = loader.loadData();
+
+// Now pass schedule to Timefold solver
+```
+
+**3. Or use environment variables**
+
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/school_schedule
+export DB_USER=postgres
+export DB_PASSWORD=your_password
+
+# Run DataLoader main method to test
+mvn exec:java -Dexec.mainClass="com.example.data.DataLoader"
+```
+
+### DataLoader Features
+
+- Loads all teachers with qualifications and per-day availability
+- Loads courses, rooms, timeslots, and student groups
+- Creates unassigned course assignments ready for solver
+- Maintains referential integrity from database
+- Uses UTF-8 encoding for Spanish characters
+- Provides detailed loading statistics
+
+### Dependencies (Already Included)
+
+The PostgreSQL JDBC driver is already included in `pom.xml`:
 
 ```xml
 <dependency>
     <groupId>org.postgresql</groupId>
     <artifactId>postgresql</artifactId>
     <version>42.7.1</version>
-</dependency>
-
-<dependency>
-    <groupId>com.zaxxer</groupId>
-    <artifactId>HikariCP</artifactId>
-    <version>5.1.0</version>
 </dependency>
 ```
 
