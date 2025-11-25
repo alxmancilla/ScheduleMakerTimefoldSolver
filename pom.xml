@@ -46,6 +46,12 @@
             <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>ai.timefold.solver</groupId>
+            <artifactId>timefold-solver-test</artifactId>
+            <version>${timefold.version}</version>
+            <scope>test</scope>
+        </dependency>
         <!-- PDF generation -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
