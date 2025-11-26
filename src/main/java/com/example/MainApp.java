@@ -30,6 +30,10 @@ public class MainApp {
 
         // Build solver
         SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory();
+
+        // SolverFactory<SchoolSchedule> solverFactory = SolverFactory
+        // .createFromXmlResource("solverConfig.xml");
+
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
 
         // Solve
