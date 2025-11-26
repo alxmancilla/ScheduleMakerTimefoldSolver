@@ -219,12 +219,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     double utilization = (double) totalAssignments / max;
 
                     // Very gentle curve: no penalty until 90%, then light increase
-                    // 50% = 0, 80% = 0, 90% = 1, 95% = 3, 100% = 5, >100% = higher
-                    if (utilization < 0.9) {
-                        return 0; // No penalty below 90% utilization
+                    // 50% = 0, 80% = 0, 88% = 1, 95% = 3, 100% = 5, >100% = higher
+                    if (utilization < 0.88) {
+                        return 0; // No penalty below 88% utilization
                     } else if (utilization <= 1.0) {
-                        // Light quadratic curve from 90-100%: (utilization - 0.9)^2 * 50
-                        double excess = utilization - 0.9;
+                        // Light quadratic curve from 88-100%: (utilization - 0.88)^2 * 50
+                        double excess = utilization - 0.88;
                         return (int) Math.round(excess * excess * 50);
                     } else {
                         // Over capacity: moderate penalty (hard constraint handles enforcement)
