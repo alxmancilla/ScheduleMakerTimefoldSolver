@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<solver xmlns="https://timefold.ai/xsd/solver" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://timefold.ai/xsd/solver https://timefold.ai/xsd/solver/solver.xsd">
+
+    <!-- Domain Model -->
+    <solutionClass>com.example.domain.SchoolSchedule</solutionClass>
+    <entityClass>com.example.domain.CourseAssignment</entityClass>
+
+    <!-- Score Configuration -->
+    <scoreDirectorFactory>
+        <constraintProviderClass>com.example.solver.SchoolConstraintProvider</constraintProviderClass>
+        <!-- 
+        <constraintWeight name="Teacher must be qualified" hardScore="1"/>
+        <constraintWeight name="Teacher must be available at timeslot" hardScore="1"/>
+        <constraintWeight name="No teacher double-booking" hardScore="1"/>
+        <constraintWeight name="No room double-booking" hardScore="1"/>
+        <constraintWeight name="Room type must satisfy course requirement" hardScore="1"/>
+        <constraintWeight name="Group cannot have two courses at same time" hardScore="1"/>
+        <constraintWeight name="Same teacher for all course hours (hard constraint)" hardScore="1"/>
+        <constraintWeight name="Group courses with same room type must use same room" hardScore="1"/>
+        <constraintWeight name="Teacher exceeds max hours per week (hard)" hardScore="1"/>
+        <constraintWeight name="No classes during lunch break" hardScore="1"/>
+        -->
+        <!-- Soft Constraint Weights (tune these values to prioritize different goals) -->
+        <!-- 
+        <constraintWeight name="Prefer group's pre-assigned room" softScore="3"/>
+        <constraintWeight name="Minimize teacher building changes" softScore="1"/>
+        <constraintWeight name="Minimize teacher idle gaps" softScore="1"/>
+        <constraintWeight name="Balance teacher workload gently" softScore="1"/>
+        <constraintWeight name="Encourage distribution among qualified teachers" softScore="1"/>
+        -->
+    </scoreDirectorFactory>
+
+    <!-- Termination -->
+    <termination>
+        <!-- Stop after 15 minutes total -->
+        <minutesSpentLimit>15</minutesSpentLimit>
+        <!-- or stop after 5 minutes of no improvement -->
+        <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
+        <!-- Or when a feasible solution is found -->
+        <bestScoreLimit>0hard/*soft</bestScoreLimit>
+    </termination>
+
+    <!-- Optimization Algorithms -->
+    <constructionHeuristic>
+        <constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>
+    </constructionHeuristic>
+    <localSearch>
+        <localSearchType>HILL_CLIMBING</localSearchType>
+    </localSearch>
+
+
+</solver>
