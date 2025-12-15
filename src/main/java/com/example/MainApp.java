@@ -2,6 +2,8 @@ package com.example;
 
 import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.api.solver.SolverFactory;
+
+import com.example.data.DataLoader;
 import com.example.data.DemoDataGenerator;
 import com.example.domain.CourseAssignment;
 import com.example.domain.SchoolSchedule;
@@ -14,9 +16,12 @@ import java.io.IOException;
 
 public class MainApp {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         // Generate demo data
-        SchoolSchedule initialSchedule = DemoDataGenerator.generateDemoData();
+        // SchoolSchedule initialSchedule = DemoDataGenerator.generateDemoData();
+
+        DataLoader dataLoader = new DataLoader("jdbc:postgresql://localhost:5432/school_schedule", "mancilla", "");
+        SchoolSchedule initialSchedule = dataLoader.loadData();
 
         System.out.println("=== School Schedule Solver ===");
         System.out.println("Initial problem:");

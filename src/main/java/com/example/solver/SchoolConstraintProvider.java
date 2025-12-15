@@ -219,12 +219,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     double utilization = (double) totalAssignments / max;
 
                     // Very gentle curve: no penalty until 90%, then light increase
-                    // 50% = 0, 80% = 0, 88% = 1, 95% = 3, 100% = 5, >100% = higher
-                    if (utilization < 0.88) {
-                        return 0; // No penalty below 88% utilization
+                    // 50% = 0, 80% = 0, 85% = 1, 95% = 3, 100% = 5, >100% = higher
+                    if (utilization < 0.85) {
+                        return 0; // No penalty below 85% utilization
                     } else if (utilization <= 1.0) {
-                        // Light quadratic curve from 88-100%: (utilization - 0.88)^2 * 50
-                        double excess = utilization - 0.88;
+                        // Light quadratic curve from 85-100%: (utilization - 0.85)^2 * 50
+                        double excess = utilization - 0.85;
                         return (int) Math.round(excess * excess * 50);
                     } else {
                         // Over capacity: moderate penalty (hard constraint handles enforcement)
@@ -250,8 +250,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     int remaining = Math.max(0, max - totalAssignments);
 
                     // Extremely gentle linear penalty on remaining capacity
-                    // Divided by 5 to make this a very weak preference
-                    return remaining / 5;
+                    // Divided by 3 to make this a very weak preference
+                    return remaining / 3;
                 })
                 .asConstraint("Encourage distribution among qualified teachers");
     }

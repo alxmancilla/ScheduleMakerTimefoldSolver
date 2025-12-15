@@ -19,7 +19,8 @@ public class DataLoader {
     /**
      * Create a DataLoader with database connection parameters.
      *
-     * @param jdbcUrl  JDBC URL (e.g., "jdbc:postgresql://localhost:5432/school_schedule")
+     * @param jdbcUrl  JDBC URL (e.g.,
+     *                 "jdbc:postgresql://localhost:5432/school_schedule")
      * @param username Database username
      * @param password Database password
      */
@@ -65,7 +66,7 @@ public class DataLoader {
         // Load basic teacher info
         String sql = "SELECT id, name, last_name, max_hours_per_week FROM teacher ORDER BY max_hours_per_week, id";
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String id = rs.getString("id");
@@ -73,7 +74,8 @@ public class DataLoader {
                 String lastName = rs.getString("last_name");
                 int maxHours = rs.getInt("max_hours_per_week");
 
-                // Create teacher with empty qualifications and availability (will be populated below)
+                // Create teacher with empty qualifications and availability (will be populated
+                // below)
                 Teacher teacher = new Teacher(id, name, lastName, new HashSet<>(),
                         new HashMap<>(), maxHours);
                 teacherMap.put(id, teacher);
@@ -95,7 +97,7 @@ public class DataLoader {
     private void loadTeacherQualifications(Connection conn, Map<String, Teacher> teacherMap) throws SQLException {
         String sql = "SELECT teacher_id, qualification FROM teacher_qualification";
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String teacherId = rs.getString("teacher_id");
@@ -119,7 +121,7 @@ public class DataLoader {
         Map<String, Map<DayOfWeek, Set<Integer>>> availabilityData = new HashMap<>();
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String teacherId = rs.getString("teacher_id");
@@ -148,8 +150,7 @@ public class DataLoader {
                     oldTeacher.getLastName(),
                     oldTeacher.getQualifications(),
                     availability,
-                    oldTeacher.getMaxHoursPerWeek()
-            );
+                    oldTeacher.getMaxHoursPerWeek());
 
             teacherMap.put(teacherId, newTeacher);
         }
@@ -163,7 +164,7 @@ public class DataLoader {
         String sql = "SELECT id, name, room_requirement, required_hours_per_week FROM course";
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String id = rs.getString("id");
@@ -186,7 +187,7 @@ public class DataLoader {
         String sql = "SELECT name, building, type FROM room";
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String name = rs.getString("name");
@@ -208,7 +209,7 @@ public class DataLoader {
         String sql = "SELECT id, day_of_week, hour, display_name FROM timeslot ORDER BY day_of_week, hour";
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String id = rs.getString("id");
@@ -233,7 +234,7 @@ public class DataLoader {
         // Load basic group info
         String sql = "SELECT id, name, preferred_room_name FROM student_group";
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String id = rs.getString("id");
@@ -258,7 +259,7 @@ public class DataLoader {
         // Load group courses
         sql = "SELECT group_id, course_name FROM group_course";
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String groupId = rs.getString("group_id");
@@ -284,7 +285,7 @@ public class DataLoader {
         String sql = "SELECT id, group_id, course_id, sequence_index FROM course_assignment ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+                ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String id = rs.getString("id");
@@ -333,7 +334,7 @@ public class DataLoader {
      */
     public static void main(String[] args) {
         String jdbcUrl = System.getenv().getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/school_schedule");
-        String username = System.getenv().getOrDefault("DB_USER", "postgres");
+        String username = System.getenv().getOrDefault("DB_USER", "mancilla");
         String password = System.getenv().getOrDefault("DB_PASSWORD", "");
 
         DataLoader loader = new DataLoader(jdbcUrl, username, password);

@@ -219,7 +219,7 @@ CROSS JOIN generate_series(7, 14) AS h;
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_catalan', d, h
 FROM generate_series(1, 5) AS d
-CROSS JOIN generate_series(7, 14) AS h;
+CROSS JOIN generate_series(7, 12) AS h;
 
 -- MARIO VERDIGUEL: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
@@ -231,7 +231,7 @@ CROSS JOIN generate_series(7, 14) AS h;
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_santana', d, h
 FROM generate_series(1, 5) AS d
-CROSS JOIN generate_series(10, 13) AS h;
+CROSS JOIN generate_series(10, 14) AS h;
 
 -- ALFREDO SALAS: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
