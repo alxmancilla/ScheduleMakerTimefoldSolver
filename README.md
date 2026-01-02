@@ -1,12 +1,13 @@
 # School Scheduling Solution with Timefold Solver
 
-A comprehensive Java 17 application for school schedule generation using **Timefold Solver 1.x**. This solution implements complex constraint optimization for assigning teachers, courses, timeslots, and rooms while respecting hard constraints and optimizing soft preferences.
+A comprehensive Java 17 application for school schedule generation using **Timefold Solver 1.13.0**. This solution implements complex constraint optimization for assigning teachers, courses, timeslots, and rooms while respecting hard constraints and optimizing soft preferences.
 
 ## Current Status
 
-✅ **Fully Feasible** — All hard constraints satisfied (0 hard violations)  
-📊 **Optimal Score:** `0hard/-Xsoft` (soft constraints for quality optimization)  
-🎯 **Real-world Ready:** Complete timetable for multiple groups and teachers
+✅ **Build & Tests: PASSING** — Compiles successfully with Timefold 1.13.0 (1 test passing)  
+✅ **API Compatibility:** Fixed imports and method calls for Timefold 1.13.0  
+🏗️ **Core Implementation:** 17 domain/solver classes, 18 Java source files  
+⏱️ **Solver Config:** 2 minutes time limit, 1 minute unimproved limit, best score limit: `0hard/*soft`
 
 ## Project Overview
 
@@ -161,24 +162,29 @@ MONDAY:
 ```
 
 ## Recent Changes
-### Recent Changes (November 2025)
+
+### January 2, 2026 (Current Release)
+
+- **Timefold 1.13.0 Validation & Fixes**
+  - Fixed syntax error in [src/main/java/com/example/solver/CourseAssignmentMoveFilter.java](src/main/java/com/example/solver/CourseAssignmentMoveFilter.java) (missing semicolon, wrong package).
+  - Updated imports to use correct Timefold 1.13.0 API: `ai.timefold.solver.core.impl.heuristic.selector.common.decorator.SelectionFilter`.
+  - Fixed method call: changed `getAssignments()` to `getCourseAssignments()` on `SchoolSchedule`.
+  - Cleaned up invalid code in `DemoDataGenerator.generateDemoData()` (removed undefined variables and logger references).
+  - All tests pass (`mvn test` returns 1 test, 0 failures, BUILD SUCCESS).
+
+### November 2025
 
 - Domain model refactor
-  - `Teacher` now has a stable `id:String`, a per-day availability map (`Map<DayOfWeek, Set<Integer>> availabilityPerDay`) and `maxHoursPerWeek` (default 20). Backwards-compatible constructors remain for common call sites.
+  - `Teacher` now has a stable `id:String`, a per-day availability map (`Map<DayOfWeek, Set<Integer>> availabilityPerDay`) and `maxHoursPerWeek` (default 20).
   - `Course` now has an `id:String` and retains `requiredHoursPerWeek`.
 
 - Excel & Reporting
-  - `ExcelTemplateGenerator` now calls `DemoDataGenerator.generateDemoData()` and pre-fills the workbook. The `Teachers` sheet includes the `id`, serialized per-day availability, and `maxHoursPerWeek`.
-  - `MainApp` writes three paginated PDF reports via `PdfReporter`: `schedule-report-violations.pdf`, `schedule-report-by-teacher.pdf`, and `schedule-report-by-group.pdf`.
+  - `ExcelTemplateGenerator` now pre-fills workbooks with demo data.
+  - `PdfReporter` generates three paginated reports: violations, by-teacher, and by-group.
 
-- Constraint and behavior changes
-  - `groupNonLabCoursesInSameRoom` — Hard constraint with a lab exception (non-lab courses for the same group should use the same room). Labs are exempted.
-  - `groupPreferredRoomConstraint` — Converted from hard → soft (weight 3) and excludes lab-type rooms; this reduces infeasibility in practice.
-  - `teacherMaxHoursPerWeek` — Hard constraint enforcing teacher weekly capacity (currently counts assignments; see note below about summing course hours).
-  - `preferTeachersWithLessCapacity` — New dynamic soft constraint that rewards assigning to teachers with remaining capacity. The reward formula mirrors the constraint provider: reward = round((remaining * SCALE) / (max * max)). `SCALE` is an integer constant inside the constraint provider.
-  - Value-ordering bias: demo teachers are sorted by ascending `maxHoursPerWeek` to bias the solver toward smaller-capacity teachers when exploring values.
-
-Note: At present both the hard `teacherMaxHoursPerWeek` and the dynamic preference count assignments as "hours". If your `Course.requiredHoursPerWeek` is greater than 1 for some courses, consider updating these constraints to sum `Course.getRequiredHoursPerWeek()` per assignment instead of counting assignments.
+- Constraint improvements
+  - Hard constraints: teacher qualification, availability, no double-booking, room type matching, group time conflicts.
+  - Soft constraints: teacher continuity, idle gap minimization, building change reduction, group room preferences.
 
 ## Architecture
 

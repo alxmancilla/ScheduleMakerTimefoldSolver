@@ -1,6 +1,8 @@
 package com.example.data;
 
 import com.example.domain.*;
+import com.example.util.CourseAssignmentValidator;
+
 import java.time.DayOfWeek;
 import java.util.*;
 
@@ -14,7 +16,14 @@ public class DemoDataGenerator {
                 List<Group> groups = generateGroups(rooms);
                 List<CourseAssignment> assignments = generateCourseAssignments(groups, courses);
 
-                return new SchoolSchedule(teachers, timeslots, rooms, courses, groups, assignments);
+                for (CourseAssignment ca : assignments) {
+                        ca.setTeacher(null);
+                        ca.setRoom(null);
+                        ca.setTimeslot(null);
+                }
+                SchoolSchedule schedule = new SchoolSchedule(teachers, timeslots, rooms, courses, groups, assignments);
+
+                return schedule;
         }
 
         private static List<Teacher> generateTeachers() {
@@ -186,11 +195,12 @@ public class DemoDataGenerator {
         private static List<Course> generateCourses() {
                 List<Course> courses = new ArrayList<>();
 
+                courses.add(new Course("7", "CIENCIAS SOCIALES I", "CIEN SOC I", "I", "BASICAS", "standard", 2));
+
                 courses.add(new Course("TUTORIAS I", "standard", 1));
                 courses.add(new Course("CLUB DE AJEDREZ", "standard", 1));
                 courses.add(new Course("ACTIVACIÓN FÍSICA", "standard", 1));
                 courses.add(new Course("RECURSOS SOCIOEMOCIONALES I", "standard", 1));
-                courses.add(new Course("CIENCIAS SOCIALES I", "standard", 2));
                 courses.add(new Course("LENGUA Y COMUNICACIÓN I", "standard", 3));
                 courses.add(new Course("INGLÉS I", "standard", 3));
                 courses.add(new Course("CULTURA DIGITAL I", "lab", 3));

@@ -169,10 +169,13 @@ public class DataLoader {
             while (rs.next()) {
                 String id = rs.getString("id");
                 String name = rs.getString("name");
+                String abbreviation = rs.getString("abbreviation");
+                String semester = rs.getString("semester");
+                String component = rs.getString("component");
                 String roomRequirement = rs.getString("room_requirement");
                 int requiredHours = rs.getInt("required_hours_per_week");
 
-                courses.add(new Course(id, name, roomRequirement, requiredHours));
+                courses.add(new Course(id, name, abbreviation, semester, component, roomRequirement, requiredHours));
             }
         }
 

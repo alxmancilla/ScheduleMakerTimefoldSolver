@@ -6,19 +6,26 @@ import java.util.UUID;
 public class Course {
     private final String id;
     private final String name;
-    private final String roomRequirement; // 'standard', 'science_lab'
+    private final String abbreviation;
+    private final String semester; // 'I', 'II', 'III', 'IV', 'V', 'VI'
+    private final String component; // 'BASICAS', 'TADHR','TEM'
     private final int requiredHoursPerWeek;
+    private final String roomRequirement; // 'standard', 'science_lab'
 
-    public Course(String id, String name, String roomRequirement, int requiredHoursPerWeek) {
+    public Course(String id, String name, String abbreviation, String semester, String component,
+            String roomRequirement, int requiredHoursPerWeek) {
         this.id = id;
         this.name = name;
+        this.abbreviation = abbreviation;
+        this.semester = semester;
+        this.component = component;
         this.roomRequirement = roomRequirement;
         this.requiredHoursPerWeek = requiredHoursPerWeek;
     }
 
     // Backwards-compatible constructor: generate an id from the name.
     public Course(String name, String roomRequirement, int requiredHoursPerWeek) {
-        this(sanitizeId("c", name), name, roomRequirement, requiredHoursPerWeek);
+        this(sanitizeId("c", name), name, "", "", "", roomRequirement, requiredHoursPerWeek);
     }
 
     private static String sanitizeId(String prefix, String name) {
@@ -28,12 +35,24 @@ public class Course {
         return prefix + "_" + s;
     }
 
+    public String getId() {
+        return id;
+    }
+
     public String getName() {
         return name;
     }
 
-    public String getId() {
-        return id;
+    public String getAbbreviation() {
+        return abbreviation;
+    }
+
+    public String getSemester() {
+        return semester;
+    }
+
+    public String getComponent() {
+        return component;
     }
 
     public String getRoomRequirement() {

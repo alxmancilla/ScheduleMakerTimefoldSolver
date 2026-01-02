@@ -18,10 +18,12 @@ public class MainApp {
 
     public static void main(String[] args) throws Exception {
         // Generate demo data
-        // SchoolSchedule initialSchedule = DemoDataGenerator.generateDemoData();
+        SchoolSchedule initialSchedule = DemoDataGenerator.generateDemoData();
 
-        DataLoader dataLoader = new DataLoader("jdbc:postgresql://localhost:5432/school_schedule", "mancilla", "");
-        SchoolSchedule initialSchedule = dataLoader.loadData();
+        // DataLoader dataLoader = new
+        // DataLoader("jdbc:postgresql://localhost:5432/school_schedule", "mancilla",
+        // "");
+        // SchoolSchedule initialSchedule = dataLoader.loadData();
 
         System.out.println("=== School Schedule Solver ===");
         System.out.println("Initial problem:");
