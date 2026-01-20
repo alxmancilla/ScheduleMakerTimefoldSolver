@@ -14,7 +14,7 @@ public class SchoolSolverConfig {
                 .withConstraintProviderClass(SchoolConstraintProvider.class)
                 .withTerminationConfig(new TerminationConfig()
                         .withUnimprovedMinutesSpentLimit(1L)
-                        .withMinutesSpentLimit(2L)
+                        .withMinutesSpentLimit(1L)
                         .withBestScoreLimit("0hard/*soft")));
     }
 }

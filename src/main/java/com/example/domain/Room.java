@@ -26,10 +26,12 @@ public class Room {
     }
 
     public boolean satisfiesRequirement(String requirement) {
-        if ("standard".equals(requirement)) {
-            return "standard".equals(type);
-        } else if ("lab".equals(requirement)) {
-            return "lab".equals(type);
+        if ("estándar".equals(requirement)) {
+            return "estándar".equals(type);
+        } else if ("taller".equals(requirement)) {
+            return "taller".equals(type);
+        } else if ("centro de cómputo".equals(requirement)) {
+            return "centro de cómputo".equals(type);
         }
         return false;
     }

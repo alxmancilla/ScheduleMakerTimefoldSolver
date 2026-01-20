@@ -12,13 +12,12 @@
 --
 -- DROP DATABASE IF EXISTS school_schedule;
 -- CREATE DATABASE school_schedule
---     WITH ENCODING='UTF8'
---     LC_COLLATE='en_US.UTF-8'
---     LC_CTYPE='en_US.UTF-8'
---     TEMPLATE=template0
---     OWNER=postgres;
+--      WITH ENCODING='UTF8'
+--      LC_COLLATE='en_US.UTF-8'
+--      LC_CTYPE='en_US.UTF-8'
+--      OWNER=mancilla;
 --
--- \c school_schedule
+--  \c school_schedule
 
 -- Set client encoding to UTF-8
 SET client_encoding = 'UTF8';
@@ -103,13 +102,17 @@ COMMENT ON COLUMN teacher_availability.hour IS 'Hour of day when teacher is avai
 -- ============================================================================
 -- Courses that can be taught
 CREATE TABLE course (
-    id VARCHAR(100) PRIMARY KEY,
-    name VARCHAR(200) NOT NULL UNIQUE,
-    room_requirement VARCHAR(50) NOT NULL,  -- 'standard' or 'lab'
+    id VARCHAR(5) PRIMARY KEY,
+    "name" VARCHAR(200) NOT NULL UNIQUE,
+    abbreviation VARCHAR(100) NOT NULL,
+    room_requirement VARCHAR(50) NOT NULL,  -- 'Estándar', 'taller', 'Estándar y taller', 'Estándar y centro de cómputo'
     required_hours_per_week INTEGER NOT NULL,
+    semester varchar(2) NOT NULL,
+	component varchar(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT check_room_requirement CHECK (room_requirement IN ('standard', 'lab')),
+    active BOOLEAN NOT NULL DEFAULT true,
+    CONSTRAINT check_room_requirement CHECK (room_requirement IN ('estándar', 'taller')),
     CONSTRAINT check_required_hours CHECK (required_hours_per_week > 0)
 );
 
@@ -127,10 +130,10 @@ COMMENT ON COLUMN course.required_hours_per_week IS 'Number of hours per week th
 CREATE TABLE room (
     name VARCHAR(100) PRIMARY KEY,
     building VARCHAR(50) NOT NULL,
-    type VARCHAR(50) NOT NULL,  -- 'standard' or 'lab'
+    type VARCHAR(50) NOT NULL,  -- 'estándar' or 'taller'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT check_room_type CHECK (type IN ('standard', 'lab'))
+    CONSTRAINT check_room_type CHECK (type IN ('estándar', 'taller'))
 );
 
 CREATE INDEX idx_room_building ON room(building);

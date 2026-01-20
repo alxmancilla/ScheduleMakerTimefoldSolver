@@ -154,7 +154,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEach(CourseAssignment.class)
                 .filter(assignment -> assignment.getGroup() != null
                         && assignment.getGroup().getPreferredRoom() != null
-                        && !"lab".equalsIgnoreCase(assignment.getGroup().getPreferredRoom().getType())
+                        && !"taller".equalsIgnoreCase(assignment.getGroup().getPreferredRoom().getType())
+                        && !"centro de cómputo".equalsIgnoreCase(assignment.getGroup().getPreferredRoom().getType())
+                        && !"laboratorio".equalsIgnoreCase(assignment.getGroup().getPreferredRoom().getType())
                         && (assignment.getRoom() == null
                                 || !assignment.getRoom().equals(assignment.getGroup().getPreferredRoom())))
                 .penalize(HardSoftScore.ofSoft(3))

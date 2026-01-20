@@ -4,6 +4,7 @@ import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 
 import com.example.data.DataLoader;
+import com.example.data.DataSaver;
 import com.example.data.DemoDataGenerator;
 import com.example.domain.CourseAssignment;
 import com.example.domain.SchoolSchedule;
@@ -13,17 +14,18 @@ import java.util.*;
 import com.example.analysis.ScheduleAnalyzer;
 import com.example.util.PdfReporter;
 import java.io.IOException;
+import java.sql.SQLException;
 
 public class MainApp {
 
     public static void main(String[] args) throws Exception {
         // Generate demo data
-        SchoolSchedule initialSchedule = DemoDataGenerator.generateDemoData();
-
-        // DataLoader dataLoader = new
-        // DataLoader("jdbc:postgresql://localhost:5432/school_schedule", "mancilla",
-        // "");
-        // SchoolSchedule initialSchedule = dataLoader.loadData();
+        // SchoolSchedule initialSchedule = DemoDataGenerator.generateDemoData();
+        String jdbcUrl = "jdbc:postgresql://localhost:5432/school_schedule";
+        String username = "mancilla";
+        String password = "";
+        DataLoader dataLoader = new DataLoader(jdbcUrl, username, password);
+        SchoolSchedule initialSchedule = dataLoader.loadData();
 
         System.out.println("=== School Schedule Solver ===");
         System.out.println("Initial problem:");
@@ -84,6 +86,24 @@ public class MainApp {
             }
         });
         System.out.println();
+
+        // Save results back to database
+        System.out.println();
+        System.out.println("=== Saving to Database ===");
+        DataSaver dataSaver = new DataSaver(jdbcUrl, username, password);
+        try {
+            dataSaver.saveSchedule(solvedSchedule);
+
+            // Print statistics
+            System.out.println();
+            System.out.println("=== Database Statistics ===");
+            Map<String, Integer> stats = dataSaver.getScheduleStatistics();
+            stats.forEach((k, v) -> System.out.println("- " + k + ": " + v));
+        } catch (SQLException e) {
+            System.err.println("Failed to save schedule to database: " + e.getMessage());
+            e.printStackTrace();
+        }
+
         // Print schedule by day
         System.out.println("=== Schedule by Day ===");
         printScheduleByDay(solvedSchedule);
@@ -107,6 +127,7 @@ public class MainApp {
         } catch (IOException e) {
             System.err.println("Failed to write PDF report: " + e.getMessage());
         }
+
     }
 
     // Soft constraint analysis

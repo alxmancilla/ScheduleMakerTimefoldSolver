@@ -161,7 +161,7 @@ public class DataLoader {
      */
     private List<Course> loadCourses(Connection conn) throws SQLException {
         List<Course> courses = new ArrayList<>();
-        String sql = "SELECT id, name, room_requirement, required_hours_per_week FROM course";
+        String sql = "SELECT id, name, abbreviation, semester, component, room_requirement, required_hours_per_week, active FROM course";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -174,8 +174,10 @@ public class DataLoader {
                 String component = rs.getString("component");
                 String roomRequirement = rs.getString("room_requirement");
                 int requiredHours = rs.getInt("required_hours_per_week");
+                Boolean active = rs.getBoolean("active");
 
-                courses.add(new Course(id, name, abbreviation, semester, component, roomRequirement, requiredHours));
+                courses.add(new Course(id, name, abbreviation, semester, component, roomRequirement, requiredHours,
+                        active));
             }
         }
 
