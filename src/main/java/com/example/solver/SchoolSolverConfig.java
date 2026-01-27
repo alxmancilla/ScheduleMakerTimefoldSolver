@@ -1,20 +1,18 @@
 package com.example.solver;
 
 import ai.timefold.solver.core.api.solver.SolverFactory;
-import ai.timefold.solver.core.config.solver.SolverConfig;
-import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import com.example.domain.SchoolSchedule;
+import java.io.File;
 
 public class SchoolSolverConfig {
 
     public static SolverFactory<SchoolSchedule> buildSolverFactory() {
-        return SolverFactory.create(new SolverConfig()
-                .withEntityClasses(com.example.domain.CourseAssignment.class)
-                .withSolutionClass(SchoolSchedule.class)
-                .withConstraintProviderClass(SchoolConstraintProvider.class)
-                .withTerminationConfig(new TerminationConfig()
-                        .withUnimprovedMinutesSpentLimit(1L)
-                        .withMinutesSpentLimit(1L)
-                        .withBestScoreLimit("0hard/*soft")));
+        try {
+            File configFile = new File(SchoolSolverConfig.class.getClassLoader()
+                    .getResource("solverConfig.xml").toURI());
+            return SolverFactory.createFromXmlFile(configFile);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load solver configuration", e);
+        }
     }
 }

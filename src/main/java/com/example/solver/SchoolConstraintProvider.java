@@ -15,21 +15,22 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // Hard constraints (infeasibility: must be satisfied)
                 teacherMustBeQualified(constraintFactory),
                 teacherMustBeAvailable(constraintFactory),
+                minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
                 noTeacherDoubleBooking(constraintFactory),
                 noRoomDoubleBooking(constraintFactory),
                 roomTypeMustSatisfyRequirement(constraintFactory),
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 sameTeacherForAllCourseHours(constraintFactory),
-                teacherMaxHoursPerWeek(constraintFactory),
-                groupCoursesInSameRoomByType(constraintFactory),
+                // groupCoursesInSameRoomByType(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
                 // Prefer group's pre-assigned room is a soft preference (weight 3)
-                groupPreferredRoomConstraint(constraintFactory),
-                minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
-                minimizeTeacherBuildingChanges(constraintFactory), // weight 1 (comfort: minimize travel)
+                // groupPreferredRoomConstraint(constraintFactory),
+                teacherMaxHoursPerWeek(constraintFactory),
+                // minimizeTeacherBuildingChanges(constraintFactory), // weight 1 (comfort:
+                // minimize travel)
                 balanceTeacherWorkload(constraintFactory),
-                encourageAlternativeQualifiedTeachers(constraintFactory),
+                // encourageAlternativeQualifiedTeachers(constraintFactory),
         };
     }
 
@@ -144,7 +145,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .groupBy(CourseAssignment::getTeacher,
                         ConstraintCollectors.count())
                 .filter((teacher, totalAssignments) -> totalAssignments > teacher.getMaxHoursPerWeek())
-                .penalize(HardSoftScore.ONE_HARD,
+                .penalize(HardSoftScore.ONE_SOFT,
                         (teacher, totalAssignments) -> totalAssignments - teacher.getMaxHoursPerWeek())
                 .asConstraint("Teacher exceeds max hours per week (hard)");
     }
@@ -198,9 +199,18 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                             && Math.abs(a1.getTimeslot().getHour() - a2.getTimeslot().getHour()) > 1;
                 })
                 .penalize(HardSoftScore.ONE_SOFT, (a1, a2) -> {
-                    // Penalize proportionally to gap size (minus 1 for consecutive hours)
-                    // 2-hour gap (7am, 9am) = 1 penalty, 6-hour gap (7am, 1pm) = 5 penalty
                     int gap = Math.abs(a1.getTimeslot().getHour() - a2.getTimeslot().getHour()) - 1;
+
+                    // ENHANCED: Check if teaching SAME group = higher penalty
+                    // Same group and same day with gap should be more strictly penalized
+                    if (a1.getGroup() != null && a1.getGroup().equals(a2.getGroup())
+                            && a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+                        // Same group split across hours: penalize 4x
+                        // This keeps course hours consecutive and improves teaching quality
+                        return gap * 3;
+                    }
+
+                    // Different courses: standard penalty (less strict)
                     return gap;
                 })
                 .asConstraint("Minimize teacher idle gaps (efficiency)");

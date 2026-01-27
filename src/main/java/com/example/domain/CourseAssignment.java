@@ -13,13 +13,13 @@ public class CourseAssignment {
     private Course course;
     private int sequenceIndex; // Which hour of the course (0, 1, 2, etc.)
 
-    @PlanningVariable(valueRangeProviderRefs = { "teacherRange" })
+    // @PlanningVariable(valueRangeProviderRefs = { "teacherRange" })
     private Teacher teacher;
 
     @PlanningVariable(valueRangeProviderRefs = { "timeslotRange" })
     private Timeslot timeslot;
 
-    @PlanningVariable(valueRangeProviderRefs = { "roomRange" })
+    // @PlanningVariable(valueRangeProviderRefs = { "roomRange" })
     private Room room;
 
     public CourseAssignment() {
@@ -37,16 +37,32 @@ public class CourseAssignment {
         return id;
     }
 
+    public void setId(String id) {
+        this.id = id;
+    }
+
     public Group getGroup() {
         return group;
+    }
+
+    public void setGroup(Group group) {
+        this.group = group;
     }
 
     public Course getCourse() {
         return course;
     }
 
+    public void setCourse(Course course) {
+        this.course = course;
+    }
+
     public int getSequenceIndex() {
         return sequenceIndex;
+    }
+
+    public void setSequenceIndex(int sequenceIndex) {
+        this.sequenceIndex = sequenceIndex;
     }
 
     public Teacher getTeacher() {

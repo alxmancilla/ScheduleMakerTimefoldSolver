@@ -10,7 +10,7 @@ import java.util.List;
 
 @PlanningSolution
 public class SchoolSchedule {
-    @ValueRangeProvider(id = "teacherRange")
+    // @ValueRangeProvider(id = "teacherRange")
     @ProblemFactCollectionProperty
     private List<Teacher> teachers;
 
@@ -18,7 +18,7 @@ public class SchoolSchedule {
     @ProblemFactCollectionProperty
     private List<Timeslot> timeslots;
 
-    @ValueRangeProvider(id = "roomRange")
+    // @ValueRangeProvider(id = "roomRange")
     @ProblemFactCollectionProperty
     private List<Room> rooms;
 

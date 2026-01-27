@@ -103,9 +103,9 @@ public class PdfReporter {
             Map<String, Integer> hardViolations,
             Map<String, Integer> softViolations,
             String baseName) throws IOException {
-        String violationsPath = baseName + "-violations.pdf";
-        String byTeacherPath = baseName + "-by-teacher.pdf";
-        String byGroupPath = baseName + "-by-group.pdf";
+        String violationsPath = baseName + "-incumplimientos.pdf";
+        String byTeacherPath = baseName + "-por-maestro.pdf";
+        String byGroupPath = baseName + "-por-grupo.pdf";
 
         generateViolationsPdf(schedule, hardViolations, softViolations, violationsPath);
         generateScheduleByTeacherPdf(schedule, byTeacherPath);
@@ -261,7 +261,9 @@ public class PdfReporter {
         try (PDDocument doc = new PDDocument()) {
             Map<String, java.util.List<CourseAssignment>> byTeacher = new java.util.TreeMap<>();
             for (CourseAssignment a : schedule.getCourseAssignments()) {
-                String teacher = a.getTeacher() != null ? a.getTeacher().getName() : "UNASSIGNED";
+                String teacher = a.getTeacher() != null
+                        ? (a.getTeacher().getName() + " " + a.getTeacher().getLastName())
+                        : "UNASSIGNED";
                 byTeacher.computeIfAbsent(teacher, k -> new java.util.ArrayList<>()).add(a);
             }
 
@@ -292,7 +294,7 @@ public class PdfReporter {
                     // Build calendar data structure for this teacher
                     Map<Integer, Map<Integer, java.util.List<CourseAssignment>>> calendar = new java.util.TreeMap<>();
 
-                    int minHour = 8;
+                    int minHour = 7;
                     int maxHour = 15;
 
                     for (int day = 1; day <= 5; day++) {
@@ -341,7 +343,7 @@ public class PdfReporter {
                                 if (cellText.length() > 0) {
                                     cellText.append("\n");
                                 }
-                                cellText.append(a.getCourse().getName());
+                                cellText.append(a.getCourse().getAbbreviation());
                                 cellText.append("\n");
                                 cellText.append(a.getGroup().getName());
                                 if (a.getRoom() != null) {
@@ -350,7 +352,7 @@ public class PdfReporter {
                                 }
                             }
                             drawCell(cs, tableX + (day - 1) * cellWidth, tableY, cellWidth, cellHeight,
-                                    cellText.toString(), 8, false);
+                                    cellText.toString(), 6, false);
                         }
                         tableY -= cellHeight;
                     }
@@ -402,7 +404,7 @@ public class PdfReporter {
                     // Build calendar data structure for this group
                     Map<Integer, Map<Integer, java.util.List<CourseAssignment>>> calendar = new java.util.TreeMap<>();
 
-                    int minHour = 8;
+                    int minHour = 7;
                     int maxHour = 15;
 
                     for (int day = 1; day <= 5; day++) {
@@ -451,10 +453,10 @@ public class PdfReporter {
                                 if (cellText.length() > 0) {
                                     cellText.append("\n");
                                 }
-                                cellText.append(a.getCourse().getName());
+                                cellText.append(a.getCourse().getAbbreviation());
                                 if (a.getTeacher() != null) {
                                     cellText.append("\n");
-                                    cellText.append(a.getTeacher().getName());
+                                    cellText.append(a.getTeacher().getName() + " " + a.getTeacher().getLastName());
                                 }
                                 if (a.getRoom() != null) {
                                     cellText.append("\n");
@@ -462,7 +464,7 @@ public class PdfReporter {
                                 }
                             }
                             drawCell(cs, tableX + (day - 1) * cellWidth, tableY, cellWidth, cellHeight,
-                                    cellText.toString(), 8, false);
+                                    cellText.toString(), 6, false);
                         }
                         tableY -= cellHeight;
                     }

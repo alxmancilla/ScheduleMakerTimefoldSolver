@@ -6,13 +6,13 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class Teacher {
-    private final String id;
-    private final String name;
-    private final String lastName;
-    private final Set<String> qualifications;
+    private String id;
+    private String name;
+    private String lastName;
+    private Set<String> qualifications;
     // Availability expressed as a map from DayOfWeek -> set of available hours
     // (each hour is an int)
-    private final java.util.Map<DayOfWeek, java.util.Set<Integer>> availabilityPerDay = new java.util.HashMap<>();
+    private java.util.Map<DayOfWeek, java.util.Set<Integer>> availabilityPerDay = new java.util.HashMap<>();
     // Maximum teaching hours per week for this teacher. Default will be 20.
     private int maxHoursPerWeek = 40;
 
@@ -86,6 +86,14 @@ public class Teacher {
         return maxHoursPerWeek;
     }
 
+    public void setMaxHoursPerWeek() {
+        this.maxHoursPerWeek = maxHoursPerWeek;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
     public String getId() {
         return id;
     }
@@ -101,12 +109,24 @@ public class Teacher {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public String getLastName() {
         return lastName;
     }
 
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
     public Set<String> getQualifications() {
         return qualifications;
+    }
+
+    public void setQualifications(Set<String> qualifications) {
+        this.qualifications = qualifications;
     }
 
     /**

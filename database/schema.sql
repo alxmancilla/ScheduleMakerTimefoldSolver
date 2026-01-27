@@ -112,7 +112,7 @@ CREATE TABLE course (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     active BOOLEAN NOT NULL DEFAULT true,
-    CONSTRAINT check_room_requirement CHECK (room_requirement IN ('estándar', 'taller')),
+    CONSTRAINT check_room_requirement CHECK (room_requirement IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica','centro de cómputo', 'laboratorio')),
     CONSTRAINT check_required_hours CHECK (required_hours_per_week > 0)
 );
 
@@ -133,7 +133,7 @@ CREATE TABLE room (
     type VARCHAR(50) NOT NULL,  -- 'estándar' or 'taller'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT check_room_type CHECK (type IN ('estándar', 'taller'))
+    CONSTRAINT check_room_type CHECK (type IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica', 'centro de cómputo', 'laboratorio'))
 );
 
 CREATE INDEX idx_room_building ON room(building);

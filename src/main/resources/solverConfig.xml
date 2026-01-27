@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<solver>
+    <solutionClass>com.example.domain.SchoolSchedule</solutionClass>
+    <entityClass>com.example.domain.CourseAssignment</entityClass>
+    <scoreDirectorFactory>
+        <constraintProviderClass>com.example.solver.SchoolConstraintProvider</constraintProviderClass>
+    </scoreDirectorFactory>
+
+    <!-- Phase 1: Construction Heuristic -->
+    <constructionHeuristic>
+        <constructionHeuristicType>FIRST_FIT</constructionHeuristicType>
+    </constructionHeuristic>
+
+    <!-- Phase 2: Local Search (Improvement) -->
+    <localSearch>
+        <termination>
+            <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
+            <minutesSpentLimit>25</minutesSpentLimit>
+            <bestScoreLimit>0hard/*soft</bestScoreLimit>
+        </termination>
+    </localSearch>
+</solver>
