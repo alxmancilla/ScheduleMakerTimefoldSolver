@@ -195,7 +195,8 @@ public class DemoDataGenerator {
         private static List<Course> generateCourses() {
                 List<Course> courses = new ArrayList<>();
 
-                courses.add(new Course("7", "CIENCIAS SOCIALES I", "CIEN SOC I", "I", "BASICAS", "standard", 2));
+                courses.add(new Course("111", "CIENCIAS SOCIALES I", "CIEN SOC I", "I", "BASICAS", "standard", 2,
+                                Boolean.TRUE));
 
                 courses.add(new Course("TUTORIAS I", "standard", 1));
                 courses.add(new Course("CLUB DE AJEDREZ", "standard", 1));

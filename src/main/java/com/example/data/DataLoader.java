@@ -43,7 +43,8 @@ public class DataLoader {
             List<Room> rooms = loadRooms(conn);
             List<Timeslot> timeslots = loadTimeslots(conn);
             List<Group> groups = loadGroups(conn, rooms);
-            List<CourseAssignment> assignments = loadCourseAssignments(conn, groups, courses);
+            List<CourseAssignment> assignments = loadCourseAssignments(conn, groups, courses, teachers, rooms,
+                    timeslots);
 
             System.out.println("Loaded from database:");
             System.out.println("  - " + teachers.size() + " teachers");
@@ -161,7 +162,7 @@ public class DataLoader {
      */
     private List<Course> loadCourses(Connection conn) throws SQLException {
         List<Course> courses = new ArrayList<>();
-        String sql = "SELECT id, name, room_requirement, required_hours_per_week FROM course";
+        String sql = "SELECT id, name, abbreviation, semester, component, room_requirement, required_hours_per_week, active FROM course";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -174,8 +175,10 @@ public class DataLoader {
                 String component = rs.getString("component");
                 String roomRequirement = rs.getString("room_requirement");
                 int requiredHours = rs.getInt("required_hours_per_week");
+                Boolean active = rs.getBoolean("active");
 
-                courses.add(new Course(id, name, abbreviation, semester, component, roomRequirement, requiredHours));
+                courses.add(new Course(id, name, abbreviation, semester, component, roomRequirement, requiredHours,
+                        active));
             }
         }
 
@@ -279,13 +282,15 @@ public class DataLoader {
     }
 
     /**
-     * Load all course assignments (initially unassigned).
+     * Load all course assignments with teacher, room, and timeslot assignments when
+     * available.
      */
-    private List<CourseAssignment> loadCourseAssignments(Connection conn, List<Group> groups, List<Course> courses)
+    private List<CourseAssignment> loadCourseAssignments(Connection conn, List<Group> groups, List<Course> courses,
+            List<Teacher> teachers, List<Room> rooms, List<Timeslot> timeslots)
             throws SQLException {
         List<CourseAssignment> assignments = new ArrayList<>();
 
-        String sql = "SELECT id, group_id, course_id, sequence_index FROM course_assignment ORDER BY id";
+        String sql = "SELECT id, group_id, course_id, sequence_index, teacher_id, room_name, timeslot_id FROM course_assignment ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -308,6 +313,45 @@ public class DataLoader {
                         .orElseThrow(() -> new SQLException("Course not found: " + courseId));
 
                 CourseAssignment assignment = new CourseAssignment(id, group, course, sequenceIndex);
+
+                // Assign teacher if available
+                String teacherId = rs.getString("teacher_id");
+                if (teacherId != null && !teacherId.isEmpty()) {
+                    Teacher teacher = teachers.stream()
+                            .filter(t -> t.getId().equals(teacherId))
+                            .findFirst()
+                            .orElse(null);
+                    if (teacher != null) {
+                        assignment.setTeacher(teacher);
+                    }
+                }
+
+                // Assign room if available
+                String roomName = rs.getString("room_name");
+                if (roomName != null && !roomName.isEmpty()) {
+                    Room room = rooms.stream()
+                            .filter(r -> r.getName().equals(roomName))
+                            .findFirst()
+                            .orElse(null);
+                    if (room != null) {
+                        assignment.setRoom(room);
+                    }
+                }
+
+                // Assign timeslot if available
+                /**
+                 * String timeslotId = rs.getString("timeslot_id");
+                 * if (timeslotId != null && !timeslotId.isEmpty()) {
+                 * Timeslot timeslot = timeslots.stream()
+                 * .filter(ts -> ts.getId().equals(timeslotId))
+                 * .findFirst()
+                 * .orElse(null);
+                 * if (timeslot != null) {
+                 * assignment.setTimeslot(timeslot);
+                 * }
+                 * }
+                 */
+
                 assignments.add(assignment);
             }
         }

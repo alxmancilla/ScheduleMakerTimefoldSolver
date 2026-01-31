@@ -222,14 +222,14 @@ public final class ScheduleAnalyzer {
         for (CourseAssignment a : list) {
             if (a.getTeacher() == null)
                 continue;
-            String name = a.getTeacher().getName();
+            String name = a.getTeacher().getName() + " " + a.getTeacher().getLastName();
             teacherCounts.put(name, teacherCounts.getOrDefault(name, 0) + 1);
             teacherMax.putIfAbsent(name, a.getTeacher().getMaxHoursPerWeek());
         }
         for (Map.Entry<String, Integer> e : teacherCounts.entrySet()) {
             String name = e.getKey();
             int count = e.getValue();
-            int max = teacherMax.getOrDefault(name, 20);
+            int max = teacherMax.getOrDefault(name, 40);
             if (count > max) {
                 int excess = count - max;
                 teacherMaxExcessDetails.add(name + ": assigned=" + count + ", max=" + max + ", excess=" + excess);

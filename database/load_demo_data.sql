@@ -304,18 +304,17 @@ CROSS JOIN generate_series(7, 14) AS h;
 -- ============================================================================
 -- 11 courses with varying hours per week
 
-INSERT INTO course (id, name, room_requirement, required_hours_per_week) VALUES
-('c_tutorias_i', 'TUTORIAS I', 'standard', 1),
-('c_club_de_ajedrez', 'CLUB DE AJEDREZ', 'standard', 1),
-('c_activaci_n_f_sica', 'ACTIVACIÓN FÍSICA', 'standard', 1),
-('c_recursos_socioemocionales_i', 'RECURSOS SOCIOEMOCIONALES I', 'standard', 1),
-('c_ciencias_sociales_i', 'CIENCIAS SOCIALES I', 'standard', 2),
-('c_lengua_y_comunicaci_n_i', 'LENGUA Y COMUNICACIÓN I', 'standard', 3),
-('c_ingl_s_i', 'INGLÉS I', 'standard', 3),
-('c_cultura_digital_i', 'CULTURA DIGITAL I', 'lab', 3),
-('c_la_materia_y_sus_interacciones', 'LA MATERIA Y SUS INTERACCIONES', 'standard', 3),
-('c_humanidades_i', 'HUMANIDADES I', 'standard', 4),
-('c_pensamiento_matem_tico_i', 'PENSAMIENTO MATEMÁTICO I', 'standard', 4);
+INSERT INTO course (id, name, abbreviation, semester, component, room_requirement, required_hours_per_week) VALUES
+('t_i', 'TUTORIAS I', 'c_tutorias_i', 'I', 'theory', 'estándar', 1),
+('ca', 'CLUB DE AJEDREZ', 'c_club_de_ajedrez', 'I', 'theory', 'estándar', 1),
+('rs_i', 'RECURSOS SOCIOEMOCIONALES I', 'c_recursos_socioemocionales_i', 'I', 'theory', 'estándar', 1),
+('cs_i', 'CIENCIAS SOCIALES I', 'c_ciencias_sociales_i', 'I', 'theory', 'estándar', 2),
+('lc_i', 'LENGUA Y COMUNICACIÓN I', 'c_lengua_y_comunicacion_i', 'I', 'theory', 'estándar', 3),
+('i_i', 'INGLÉS I', 'c_ingles_i', 'I', 'theory', 'estándar', 3),
+('cd_i', 'CULTURA DIGITAL I', 'c_cultura_digital_i', 'I', 'theory', 'taller', 3),
+('m_i', 'LA MATERIA Y SUS INTERACCIONES', 'c_materia_interacciones', 'I', 'theory', 'estándar', 3),
+('h_i', 'HUMANIDADES I', 'c_humanidades_i', 'I', 'theory', 'estándar', 4),
+('pm_i', 'PENSAMIENTO MATEMÁTICO I', 'c_pensamiento_matematico_i', 'I', 'theory', 'estándar', 4);
 
 -- ============================================================================
 -- ROOMS DATA
@@ -323,17 +322,17 @@ INSERT INTO course (id, name, room_requirement, required_hours_per_week) VALUES
 -- 11 rooms total: 9 standard classrooms + 2 labs
 
 INSERT INTO room (name, building, type) VALUES
-('Room 05', 'A', 'standard'),
-('Room 06', 'A', 'standard'),
-('Room 07', 'A', 'standard'),
-('Room 08', 'A', 'standard'),
-('Room 09', 'A', 'standard'),
-('Room 10', 'A', 'standard'),
-('Room 11', 'A', 'standard'),
-('Room 12', 'A', 'standard'),
-('Room 13', 'A', 'standard'),
-('Lab CC3', 'A', 'lab'),
-('Lab CC4', 'A', 'lab');
+('Room 05', 'A', 'estándar'),
+('Room 06', 'A', 'estándar'),
+('Room 07', 'A', 'estándar'),
+('Room 08', 'A', 'estándar'),
+('Room 09', 'A', 'estándar'),
+('Room 10', 'A', 'estándar'),
+('Room 11', 'A', 'estándar'),
+('Room 12', 'A', 'estándar'),
+('Room 13', 'A', 'estándar'),
+('Lab CC3', 'A', 'taller'),
+('Lab CC4', 'A', 'taller');
 
 -- ============================================================================
 -- TIMESLOTS DATA
@@ -435,7 +434,8 @@ SELECT
     NULL AS timeslot_id,
     NULL AS room_name
 FROM student_group g
-CROSS JOIN course c
+INNER JOIN group_course gc ON g.id = gc.group_id
+INNER JOIN course c ON gc.course_name = c.name
 CROSS JOIN LATERAL generate_series(0, c.required_hours_per_week - 1) AS seq(n)
 ORDER BY g.id, c.id, seq.n;
 

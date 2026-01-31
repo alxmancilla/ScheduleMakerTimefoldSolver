@@ -16,7 +16,7 @@ import com.example.util.PdfReporter;
 import java.io.IOException;
 import java.sql.SQLException;
 
-public class MainApp {
+public class MainReportsApp {
 
     public static void main(String[] args) throws Exception {
         // Generate demo data
@@ -25,25 +25,17 @@ public class MainApp {
         String username = "mancilla";
         String password = "";
         DataLoader dataLoader = new DataLoader(jdbcUrl, username, password);
-        SchoolSchedule initialSchedule = dataLoader.loadData();
+        SchoolSchedule solvedSchedule = dataLoader.loadData();
 
         System.out.println("=== School Schedule Solver ===");
         System.out.println("Initial problem:");
-        System.out.println("  Teachers: " + initialSchedule.getTeachers().size());
-        System.out.println("  Courses: " + initialSchedule.getCourses().size());
-        System.out.println("  Rooms: " + initialSchedule.getRooms().size());
-        System.out.println("  Timeslots: " + initialSchedule.getTimeslots().size());
-        System.out.println("  Groups: " + initialSchedule.getGroups().size());
-        System.out.println("  Course Assignments: " + initialSchedule.getCourseAssignments().size());
+        System.out.println("  Teachers: " + solvedSchedule.getTeachers().size());
+        System.out.println("  Courses: " + solvedSchedule.getCourses().size());
+        System.out.println("  Rooms: " + solvedSchedule.getRooms().size());
+        System.out.println("  Timeslots: " + solvedSchedule.getTimeslots().size());
+        System.out.println("  Groups: " + solvedSchedule.getGroups().size());
+        System.out.println("  Course Assignments: " + solvedSchedule.getCourseAssignments().size());
         System.out.println();
-
-        // Build solver
-        SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory();
-        Solver<SchoolSchedule> solver = solverFactory.buildSolver();
-
-        // Solve
-        System.out.println("Solving...");
-        SchoolSchedule solvedSchedule = solver.solve(initialSchedule);
 
         // Print results
         System.out.println();
@@ -69,7 +61,6 @@ public class MainApp {
         });
         System.out.println();
 
-        /** */
         // Analyze soft constraint violations (counts)
         System.out.println("=== Soft Constraint Violations (by rule) ===");
         Map<String, Integer> softViolations = ScheduleAnalyzer.analyzeSoftConstraintViolations(solvedSchedule);
@@ -80,47 +71,27 @@ public class MainApp {
         System.out.println("=== Soft Constraint Violations (details) ===");
         Map<String, List<String>> softDetails = ScheduleAnalyzer
                 .analyzeSoftConstraintViolationsDetailed(solvedSchedule);
-
-        /**
-         * softDetails.forEach((rule, offenders) -> {
-         * System.out.println("- " + rule + ": " + offenders.size());
-         * for (String desc : offenders) {
-         * System.out.println(" " + desc);
-         * }
-         * });
-         */
+        softDetails.forEach((rule, offenders) -> {
+            System.out.println("- " + rule + ": " + offenders.size());
+            for (String desc : offenders) {
+                System.out.println("    " + desc);
+            }
+        });
         System.out.println();
-
-        // Save results back to database
-        System.out.println();
-        System.out.println("=== Saving to Database ===");
-        DataSaver dataSaver = new DataSaver(jdbcUrl, username, password);
-        try {
-            dataSaver.saveSchedule(solvedSchedule);
-
-            // Print statistics
-            System.out.println();
-            System.out.println("=== Database Statistics ===");
-            Map<String, Integer> stats = dataSaver.getScheduleStatistics();
-            stats.forEach((k, v) -> System.out.println("- " + k + ": " + v));
-        } catch (SQLException e) {
-            System.err.println("Failed to save schedule to database: " + e.getMessage());
-            e.printStackTrace();
-        }
 
         // Print schedule by day
-        // System.out.println("=== Schedule by Day ===");
-        // printScheduleByDay(solvedSchedule);
+        System.out.println("=== Schedule by Day ===");
+        printScheduleByDay(solvedSchedule);
 
         // Print schedule by teacher
         System.out.println();
-        // System.out.println("=== Schedule by Teacher ===");
-        // printScheduleByTeacher(solvedSchedule);
+        System.out.println("=== Schedule by Teacher ===");
+        printScheduleByTeacher(solvedSchedule);
 
         // Print schedule by group
         System.out.println();
-        // System.out.println("=== Schedule by Group ===");
-        // printScheduleByGroup(solvedSchedule);
+        System.out.println("=== Schedule by Group ===");
+        printScheduleByGroup(solvedSchedule);
 
         // Write PDF report
         try {
