@@ -21,6 +21,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 roomTypeMustSatisfyRequirement(constraintFactory),
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 sameTeacherForAllCourseHours(constraintFactory),
+                sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
                 // groupCoursesInSameRoomByType(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
@@ -99,6 +100,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && !a1.getTeacher().equals(a2.getTeacher()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Same teacher for all course hours (hard constraint)");
+    }
+
+    private Constraint sixthSemesterGroupsMustFinishBefore2pm(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEach(CourseAssignment.class)
+                .filter(assignment -> assignment.getCourse() != null
+                        && "VI".equals(assignment.getCourse().getSemester())
+                        && assignment.getTimeslot() != null
+                        && assignment.getTimeslot().getHour() >= 14) // 14:00 is 2pm
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("6th semester groups must finish before 2pm");
     }
 
     private Constraint groupCoursesInSameRoomByType(ConstraintFactory constraintFactory) {
