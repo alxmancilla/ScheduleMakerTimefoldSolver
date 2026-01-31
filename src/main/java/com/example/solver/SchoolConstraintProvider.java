@@ -116,11 +116,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
     private Constraint groupCourseMustBeConsecutiveOnSameDay(ConstraintFactory constraintFactory) {
         // Each group taking a course should have all its hours consecutive on the same day.
-        // This constraint penalizes pairs of assignments where:
-        // 1. Same group takes the same course
-        // 2. They are on the same day but NOT consecutive (gap exists)
-        // 3. OR they are on different days (violating the "same day" requirement)
-        // 4. OR there would be 3+ consecutive hours (max 2 hours allowed)
+        // Uses sequenceIndex to validate that hours are properly ordered and consecutive.
+        // sequenceIndex 0 should come before sequenceIndex 1, etc., and they must be
+        // on the same day with consecutive hours (e.g., hour 10, 11, 12 for indices 0, 1, 2).
         return constraintFactory
                 .forEachUniquePair(CourseAssignment.class)
                 .filter((a1, a2) -> {
@@ -129,23 +127,31 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         return false;
                     }
                     
+                    // Different sequence indices (different hours of the same course)
+                    if (a1.getSequenceIndex() == a2.getSequenceIndex()) {
+                        return false;
+                    }
+                    
                     if (a1.getTimeslot() == null || a2.getTimeslot() == null) {
                         return false;
                     }
                     
-                    // If on different days, they must both be scheduled on the same day
+                    // Must be on the same day
                     if (!a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
                         return true; // Violation: same course for same group should be on same day
                     }
                     
-                    // Both on same day: check if consecutive
+                    // Both on same day: validate consecutive hours based on sequence indices
                     int hour1 = a1.getTimeslot().getHour();
                     int hour2 = a2.getTimeslot().getHour();
-                    int hourDiff = Math.abs(hour1 - hour2);
+                    int seqDiff = a2.getSequenceIndex() - a1.getSequenceIndex();
+                    int hourDiff = hour2 - hour1;
                     
-                    // Not consecutive (gap > 1 hour on same day) = violation
-                    if (hourDiff > 1) {
-                        return true;
+                    // Hours should match the sequence difference
+                    // If seqDiff is +1, then hour should also be +1 (consecutive)
+                    // If seqDiff is -1, then hour should be -1 (consecutive in reverse)
+                    if (hourDiff != seqDiff) {
+                        return true; // Violation: not consecutive or wrong order
                     }
                     
                     return false;
