@@ -115,10 +115,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint groupCourseMustBeConsecutiveOnSameDay(ConstraintFactory constraintFactory) {
-        // Each group taking a course should have all its hours consecutive on the same day.
-        // Uses sequenceIndex to validate that hours are properly ordered and consecutive.
-        // sequenceIndex 0 should come before sequenceIndex 1, etc., and they must be
-        // on the same day with consecutive hours (e.g., hour 10, 11, 12 for indices 0, 1, 2).
+        // When a group takes multiple hours of the same course on the SAME day,
+        // those hours must be consecutive.
+        // However, course hours can be spread across different days (no requirement for same day).
+        // This constraint only applies when both assignments happen to be on the same day.
         return constraintFactory
                 .forEachUniquePair(CourseAssignment.class)
                 .filter((a1, a2) -> {
@@ -126,38 +126,38 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (!a1.getGroup().equals(a2.getGroup()) || !a1.getCourse().equals(a2.getCourse())) {
                         return false;
                     }
-                    
+
                     // Different sequence indices (different hours of the same course)
                     if (a1.getSequenceIndex() == a2.getSequenceIndex()) {
                         return false;
                     }
-                    
+
                     if (a1.getTimeslot() == null || a2.getTimeslot() == null) {
                         return false;
                     }
-                    
-                    // Must be on the same day
+
+                    // Only enforce consecutiveness if both assignments are on the same day
                     if (!a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                        return true; // Violation: same course for same group should be on same day
+                        return false; // Different days: no violation
                     }
-                    
+
                     // Both on same day: validate consecutive hours based on sequence indices
                     int hour1 = a1.getTimeslot().getHour();
                     int hour2 = a2.getTimeslot().getHour();
                     int seqDiff = a2.getSequenceIndex() - a1.getSequenceIndex();
                     int hourDiff = hour2 - hour1;
-                    
+
                     // Hours should match the sequence difference
                     // If seqDiff is +1, then hour should also be +1 (consecutive)
                     // If seqDiff is -1, then hour should be -1 (consecutive in reverse)
                     if (hourDiff != seqDiff) {
-                        return true; // Violation: not consecutive or wrong order
+                        return true; // Violation: not consecutive on the same day
                     }
-                    
+
                     return false;
                 })
                 .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Group course hours must be consecutive on the same day");
+                .asConstraint("Group course hours must be consecutive when on the same day");
     }
 
     private Constraint groupCoursesInSameRoomByType(ConstraintFactory constraintFactory) {
