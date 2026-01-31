@@ -22,6 +22,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 sameTeacherForAllCourseHours(constraintFactory),
                 sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
+                groupCourseMustBeConsecutiveOnSameDay(constraintFactory),
                 // groupCoursesInSameRoomByType(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
@@ -111,6 +112,46 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && assignment.getTimeslot().getHour() >= 14) // 14:00 is 2pm
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("6th semester groups must finish before 2pm");
+    }
+
+    private Constraint groupCourseMustBeConsecutiveOnSameDay(ConstraintFactory constraintFactory) {
+        // Each group taking a course should have all its hours consecutive on the same day.
+        // This constraint penalizes pairs of assignments where:
+        // 1. Same group takes the same course
+        // 2. They are on the same day but NOT consecutive (gap exists)
+        // 3. OR they are on different days (violating the "same day" requirement)
+        // 4. OR there would be 3+ consecutive hours (max 2 hours allowed)
+        return constraintFactory
+                .forEachUniquePair(CourseAssignment.class)
+                .filter((a1, a2) -> {
+                    // Must be same group and same course
+                    if (!a1.getGroup().equals(a2.getGroup()) || !a1.getCourse().equals(a2.getCourse())) {
+                        return false;
+                    }
+                    
+                    if (a1.getTimeslot() == null || a2.getTimeslot() == null) {
+                        return false;
+                    }
+                    
+                    // If on different days, they must both be scheduled on the same day
+                    if (!a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+                        return true; // Violation: same course for same group should be on same day
+                    }
+                    
+                    // Both on same day: check if consecutive
+                    int hour1 = a1.getTimeslot().getHour();
+                    int hour2 = a2.getTimeslot().getHour();
+                    int hourDiff = Math.abs(hour1 - hour2);
+                    
+                    // Not consecutive (gap > 1 hour on same day) = violation
+                    if (hourDiff > 1) {
+                        return true;
+                    }
+                    
+                    return false;
+                })
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Group course hours must be consecutive on the same day");
     }
 
     private Constraint groupCoursesInSameRoomByType(ConstraintFactory constraintFactory) {
