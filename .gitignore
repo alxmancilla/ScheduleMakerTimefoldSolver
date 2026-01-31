@@ -16,6 +16,9 @@ release.properties
 .DS_Store
 *.class
 
+# Datasets
+database/datasets/
+
 # Build artifacts
 *.jar
 *.zip
