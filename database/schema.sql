@@ -213,6 +213,7 @@ CREATE TABLE course_assignment (
     teacher_id VARCHAR(100),          -- Nullable: assigned by solver
     timeslot_id VARCHAR(50),          -- Nullable: assigned by solver
     room_name VARCHAR(100),           -- Nullable: assigned by solver
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,  -- If TRUE, Timefold must not modify this assignment
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES student_group(id) ON DELETE CASCADE,
@@ -229,6 +230,12 @@ CREATE INDEX idx_assignment_course ON course_assignment(course_id);
 CREATE INDEX idx_assignment_teacher ON course_assignment(teacher_id);
 CREATE INDEX idx_assignment_timeslot ON course_assignment(timeslot_id);
 CREATE INDEX idx_assignment_room ON course_assignment(room_name);
+
+ALTER TABLE course_assignment
+ADD CONSTRAINT pinned_requires_timeslot
+CHECK (
+    pinned = FALSE OR timeslot_id IS NOT NULL
+);
 
 COMMENT ON TABLE course_assignment IS 'Course assignment planning entities (teacher, timeslot, room TBD by solver)';
 COMMENT ON COLUMN course_assignment.sequence_index IS 'Which hour of the course (0-indexed) for multi-hour courses';

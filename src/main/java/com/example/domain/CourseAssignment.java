@@ -1,6 +1,7 @@
 package com.example.domain;
 
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
+import ai.timefold.solver.core.api.domain.entity.PlanningPin;
 import ai.timefold.solver.core.api.domain.variable.PlanningVariable;
 import ai.timefold.solver.core.api.domain.lookup.PlanningId;
 import java.util.Objects;
@@ -12,6 +13,9 @@ public class CourseAssignment {
     private Group group;
     private Course course;
     private int sequenceIndex; // Which hour of the course (0, 1, 2, etc.)
+
+    @PlanningPin
+    private boolean pinned;
 
     // @PlanningVariable(valueRangeProviderRefs = { "teacherRange" })
     private Teacher teacher;
@@ -89,6 +93,14 @@ public class CourseAssignment {
         this.room = room;
     }
 
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -106,7 +118,7 @@ public class CourseAssignment {
 
     @Override
     public String toString() {
-        return String.format("%s [%s] slot=%s teacher=%s room=%s",
-                id, course, timeslot, teacher, room);
+        return String.format("%s [%s] slot=%s teacher=%s room=%s %s sequence=%d",
+                id, course, timeslot, teacher, room, pinned ? "PINNED" : "UNPINNED", sequenceIndex);
     }
 }

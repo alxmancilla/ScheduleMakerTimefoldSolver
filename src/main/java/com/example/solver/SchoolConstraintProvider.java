@@ -5,6 +5,10 @@ import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
+
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+
 import com.example.domain.CourseAssignment;
 
 public class SchoolConstraintProvider implements ConstraintProvider {
@@ -23,6 +27,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 sameTeacherForAllCourseHours(constraintFactory),
                 sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
                 groupCourseMustBeConsecutiveOnSameDay(constraintFactory),
+                noCoursesOnMondayMorningForADHR(constraintFactory),
                 // groupCoursesInSameRoomByType(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
@@ -117,8 +122,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     private Constraint groupCourseMustBeConsecutiveOnSameDay(ConstraintFactory constraintFactory) {
         // When a group takes multiple hours of the same course on the SAME day,
         // those hours must be consecutive.
-        // However, course hours can be spread across different days (no requirement for same day).
-        // This constraint only applies when both assignments happen to be on the same day.
+        // However, course hours can be spread across different days (no requirement for
+        // same day).
+        // This constraint only applies when both assignments happen to be on the same
+        // day.
         return constraintFactory
                 .forEachUniquePair(CourseAssignment.class)
                 .filter((a1, a2) -> {
@@ -192,6 +199,32 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 })
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Group courses with same room type must use same room");
+    }
+
+    private Constraint noCoursesOnMondayMorningForADHR(ConstraintFactory factory) {
+        return factory.forEach(CourseAssignment.class)
+                // Timeslot must exist
+                .filter(assignment -> assignment.getTimeslot() != null)
+
+                // ✅ Scope: ONLY 6th semester groups
+                .filter(assignment -> assignment.getGroup() != null && (assignment.getGroup().getId().equals("4AARH") ||
+                        assignment.getGroup().getId().equals("6AARH")))
+
+                // Monday 09:00–13:00 overlap
+                .filter(assignment -> assignment.getTimeslot().getDayOfWeek() == DayOfWeek.MONDAY &&
+                        overlapsForbiddenWindow(
+                                LocalTime.of(assignment.getTimeslot().getHour(), 0),
+                                LocalTime.of(assignment.getTimeslot().getHour() + 1, 0)))
+
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("6th semester groups cannot have courses on Monday 9am–1pm");
+    }
+
+    private boolean overlapsForbiddenWindow(LocalTime start, LocalTime end) {
+        LocalTime forbiddenStart = LocalTime.of(9, 0);
+        LocalTime forbiddenEnd = LocalTime.of(13, 0);
+
+        return start.isBefore(forbiddenEnd) && end.isAfter(forbiddenStart);
     }
 
     private Constraint teacherMaxHoursPerWeek(ConstraintFactory constraintFactory) {

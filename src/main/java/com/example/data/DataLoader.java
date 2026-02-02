@@ -290,7 +290,7 @@ public class DataLoader {
             throws SQLException {
         List<CourseAssignment> assignments = new ArrayList<>();
 
-        String sql = "SELECT id, group_id, course_id, sequence_index, teacher_id, room_name, timeslot_id FROM course_assignment ORDER BY id";
+        String sql = "SELECT id, group_id, course_id, sequence_index, teacher_id, room_name, timeslot_id, pinned FROM course_assignment ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -339,18 +339,26 @@ public class DataLoader {
                 }
 
                 // Assign timeslot if available
-                /**
-                 * String timeslotId = rs.getString("timeslot_id");
-                 * if (timeslotId != null && !timeslotId.isEmpty()) {
-                 * Timeslot timeslot = timeslots.stream()
-                 * .filter(ts -> ts.getId().equals(timeslotId))
-                 * .findFirst()
-                 * .orElse(null);
-                 * if (timeslot != null) {
-                 * assignment.setTimeslot(timeslot);
-                 * }
-                 * }
-                 */
+                String timeslotId = rs.getString("timeslot_id");
+                if (timeslotId != null && !timeslotId.isEmpty()) {
+                    Timeslot timeslot = timeslots.stream()
+                            .filter(ts -> ts.getId().equals(timeslotId))
+                            .findFirst()
+                            .orElse(null);
+                    if (timeslot != null) {
+                        assignment.setTimeslot(timeslot);
+                    }
+                }
+
+                boolean pinned = rs.getBoolean("pinned");
+                System.out.println(" pinned assignment: " + pinned);
+                assignment.setPinned(pinned);
+
+                if (assignment.isPinned()) {
+                    System.out.println("Loaded pinned assignment: " + assignment);
+                } else {
+                    System.out.println("Loaded unpinned assignment: " + assignment.getId());
+                }
 
                 assignments.add(assignment);
             }

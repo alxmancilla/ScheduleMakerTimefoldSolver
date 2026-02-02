@@ -37,6 +37,8 @@ public class MainApp {
         System.out.println("  Course Assignments: " + initialSchedule.getCourseAssignments().size());
         System.out.println();
 
+        // System.exit(0);
+
         // Build solver
         SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory();
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
