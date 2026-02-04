@@ -15,7 +15,7 @@
     <localSearch>
         <termination>
             <unimprovedMinutesSpentLimit>3</unimprovedMinutesSpentLimit>
-            <minutesSpentLimit>15</minutesSpentLimit>
+            <minutesSpentLimit>50</minutesSpentLimit>
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
         </termination>
     </localSearch>

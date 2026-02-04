@@ -37,7 +37,7 @@ public class Room {
         } else if ("centro de cómputo".equals(requirement)) {
             return "centro de cómputo".equals(type);
         } else if ("laboratorio".equals(requirement)) {
-            return "laboratorio".equals(type);
+            return ("laboratorio".equals(type) || "estándar".equals(type));
         }
         return false;
     }

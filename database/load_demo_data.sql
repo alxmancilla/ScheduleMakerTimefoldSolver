@@ -1,14 +1,8 @@
 -- ============================================================================
 -- School Scheduling System - Demo Data Loading Script
 -- ============================================================================
--- This script loads the same demo data used in DemoDataGenerator.java
--- Corresponds to the data generated in:
--- - generateTeachers()
--- - generateCourses()
--- - generateRooms()
--- - generateTimeslots()
--- - generateGroups()
--- - generateCourseAssignments()
+-- This script populates the database with demo data for teachers, courses,
+-- rooms, timeslots, student groups, and course assignments.
 -- ============================================================================
 
 -- Set client encoding to UTF-8 for proper handling of special characters
@@ -33,130 +27,108 @@ DELETE FROM teacher;
 -- Note: ID is generated from lastName (sanitized)
 
 INSERT INTO teacher (id, name, last_name, max_hours_per_week) VALUES
-('t_melo', 'GUSTAVO', 'MELO', 30),
-('t_diego', 'MONICA E. ', 'DIEGO', 30),
-('t_ramirez', 'QUESIA ALONDRA', 'RAMIREZ', 40),
-('t_sanchez', 'LUIS', 'SANCHEZ', 30),
-('t_lluck', 'DIANA R.', 'LLUCK', 30),
-('t_acevedo', 'JUAN A.', 'ACEVEDO', 30),
-('t_garcia', 'HUGO', 'GARCIA', 40),
-('t_retana', 'JOSÉ CARLOS', 'RETANA', 30),
-('t_catalan', 'BALBINA', 'CATALAN', 20),
-('t_verdiguel', 'MARIO', 'VERDIGUEL', 40),
-('t_santana', 'ISRAEL', 'SANTANA', 20),
-('t_salas', 'ALFREDO', 'SALAS', 40),
-('t_barrios', 'ANDRES', 'BARRIOS', 40),
-('t_uribe', 'ITZEL', 'URIBE', 30),
-('t_herrera', 'YASIR', 'HERRERA', 30),
-('t_mart_nez', 'YAMEL A.', 'MARTÍNEZ', 40),
-('t_de_los_santos', 'LETICIA', 'DE LOS SANTOS', 40),
-('t_bahena', 'JOSE', 'BAHENA', 30),
-('t_nu_ez', 'LUCIA DANIELA', 'NUÑEZ', 30),
-('t_rosete', 'PABLO B.', 'ROSETE', 30),
-('t_adame', 'CARLOS IVAN', 'ADAME', 30),
-('t_guzman_contreras', 'MIGUEL A.', 'GUZMAN CONTRERAS', 40);
+('t_melo', 'HUGO', 'XYXYXYXY', 30),
+('t_diego', 'MONICA', 'XYXYXYXY', 30),
+('t_ramirez', 'QUESIA', 'XYXYXYXY', 40),
+('t_sanchez', 'LUIS', 'XYXYXYXY', 30),
+('t_lluck', 'DIANA', 'XYXYXYXY', 30),
+('t_acevedo', 'JUAN', 'XYXYXYXY', 30),
+('t_garcia', 'HUGO', 'XYXYXYXY', 40),
+('t_retana', 'JOSÉ ', 'XYXYXYXY', 30),
+('t_catalan', 'PEDRO', 'XYXYXYXY', 20),
+('t_verdiguel', 'MARIO', 'XYXYXYXY', 40),
+('t_santana', 'FRANCISCO', 'XYXYXYXY', 20),
+('t_salas', 'ALFREDO', 'XYXYXYXY', 40),
+('t_barrios', 'ANDRES', 'XYXYXYXY', 40),
+('t_uribe', 'ITZEL', 'XYXYXYXY', 30),
+('t_herrera', 'TOMAS', 'XYXYXYXY', 30),
+('t_marez', 'JUANA', 'XYXYXYXY', 40),
+('t_santos', 'LETICIA', 'XYXYXYXY', 40),
+('t_bahena', 'JOSE', 'XYXYXYXY', 30),
+('t_nu_ez', 'LUCIA', 'XYXYXYXY', 30),
+('t_rosete', 'PABLO', 'XYXYXYXY', 30),
+('t_adame', 'CARLOS', 'XYXYXYXY', 30),
+('t_contreras', 'MIGUEL', 'XYXYXYXY', 40);
 
 -- ============================================================================
 -- TEACHER QUALIFICATIONS
 -- ============================================================================
 
--- GUSTAVO MELO - LENGUA Y COMUNICACIÓN I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_melo', 'LENGUA Y COMUNICACIÓN I');
+('t_melo', 'LENGUA Y COMUNICACIÓN');
 
--- MONICA E. DIEGO - INGLÉS I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_diego', 'INGLÉS I');
+('t_diego', 'INGLÉS');
 
--- QUESIA ALONDRA RAMIREZ - INGLÉS I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_ramirez', 'INGLÉS I');
+('t_ramirez', 'INGLÉS');
 
--- LUIS SANCHEZ - PENSAMIENTO MATEMÁTICO I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_sanchez', 'PENSAMIENTO MATEMÁTICO I');
+('t_sanchez', 'PENSAMIENTO ABSTRACTO');
 
--- DIANA R. LLUCK - PENSAMIENTO MATEMÁTICO I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_lluck', 'PENSAMIENTO MATEMÁTICO I');
+('t_lluck', 'PENSAMIENTO ABSTRACTO');
 
--- JUAN A. ACEVEDO - PENSAMIENTO MATEMÁTICO I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_acevedo', 'PENSAMIENTO MATEMÁTICO I');
+('t_acevedo', 'PENSAMIENTO ABSTRACTO');
 
--- HUGO GARCIA - PENSAMIENTO MATEMÁTICO I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_garcia', 'PENSAMIENTO MATEMÁTICO I');
+('t_garcia', 'PENSAMIENTO ABSTRACTO');
 
--- JOSÉ CARLOS RETANA - CULTURA DIGITAL I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_retana', 'CULTURA DIGITAL I');
+('t_retana', 'CULTURA DIGITAL');
 
--- BALBINA CATALAN - CULTURA DIGITAL I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_catalan', 'CULTURA DIGITAL I');
+('t_catalan', 'CULTURA DIGITAL');
 
--- MARIO VERDIGUEL - CULTURA DIGITAL I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_verdiguel', 'CULTURA DIGITAL I');
+('t_verdiguel', 'CULTURA DIGITAL');
 
--- ISRAEL SANTANA - CULTURA DIGITAL I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_santana', 'CULTURA DIGITAL I');
+('t_santana', 'CULTURA DIGITAL');
 
--- ALFREDO SALAS - LA MATERIA Y SUS INTERACCIONES
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
 ('t_salas', 'LA MATERIA Y SUS INTERACCIONES');
 
--- ANDRES BARRIOS - Multiple qualifications
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_barrios', 'RECURSOS SOCIOEMOCIONALES I'),
-('t_barrios', 'TUTORIAS I');
+('t_barrios', 'RECURSOS SOCIOEMOCIONALES'),
+('t_barrios', 'TUTORIAS');
 
--- ITZEL URIBE - Multiple qualifications
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
 ('t_uribe', 'LA MATERIA Y SUS INTERACCIONES'),
-('t_uribe', 'RECURSOS SOCIOEMOCIONALES I'),
-('t_uribe', 'TUTORIAS I');
+('t_uribe', 'RECURSOS SOCIOEMOCIONALES'),
+('t_uribe', 'TUTORIAS');
 
--- YASIR HERRERA - Multiple qualifications
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
 ('t_herrera', 'LA MATERIA Y SUS INTERACCIONES'),
-('t_herrera', 'RECURSOS SOCIOEMOCIONALES I'),
-('t_herrera', 'TUTORIAS I');
+('t_herrera', 'RECURSOS SOCIOEMOCIONALES'),
+('t_herrera', 'TUTORIAS');
 
--- YAMEL A. MARTÍNEZ - CIENCIAS SOCIALES I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_mart_nez', 'CIENCIAS SOCIALES I');
+('t_marez', 'CIENCIAS SOCIALES');
 
--- LETICIA DE LOS SANTOS - HUMANIDADES I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_de_los_santos', 'HUMANIDADES I');
+('t_santos', 'HUMANIDADES');
 
--- JOSE BAHENA - Multiple qualifications
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_bahena', 'RECURSOS SOCIOEMOCIONALES I'),
-('t_bahena', 'HUMANIDADES I'),
-('t_bahena', 'TUTORIAS I');
+('t_bahena', 'RECURSOS SOCIOEMOCIONALES'),
+('t_bahena', 'HUMANIDADES'),
+('t_bahena', 'TUTORIAS');
 
--- LUCIA DANIELA NUÑEZ - Multiple qualifications
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_nu_ez', 'RECURSOS SOCIOEMOCIONALES I'),
-('t_nu_ez', 'TUTORIAS I');
+('t_nu_ez', 'RECURSOS SOCIOEMOCIONALES'),
+('t_nu_ez', 'TUTORIAS');
 
--- PABLO B. ROSETE - Multiple qualifications
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
 ('t_rosete', 'CLUB DE AJEDREZ'),
-('t_rosete', 'RECURSOS SOCIOEMOCIONALES I'),
-('t_rosete', 'TUTORIAS I');
+('t_rosete', 'RECURSOS SOCIOEMOCIONALES'),
+('t_rosete', 'TUTORIAS');
 
--- CARLOS IVAN ADAME - ACTIVACIÓN FÍSICA
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
 ('t_adame', 'ACTIVACIÓN FÍSICA');
 
--- MIGUEL A. GUZMAN CONTRERAS - CIENCIAS SOCIALES I
 INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
-('t_guzman_contreras', 'CIENCIAS SOCIALES I');
+('t_contreras', 'CIENCIAS SOCIALES');
 
 -- ============================================================================
 -- TEACHER AVAILABILITY
@@ -167,135 +139,113 @@ INSERT INTO teacher_qualification (teacher_id, qualification) VALUES
 -- Function to generate availability for a teacher
 -- Parameters: teacher_id, days (1-5 for Mon-Fri), start_hour, end_hour
 
--- GUSTAVO MELO: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_melo', d, h
 FROM generate_series(1, 5) AS d  -- Mon-Fri
 CROSS JOIN generate_series(7, 14) AS h;
 
--- MONICA E. DIEGO: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_diego', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- QUESIA ALONDRA RAMIREZ: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_ramirez', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- LUIS SANCHEZ: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_sanchez', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- DIANA R. LLUCK: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_lluck', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- JUAN A. ACEVEDO: Mon-Fri 11-15 (different hours!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_acevedo', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(11, 14) AS h;
 
--- HUGO GARCIA: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_garcia', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- JOSÉ CARLOS RETANA: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_retana', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- BALBINA CATALAN: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_catalan', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 12) AS h;
 
--- MARIO VERDIGUEL: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_verdiguel', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- ISRAEL SANTANA: Mon-Fri 10-14 (different hours!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_santana', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(10, 14) AS h;
 
--- ALFREDO SALAS: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_salas', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- ANDRES BARRIOS: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_barrios', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- ITZEL URIBE: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_uribe', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- YASIR HERRERA: Mon-Fri 7-14 (ends at 14, not 15!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_herrera', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 13) AS h;
 
--- YAMEL A. MARTÍNEZ: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
-SELECT 't_mart_nez', d, h
+SELECT 't_marez', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- LETICIA DE LOS SANTOS: Mon-Fri 7-13 (ends at 13!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
-SELECT 't_de_los_santos', d, h
+SELECT 't_santos', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 12) AS h;
 
--- JOSE BAHENA: Mon-Fri 7-13 (ends at 13!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_bahena', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 12) AS h;
 
--- LUCIA DANIELA NUÑEZ: Mon-Fri 7-13 (ends at 13!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_nu_ez', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 12) AS h;
 
--- PABLO B. ROSETE: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_rosete', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
--- CARLOS IVAN ADAME: Mon-Fri 9-15 (starts at 9!)
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
 SELECT 't_adame', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(9, 14) AS h;
 
--- MIGUEL A. GUZMAN CONTRERAS: Mon-Fri 7-15
 INSERT INTO teacher_availability (teacher_id, day_of_week, hour)
-SELECT 't_guzman_contreras', d, h
+SELECT 't_contreras', d, h
 FROM generate_series(1, 5) AS d
 CROSS JOIN generate_series(7, 14) AS h;
 
@@ -305,16 +255,16 @@ CROSS JOIN generate_series(7, 14) AS h;
 -- 11 courses with varying hours per week
 
 INSERT INTO course (id, name, abbreviation, semester, component, room_requirement, required_hours_per_week) VALUES
-('t_i', 'TUTORIAS I', 'c_tutorias_i', 'I', 'theory', 'estándar', 1),
+('t_i', 'TUTORIAS', 'c_tutorias_i', 'I', 'theory', 'estándar', 1),
 ('ca', 'CLUB DE AJEDREZ', 'c_club_de_ajedrez', 'I', 'theory', 'estándar', 1),
-('rs_i', 'RECURSOS SOCIOEMOCIONALES I', 'c_recursos_socioemocionales_i', 'I', 'theory', 'estándar', 1),
-('cs_i', 'CIENCIAS SOCIALES I', 'c_ciencias_sociales_i', 'I', 'theory', 'estándar', 2),
-('lc_i', 'LENGUA Y COMUNICACIÓN I', 'c_lengua_y_comunicacion_i', 'I', 'theory', 'estándar', 3),
-('i_i', 'INGLÉS I', 'c_ingles_i', 'I', 'theory', 'estándar', 3),
-('cd_i', 'CULTURA DIGITAL I', 'c_cultura_digital_i', 'I', 'theory', 'taller', 3),
+('rs_i', 'RECURSOS SOCIOEMOCIONALES', 'c_recursos_socioemocionales_i', 'I', 'theory', 'estándar', 1),
+('cs_i', 'CIENCIAS SOCIALES', 'c_ciencias_sociales_i', 'I', 'theory', 'estándar', 2),
+('lc_i', 'LENGUA Y COMUNICACIÓN', 'c_lengua_y_comunicacion_i', 'I', 'theory', 'estándar', 3),
+('i_i', 'INGLÉS', 'c_ingles_i', 'I', 'theory', 'estándar', 3),
+('cd_i', 'CULTURA DIGITAL', 'c_cultura_digital_i', 'I', 'theory', 'taller', 3),
 ('m_i', 'LA MATERIA Y SUS INTERACCIONES', 'c_materia_interacciones', 'I', 'theory', 'estándar', 3),
-('h_i', 'HUMANIDADES I', 'c_humanidades_i', 'I', 'theory', 'estándar', 4),
-('pm_i', 'PENSAMIENTO MATEMÁTICO I', 'c_pensamiento_matematico_i', 'I', 'theory', 'estándar', 4);
+('h_i', 'HUMANIDADES', 'c_humanidades_i', 'I', 'theory', 'estándar', 4),
+('pm_i', 'PENSAMIENTO ABSTRACTO', 'c_pensamiento_matematico_i', 'I', 'theory', 'estándar', 4);
 
 -- ============================================================================
 -- ROOMS DATA
