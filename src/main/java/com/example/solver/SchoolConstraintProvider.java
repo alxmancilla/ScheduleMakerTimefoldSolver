@@ -10,6 +10,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 
 import com.example.domain.CourseAssignment;
+import com.example.domain.Teacher;
 
 public class SchoolConstraintProvider implements ConstraintProvider {
 
@@ -19,21 +20,22 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // Hard constraints (infeasibility: must be satisfied)
                 teacherMustBeQualified(constraintFactory),
                 teacherMustBeAvailable(constraintFactory),
-                minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
                 noTeacherDoubleBooking(constraintFactory),
-                noRoomDoubleBooking(constraintFactory),
-                roomTypeMustSatisfyRequirement(constraintFactory),
-                groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 sameTeacherForAllCourseHours(constraintFactory),
-                sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
+                roomTypeMustSatisfyRequirement(constraintFactory),
+                noRoomDoubleBooking(constraintFactory),
+                groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 groupCourseMustBeConsecutiveOnSameDay(constraintFactory),
-                noCoursesOnMondayMorningForADHR(constraintFactory),
+                sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
+                // noCoursesOnMondayMorningForADHR(constraintFactory),
                 // groupCoursesInSameRoomByType(constraintFactory),
 
                 // Soft constraints (quality optimization: weighted preferences)
                 // Prefer group's pre-assigned room is a soft preference (weight 3)
                 // groupPreferredRoomConstraint(constraintFactory),
+                minimizeTeacherIdleGaps(constraintFactory), // weight 1 (comfort: efficiency)
                 teacherMaxHoursPerWeek(constraintFactory),
+                // preferUsingTeachersWithMoreAvailability(constraintFactory),
                 // minimizeTeacherBuildingChanges(constraintFactory), // weight 1 (comfort:
                 // minimize travel)
                 balanceTeacherWorkload(constraintFactory),
@@ -242,6 +244,20 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Teacher exceeds max hours per week (hard)");
     }
 
+    private Constraint preferUsingTeachersWithMoreAvailability(ConstraintFactory factory) {
+        return factory.forEach(CourseAssignment.class)
+                .filter(a -> a.getTeacher() != null)
+                .penalize(
+                        HardSoftScore.ONE_SOFT,
+                        a -> scarcityPenalty(a.getTeacher()))
+                .asConstraint("Prefer teachers with higher availability");
+    }
+
+    private int scarcityPenalty(Teacher teacher) {
+        // Inverse weight: fewer hours → bigger penalty
+        return Math.max(1, 40 - teacher.getMaxHoursPerWeek());
+    }
+
     private Constraint groupPreferredRoomConstraint(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEach(CourseAssignment.class)
@@ -297,9 +313,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Same group and same day with gap should be more strictly penalized
                     if (a1.getGroup() != null && a1.getGroup().equals(a2.getGroup())
                             && a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                        // Same group split across hours: penalize 4x
+                        // Same group split across hours: penalize 2x
                         // This keeps course hours consecutive and improves teaching quality
-                        return gap * 3;
+                        return gap * 2;
                     }
 
                     // Different courses: standard penalty (less strict)
@@ -324,11 +340,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
                     // Very gentle curve: no penalty until 90%, then light increase
                     // 50% = 0, 80% = 0, 85% = 1, 95% = 3, 100% = 5, >100% = higher
-                    if (utilization < 0.85) {
-                        return 0; // No penalty below 85% utilization
+                    if (utilization < 0.95) {
+                        return 0; // No penalty below 95% utilization
                     } else if (utilization <= 1.0) {
-                        // Light quadratic curve from 85-100%: (utilization - 0.85)^2 * 50
-                        double excess = utilization - 0.85;
+                        // Light quadratic curve from 95-100%: (utilization - 0.95)^2 * 50
+                        double excess = utilization - 0.95;
                         return (int) Math.round(excess * excess * 50);
                     } else {
                         // Over capacity: moderate penalty (hard constraint handles enforcement)
