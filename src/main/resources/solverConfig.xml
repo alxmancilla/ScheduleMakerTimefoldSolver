@@ -14,7 +14,7 @@
     <!-- Phase 2: Local Search (Improvement) -->
     <localSearch>
         <termination>
-            <unimprovedMinutesSpentLimit>2</unimprovedMinutesSpentLimit>
+            <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
             <minutesSpentLimit>100</minutesSpentLimit>
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
         </termination>

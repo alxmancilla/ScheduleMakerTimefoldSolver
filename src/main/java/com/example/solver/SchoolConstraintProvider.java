@@ -26,7 +26,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 noRoomDoubleBooking(constraintFactory),
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory),
                 groupCourseMustBeConsecutiveOnSameDay(constraintFactory),
-                sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
+                // sixthSemesterGroupsMustFinishBefore2pm(constraintFactory),
                 // noCoursesOnMondayMorningForADHR(constraintFactory),
                 // groupCoursesInSameRoomByType(constraintFactory),
 
