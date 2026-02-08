@@ -49,8 +49,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // - Evaluated only if all HARD constraints pass
                 // - Order by computational cost (most expensive first)
                 minimizeTeacherIdleGaps(constraintFactory), // #9: ~1,000 pairs (most expensive SOFT)
-                limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // #10: groupBy aggregation (weight 15,
-                                                                            // concentrate non-BASICAS)
+                // limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // #10: groupBy
+                // aggregation (weight 15,
+                // concentrate non-BASICAS)
                 teacherMaxHoursPerWeek(constraintFactory), // #11: groupBy aggregation (workload balance)
 
                 // ========== COMMENTED OUT CONSTRAINTS ==========
@@ -185,11 +186,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // consecutively
 
                     int basePenalty = Math.max(1, gapSize); // At least 1 penalty for any violation
-
-                    if (component != null && !component.equalsIgnoreCase("BASICAS")) {
-                        // Non-BASICAS courses: 3x penalty (TADHR, TEM, etc.)
-                        return basePenalty * 3;
-                    }
+                    /**
+                     * if (component != null && !component.equalsIgnoreCase("BASICAS")) {
+                     * // Non-BASICAS courses: 3x penalty (TADHR, TEM, etc.)
+                     * return basePenalty * 3;
+                     * }
+                     */
 
                     // BASICAS courses: standard penalty
                     return basePenalty;

@@ -6,7 +6,7 @@ import ai.timefold.solver.core.api.domain.variable.PlanningVariable;
 import ai.timefold.solver.core.api.domain.lookup.PlanningId;
 import java.util.Objects;
 
-@PlanningEntity(difficultyComparatorClass = CourseAssignmentDifficultyComparator.class)
+@PlanningEntity
 public class CourseAssignment {
     @PlanningId
     private String id;
