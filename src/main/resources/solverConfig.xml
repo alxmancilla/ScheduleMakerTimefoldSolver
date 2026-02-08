@@ -7,16 +7,43 @@
     </scoreDirectorFactory>
 
     <!-- Phase 1: Construction Heuristic -->
+    <!-- FIRST_FIT processes assignments in natural order (by group, course, sequence_index).
+         This is optimal for pre-assigned data where teachers and rooms are already set,
+         and only timeslots need assignment. Natural ordering helps satisfy the consecutive
+         hours constraint by processing same course/group assignments together. -->
     <constructionHeuristic>
         <constructionHeuristicType>FIRST_FIT</constructionHeuristicType>
     </constructionHeuristic>
 
     <!-- Phase 2: Local Search (Improvement) -->
+    <!-- Uses multiple algorithms for better exploration:
+         - Late Acceptance: Good for escaping local optima
+         - Tabu Search: Prevents cycling back to recent solutions -->
     <localSearch>
+        <unionMoveSelector>
+            <!-- Change 1 variable (timeslot) -->
+            <changeMoveSelector/>
+            <!-- Swap assignments between two entities -->
+            <swapMoveSelector/>
+            <!-- Pillar swap: swap groups of assignments with same value -->
+            <!-- <pillarSwapMoveSelector/> -->
+        </unionMoveSelector>
+        <acceptor>
+            <!-- Late Acceptance: accepts moves based on score from N steps ago -->
+            <lateAcceptanceSize>1000</lateAcceptanceSize>
+            <!-- Tabu Search: prevents cycling back to recent solutions -->
+            <entityTabuSize>7</entityTabuSize>
+        </acceptor>
+        <forager>
+            <acceptedCountLimit>1</acceptedCountLimit>
+        </forager>
         <termination>
-            <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
-            <minutesSpentLimit>100</minutesSpentLimit>
+            <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
+            <!-- Or after 10 minutes total -->
+            <minutesSpentLimit>120</minutesSpentLimit>
+            <!-- Or after 3 minutes without improvement -->
+            <unimprovedMinutesSpentLimit>3</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>

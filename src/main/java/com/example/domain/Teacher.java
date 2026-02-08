@@ -167,6 +167,15 @@ public class Teacher {
         return hours != null && hours.contains(timeslot.getHour());
     }
 
+    /**
+     * Check if teacher is available at a specific day and hour.
+     * This is a convenience method that doesn't require a Timeslot object.
+     */
+    public boolean isAvailableAt(DayOfWeek day, int hour) {
+        java.util.Set<Integer> hours = availabilityPerDay.get(day);
+        return hours != null && hours.contains(hour);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
