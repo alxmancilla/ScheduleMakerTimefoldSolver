@@ -7,9 +7,9 @@ import java.util.*;
 /**
  * DataSaver persists the solved SchoolSchedule results back to the PostgreSQL
  * database.
- * Updates the course_assignment table with the teacher, timeslot, and room
- * assignments
+ * Updates the course_block_assignment table with the timeslot assignments
  * determined by the Timefold solver.
+ * (Teacher and room are pre-assigned from database, only timeslot is solved)
  */
 public class DataSaver {
 
@@ -32,9 +32,8 @@ public class DataSaver {
     }
 
     /**
-     * Save the solved schedule results to the database.
-     * Updates the course_assignment table with teacher, timeslot, and room
-     * assignments.
+     * Save the solved block-based schedule results to the database.
+     * Updates the course_block_assignment table with block timeslot assignments.
      *
      * @param schedule The solved SchoolSchedule from the Timefold solver
      * @throws SQLException if database access fails
@@ -43,9 +42,9 @@ public class DataSaver {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             conn.setAutoCommit(false); // Start transaction
             try {
-                saveCourseAssignments(conn, schedule.getCourseAssignments());
+                saveCourseBlockAssignments(conn, schedule.getCourseBlockAssignments());
                 conn.commit();
-                System.out.println("✓ Schedule successfully saved to database");
+                System.out.println("✓ Block-based schedule successfully saved to database");
             } catch (SQLException e) {
                 conn.rollback();
                 System.err.println("✗ Failed to save schedule. Changes rolled back.");
@@ -55,29 +54,28 @@ public class DataSaver {
     }
 
     /**
-     * Update all course assignments with their solved teacher, timeslot, and room
+     * Update all course block assignments with their solved block timeslot
      * assignments.
+     * Note: Teacher and room are pre-assigned from database, only timeslot is
+     * updated.
      */
-    private void saveCourseAssignments(Connection conn, List<CourseAssignment> assignments) throws SQLException {
-        String sql = "UPDATE course_assignment SET teacher_id = ?, timeslot_id = ?, room_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+    private void saveCourseBlockAssignments(Connection conn, List<CourseBlockAssignment> assignments)
+            throws SQLException {
+        String sql = "UPDATE course_block_assignment SET block_timeslot_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
 
         int totalUpdated = 0;
         int unassignedCount = 0;
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            for (CourseAssignment assignment : assignments) {
-                String teacherId = assignment.getTeacher() != null ? assignment.getTeacher().getId() : null;
-                String timeslotId = assignment.getTimeslot() != null ? assignment.getTimeslot().getId() : null;
-                String roomName = assignment.getRoom() != null ? assignment.getRoom().getName() : null;
+            for (CourseBlockAssignment assignment : assignments) {
+                String blockTimeslotId = assignment.getTimeslot() != null ? assignment.getTimeslot().getId() : null;
 
-                if (teacherId == null || timeslotId == null || roomName == null) {
+                if (blockTimeslotId == null) {
                     unassignedCount++;
                 }
 
-                stmt.setString(1, teacherId);
-                stmt.setString(2, timeslotId);
-                stmt.setString(3, roomName);
-                stmt.setString(4, assignment.getId());
+                stmt.setString(1, blockTimeslotId);
+                stmt.setString(2, assignment.getId());
                 stmt.addBatch();
             }
 
@@ -121,19 +119,20 @@ public class DataSaver {
     }
 
     /**
-     * Fetch the current schedule from database and return as a SchoolSchedule.
+     * Fetch the current block-based schedule from database and return as a
+     * SchoolSchedule.
      * Useful for verifying saved results.
      *
-     * @return SchoolSchedule with current assignments from database
+     * @return SchoolSchedule with current block assignments from database
      * @throws SQLException if database access fails
      */
     public SchoolSchedule loadCurrentSchedule() throws SQLException {
         DataLoader loader = new DataLoader(jdbcUrl, username, password);
-        return loader.loadData();
+        return loader.loadDataForBlockScheduling();
     }
 
     /**
-     * Get statistics about the saved schedule.
+     * Get statistics about the saved block-based schedule.
      *
      * @return Map with assignment statistics
      * @throws SQLException if database access fails
@@ -142,27 +141,27 @@ public class DataSaver {
         Map<String, Integer> stats = new HashMap<>();
 
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
-            // Total assignments
+            // Total block assignments
             try (Statement stmt = conn.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as count FROM course_assignment")) {
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as count FROM course_block_assignment")) {
                 if (rs.next()) {
                     stats.put("total_assignments", rs.getInt("count"));
                 }
             }
 
-            // Assigned assignments
+            // Assigned block assignments (timeslot assigned)
             try (Statement stmt = conn.createStatement();
                     ResultSet rs = stmt.executeQuery(
-                            "SELECT COUNT(*) as count FROM course_assignment WHERE teacher_id IS NOT NULL AND timeslot_id IS NOT NULL AND room_name IS NOT NULL")) {
+                            "SELECT COUNT(*) as count FROM course_block_assignment WHERE block_timeslot_id IS NOT NULL")) {
                 if (rs.next()) {
                     stats.put("assigned_assignments", rs.getInt("count"));
                 }
             }
 
-            // Unassigned assignments
+            // Unassigned block assignments (no timeslot)
             try (Statement stmt = conn.createStatement();
                     ResultSet rs = stmt.executeQuery(
-                            "SELECT COUNT(*) as count FROM course_assignment WHERE teacher_id IS NULL OR timeslot_id IS NULL OR room_name IS NULL")) {
+                            "SELECT COUNT(*) as count FROM course_block_assignment WHERE block_timeslot_id IS NULL")) {
                 if (rs.next()) {
                     stats.put("unassigned_assignments", rs.getInt("count"));
                 }
@@ -171,16 +170,16 @@ public class DataSaver {
             // Unique teachers assigned
             try (Statement stmt = conn.createStatement();
                     ResultSet rs = stmt.executeQuery(
-                            "SELECT COUNT(DISTINCT teacher_id) as count FROM course_assignment WHERE teacher_id IS NOT NULL")) {
+                            "SELECT COUNT(DISTINCT teacher_id) as count FROM course_block_assignment WHERE teacher_id IS NOT NULL")) {
                 if (rs.next()) {
                     stats.put("unique_teachers_assigned", rs.getInt("count"));
                 }
             }
 
-            // Unique timeslots used
+            // Unique block timeslots used
             try (Statement stmt = conn.createStatement();
                     ResultSet rs = stmt.executeQuery(
-                            "SELECT COUNT(DISTINCT timeslot_id) as count FROM course_assignment WHERE timeslot_id IS NOT NULL")) {
+                            "SELECT COUNT(DISTINCT block_timeslot_id) as count FROM course_block_assignment WHERE block_timeslot_id IS NOT NULL")) {
                 if (rs.next()) {
                     stats.put("unique_timeslots_used", rs.getInt("count"));
                 }
@@ -189,7 +188,133 @@ public class DataSaver {
             // Unique rooms used
             try (Statement stmt = conn.createStatement();
                     ResultSet rs = stmt.executeQuery(
-                            "SELECT COUNT(DISTINCT room_name) as count FROM course_assignment WHERE room_name IS NOT NULL")) {
+                            "SELECT COUNT(DISTINCT room_name) as count FROM course_block_assignment WHERE room_name IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("unique_rooms_used", rs.getInt("count"));
+                }
+            }
+        }
+
+        return stats;
+    }
+
+    /**
+     * Example usage: Save a solved schedule to the database.
+     * stmt.setString(4, assignment.getId());
+     * stmt.addBatch();
+     * }
+     * 
+     * int[] updateCounts = stmt.executeBatch();
+     * for (int count : updateCounts) {
+     * if (count > 0) {
+     * totalUpdated++;
+     * }
+     * }
+     * }
+     * 
+     * System.out.println(" Updated " + totalUpdated + " course block assignments");
+     * if (unassignedCount > 0) {
+     * System.out.println(" ⚠ Warning: " + unassignedCount + " block assignments
+     * remain unassigned");
+     * }
+     * }
+     * 
+     * /**
+     * Clear all block assignments (set teacher, block timeslot, and room to NULL)
+     * and reset the block schedule.
+     * Useful for starting a fresh solve.
+     *
+     * @throws SQLException if database access fails
+     */
+    public void clearBlockSchedule() throws SQLException {
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+            conn.setAutoCommit(false);
+            try {
+                String sql = "UPDATE course_block_assignment SET teacher_id = NULL, block_timeslot_id = NULL, room_name = NULL, updated_at = CURRENT_TIMESTAMP";
+                try (Statement stmt = conn.createStatement()) {
+                    int count = stmt.executeUpdate(sql);
+                    conn.commit();
+                    System.out.println("✓ Cleared " + count + " course block assignments");
+                }
+            } catch (SQLException e) {
+                conn.rollback();
+                System.err.println("✗ Failed to clear block schedule. Changes rolled back.");
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Fetch the current block schedule from database and return as a
+     * SchoolSchedule.
+     * Useful for verifying saved results.
+     *
+     * @return SchoolSchedule with current block assignments from database
+     * @throws SQLException if database access fails
+     */
+    public SchoolSchedule loadCurrentBlockSchedule() throws SQLException {
+        DataLoader loader = new DataLoader(jdbcUrl, username, password);
+        return loader.loadDataForBlockScheduling();
+    }
+
+    /**
+     * Get statistics about the saved block schedule.
+     *
+     * @return Map with block assignment statistics
+     * @throws SQLException if database access fails
+     */
+    public Map<String, Integer> getBlockScheduleStatistics() throws SQLException {
+        Map<String, Integer> stats = new HashMap<>();
+
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+            // Total block assignments
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as count FROM course_block_assignment")) {
+                if (rs.next()) {
+                    stats.put("total_block_assignments", rs.getInt("count"));
+                }
+            }
+
+            // Assigned block assignments
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(*) as count FROM course_block_assignment WHERE teacher_id IS NOT NULL AND block_timeslot_id IS NOT NULL AND room_name IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("assigned_block_assignments", rs.getInt("count"));
+                }
+            }
+
+            // Unassigned block assignments
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(*) as count FROM course_block_assignment WHERE teacher_id IS NULL OR block_timeslot_id IS NULL OR room_name IS NULL")) {
+                if (rs.next()) {
+                    stats.put("unassigned_block_assignments", rs.getInt("count"));
+                }
+            }
+
+            // Unique teachers assigned
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(DISTINCT teacher_id) as count FROM course_block_assignment WHERE teacher_id IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("unique_teachers_assigned", rs.getInt("count"));
+                }
+            }
+
+            // Unique block timeslots used
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(DISTINCT block_timeslot_id) as count FROM course_block_assignment WHERE block_timeslot_id IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("unique_block_timeslots_used", rs.getInt("count"));
+                }
+            }
+
+            // Unique rooms used
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(DISTINCT room_name) as count FROM course_block_assignment WHERE room_name IS NOT NULL")) {
                 if (rs.next()) {
                     stats.put("unique_rooms_used", rs.getInt("count"));
                 }

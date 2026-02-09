@@ -36,26 +36,23 @@ public class DataLoader {
      * @return SchoolSchedule with all data loaded from database
      * @throws SQLException if database access fails
      */
-    public SchoolSchedule loadData() throws SQLException {
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
-            List<Teacher> teachers = loadTeachers(conn);
-            List<Course> courses = loadCourses(conn);
-            List<Room> rooms = loadRooms(conn);
-            List<Timeslot> timeslots = loadTimeslots(conn);
-            List<Group> groups = loadGroups(conn, rooms);
-            List<CourseAssignment> assignments = loadCourseAssignments(conn, groups, courses, teachers, rooms,
-                    timeslots);
-
-            System.out.println("Loaded from database:");
-            System.out.println("  - " + teachers.size() + " teachers");
-            System.out.println("  - " + courses.size() + " courses");
-            System.out.println("  - " + rooms.size() + " rooms");
-            System.out.println("  - " + timeslots.size() + " timeslots");
-            System.out.println("  - " + groups.size() + " groups");
-            System.out.println("  - " + assignments.size() + " course assignments");
-
-            return new SchoolSchedule(teachers, timeslots, rooms, courses, groups, assignments);
-        }
+    /**
+     * @deprecated Hour-based scheduling is no longer supported. Use
+     *             {@link #loadDataForBlockScheduling()} instead.
+     *
+     *             The database schema has been migrated to block-based scheduling
+     *             only.
+     *             The tables 'timeslot' and 'course_assignment' no longer exist.
+     *
+     * @return never returns
+     * @throws UnsupportedOperationException always thrown
+     */
+    @Deprecated
+    public SchoolSchedule loadData() {
+        throw new UnsupportedOperationException(
+                "Hour-based scheduling is no longer supported. " +
+                        "The database schema has been migrated to block-based scheduling. " +
+                        "Please use loadDataForBlockScheduling() instead.");
     }
 
     /**
@@ -208,30 +205,6 @@ public class DataLoader {
     }
 
     /**
-     * Load all timeslots.
-     */
-    private List<Timeslot> loadTimeslots(Connection conn) throws SQLException {
-        List<Timeslot> timeslots = new ArrayList<>();
-        String sql = "SELECT id, day_of_week, hour, display_name FROM timeslot ORDER BY day_of_week, hour";
-
-        try (Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery(sql)) {
-
-            while (rs.next()) {
-                String id = rs.getString("id");
-                int dayOfWeek = rs.getInt("day_of_week");
-                int hour = rs.getInt("hour");
-                String displayName = rs.getString("display_name");
-
-                DayOfWeek day = toDayOfWeek(dayOfWeek);
-                timeslots.add(new Timeslot(id, day, hour, displayName));
-            }
-        }
-
-        return timeslots;
-    }
-
-    /**
      * Load all student groups with their courses.
      */
     private List<Group> loadGroups(Connection conn, List<Room> rooms) throws SQLException {
@@ -282,15 +255,89 @@ public class DataLoader {
     }
 
     /**
-     * Load all course assignments with teacher, room, and timeslot assignments when
-     * available.
+     * Convert database day_of_week integer to Java DayOfWeek enum.
+     * Database: 1=Monday, 2=Tuesday, ..., 7=Sunday
      */
-    private List<CourseAssignment> loadCourseAssignments(Connection conn, List<Group> groups, List<Course> courses,
-            List<Teacher> teachers, List<Room> rooms, List<Timeslot> timeslots)
-            throws SQLException {
-        List<CourseAssignment> assignments = new ArrayList<>();
+    private DayOfWeek toDayOfWeek(int dayOfWeek) {
+        return switch (dayOfWeek) {
+            case 1 -> DayOfWeek.MONDAY;
+            case 2 -> DayOfWeek.TUESDAY;
+            case 3 -> DayOfWeek.WEDNESDAY;
+            case 4 -> DayOfWeek.THURSDAY;
+            case 5 -> DayOfWeek.FRIDAY;
+            case 6 -> DayOfWeek.SATURDAY;
+            case 7 -> DayOfWeek.SUNDAY;
+            default -> throw new IllegalArgumentException("Invalid day of week: " + dayOfWeek);
+        };
+    }
 
-        String sql = "SELECT id, group_id, course_id, sequence_index, teacher_id, room_name, timeslot_id, pinned FROM course_assignment ORDER BY id";
+    // ============================================================================
+    // BLOCK-BASED SCHEDULING METHODS
+    // ============================================================================
+
+    /**
+     * Load the complete dataset for block-based scheduling from the database.
+     *
+     * @return SchoolSchedule with block timeslots and course block assignments
+     * @throws SQLException if database access fails
+     */
+    public SchoolSchedule loadDataForBlockScheduling() throws SQLException {
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+            List<Teacher> teachers = loadTeachers(conn);
+            List<Course> courses = loadCourses(conn);
+            List<Room> rooms = loadRooms(conn);
+            List<BlockTimeslot> blockTimeslots = loadBlockTimeslots(conn);
+            List<Group> groups = loadGroups(conn, rooms);
+            List<CourseBlockAssignment> blockAssignments = loadCourseBlockAssignments(conn, groups, courses, teachers,
+                    rooms, blockTimeslots);
+
+            System.out.println("Loaded from database (block-based scheduling):");
+            System.out.println("  - " + teachers.size() + " teachers");
+            System.out.println("  - " + courses.size() + " courses");
+            System.out.println("  - " + rooms.size() + " rooms");
+            System.out.println("  - " + blockTimeslots.size() + " block timeslots");
+            System.out.println("  - " + groups.size() + " groups");
+            System.out.println("  - " + blockAssignments.size() + " course block assignments");
+
+            return SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses, groups,
+                    blockAssignments);
+        }
+    }
+
+    /**
+     * Load all block timeslots from the database.
+     */
+    private List<BlockTimeslot> loadBlockTimeslots(Connection conn) throws SQLException {
+        List<BlockTimeslot> blockTimeslots = new ArrayList<>();
+        String sql = "SELECT id, day_of_week, start_hour, length_hours FROM block_timeslot ORDER BY day_of_week, start_hour, length_hours";
+
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                String id = rs.getString("id");
+                int dayOfWeek = rs.getInt("day_of_week");
+                int startHour = rs.getInt("start_hour");
+                int lengthHours = rs.getInt("length_hours");
+
+                DayOfWeek day = toDayOfWeek(dayOfWeek);
+                blockTimeslots.add(new BlockTimeslot(id, day, startHour, lengthHours));
+            }
+        }
+
+        return blockTimeslots;
+    }
+
+    /**
+     * Load all course block assignments with teacher, room, and block timeslot
+     * assignments when available.
+     */
+    private List<CourseBlockAssignment> loadCourseBlockAssignments(Connection conn, List<Group> groups,
+            List<Course> courses, List<Teacher> teachers, List<Room> rooms, List<BlockTimeslot> blockTimeslots)
+            throws SQLException {
+        List<CourseBlockAssignment> assignments = new ArrayList<>();
+
+        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned FROM course_block_assignment ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -299,7 +346,7 @@ public class DataLoader {
                 String id = rs.getString("id");
                 String groupId = rs.getString("group_id");
                 String courseId = rs.getString("course_id");
-                int sequenceIndex = rs.getInt("sequence_index");
+                int blockLength = rs.getInt("block_length");
 
                 // Find corresponding group and course
                 Group group = groups.stream()
@@ -312,7 +359,7 @@ public class DataLoader {
                         .findFirst()
                         .orElseThrow(() -> new SQLException("Course not found: " + courseId));
 
-                CourseAssignment assignment = new CourseAssignment(id, group, course, sequenceIndex);
+                CourseBlockAssignment assignment = new CourseBlockAssignment(id, group, course, blockLength);
 
                 // Assign teacher if available
                 String teacherId = rs.getString("teacher_id");
@@ -338,26 +385,25 @@ public class DataLoader {
                     }
                 }
 
-                // Assign timeslot if available
-                String timeslotId = rs.getString("timeslot_id");
-                if (timeslotId != null && !timeslotId.isEmpty()) {
-                    Timeslot timeslot = timeslots.stream()
-                            .filter(ts -> ts.getId().equals(timeslotId))
+                // Assign block timeslot if available
+                String blockTimeslotId = rs.getString("block_timeslot_id");
+                if (blockTimeslotId != null && !blockTimeslotId.isEmpty()) {
+                    BlockTimeslot blockTimeslot = blockTimeslots.stream()
+                            .filter(bts -> bts.getId().equals(blockTimeslotId))
                             .findFirst()
                             .orElse(null);
-                    if (timeslot != null) {
-                        assignment.setTimeslot(timeslot);
+                    if (blockTimeslot != null) {
+                        assignment.setTimeslot(blockTimeslot);
                     }
                 }
 
                 boolean pinned = rs.getBoolean("pinned");
-                System.out.println(" pinned assignment: " + pinned);
                 assignment.setPinned(pinned);
 
                 if (assignment.isPinned()) {
-                    System.out.println("Loaded pinned assignment: " + assignment);
+                    System.out.println("Loaded pinned block assignment: " + assignment);
                 } else {
-                    System.out.println("Loaded unpinned assignment: " + assignment.getId());
+                    System.out.println("Loaded unpinned block assignment: " + assignment.getId());
                 }
 
                 assignments.add(assignment);
@@ -368,24 +414,7 @@ public class DataLoader {
     }
 
     /**
-     * Convert database day_of_week integer to Java DayOfWeek enum.
-     * Database: 1=Monday, 2=Tuesday, ..., 7=Sunday
-     */
-    private DayOfWeek toDayOfWeek(int dayOfWeek) {
-        return switch (dayOfWeek) {
-            case 1 -> DayOfWeek.MONDAY;
-            case 2 -> DayOfWeek.TUESDAY;
-            case 3 -> DayOfWeek.WEDNESDAY;
-            case 4 -> DayOfWeek.THURSDAY;
-            case 5 -> DayOfWeek.FRIDAY;
-            case 6 -> DayOfWeek.SATURDAY;
-            case 7 -> DayOfWeek.SUNDAY;
-            default -> throw new IllegalArgumentException("Invalid day of week: " + dayOfWeek);
-        };
-    }
-
-    /**
-     * Example usage: Load data from database.
+     * Example usage: Load block-based data from database.
      */
     public static void main(String[] args) {
         String jdbcUrl = System.getenv().getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/school_schedule");
@@ -395,8 +424,8 @@ public class DataLoader {
         DataLoader loader = new DataLoader(jdbcUrl, username, password);
 
         try {
-            SchoolSchedule schedule = loader.loadData();
-            System.out.println("\nSuccessfully loaded schedule from database!");
+            SchoolSchedule schedule = loader.loadDataForBlockScheduling();
+            System.out.println("\nSuccessfully loaded block-based schedule from database!");
             System.out.println("Ready for Timefold solver.");
         } catch (SQLException e) {
             System.err.println("Failed to load data from database: " + e.getMessage());

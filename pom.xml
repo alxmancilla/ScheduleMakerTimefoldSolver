@@ -94,9 +94,7 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
-                <configuration>
-                    <mainClass>com.example.MainApp</mainClass>
-                </configuration>
+                <!-- No default mainClass - must be specified via -Dexec.mainClass -->
             </plugin>
             <!-- Maven Shade Plugin - Creates fat JAR with all dependencies -->
             <plugin>

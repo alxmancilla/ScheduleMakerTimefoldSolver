@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <solver>
     <solutionClass>com.example.domain.SchoolSchedule</solutionClass>
-    <entityClass>com.example.domain.CourseAssignment</entityClass>
+    <!-- UPDATED: Changed from CourseAssignment to CourseBlockAssignment for block-based scheduling -->
+    <entityClass>com.example.domain.CourseBlockAssignment</entityClass>
     <scoreDirectorFactory>
         <constraintProviderClass>com.example.solver.SchoolConstraintProvider</constraintProviderClass>
     </scoreDirectorFactory>
 
     <!-- Phase 1: Construction Heuristic -->
-    <!-- FIRST_FIT processes assignments in natural order (by group, course, sequence_index).
+    <!-- FIRST_FIT processes block assignments in natural order (by group, course, blockLength).
          This is optimal for pre-assigned data where teachers and rooms are already set,
-         and only timeslots need assignment. Natural ordering helps satisfy the consecutive
-         hours constraint by processing same course/group assignments together. -->
+         and only block timeslots need assignment. Natural ordering helps distribute blocks
+         efficiently across the schedule. -->
     <constructionHeuristic>
         <constructionHeuristicType>FIRST_FIT</constructionHeuristicType>
     </constructionHeuristic>
@@ -41,9 +42,9 @@
             <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
             <!-- Or after 10 minutes total -->
-            <minutesSpentLimit>120</minutesSpentLimit>
+            <minutesSpentLimit>1</minutesSpentLimit>
             <!-- Or after 3 minutes without improvement -->
-            <unimprovedMinutesSpentLimit>3</unimprovedMinutesSpentLimit>
+            <unimprovedMinutesSpentLimit>1</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>

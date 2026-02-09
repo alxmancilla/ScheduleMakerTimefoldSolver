@@ -1,29 +1,47 @@
 package com.example.data;
 
 import com.example.domain.*;
-import com.example.util.CourseAssignmentValidator;
 
 import java.time.DayOfWeek;
 import java.util.*;
 
 public class DemoDataGenerator {
 
+        /**
+         * Generate demo data for hour-based scheduling (original system).
+         *
+         * @deprecated Hour-based scheduling is no longer supported. Use
+         *             {@link #generateDemoDataForBlockScheduling()} instead.
+         */
+        @Deprecated
         public static SchoolSchedule generateDemoData() {
+                throw new UnsupportedOperationException(
+                                "Hour-based scheduling is no longer supported. " +
+                                                "Please use generateDemoDataForBlockScheduling() instead.");
+        }
+
+        /**
+         * Generate demo data for block-based scheduling (new system).
+         * Creates block timeslots and course block assignments instead of individual
+         * hour assignments.
+         */
+        public static SchoolSchedule generateBlockDemoData() {
                 List<Teacher> teachers = generateTeachers();
                 List<Course> courses = generateCourses();
                 List<Room> rooms = generateRooms();
-                List<Timeslot> timeslots = generateTimeslots();
+                List<BlockTimeslot> blockTimeslots = generateBlockTimeslots();
                 List<Group> groups = generateGroups(rooms);
-                List<CourseAssignment> assignments = generateCourseAssignments(groups, courses);
+                List<CourseBlockAssignment> blockAssignments = generateCourseBlockAssignments(groups, courses);
 
-                for (CourseAssignment ca : assignments) {
-                        ca.setTeacher(null);
-                        ca.setRoom(null);
-                        ca.setTimeslot(null);
+                // Clear teacher, room, and timeslot assignments (solver will assign them)
+                for (CourseBlockAssignment cba : blockAssignments) {
+                        cba.setTeacher(null);
+                        cba.setRoom(null);
+                        cba.setTimeslot(null);
                 }
-                SchoolSchedule schedule = new SchoolSchedule(teachers, timeslots, rooms, courses, groups, assignments);
 
-                return schedule;
+                return SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses, groups,
+                                blockAssignments);
         }
 
         private static List<Teacher> generateTeachers() {
@@ -241,38 +259,6 @@ public class DemoDataGenerator {
                 return rooms;
         }
 
-        private static List<Timeslot> generateTimeslots() {
-                List<Timeslot> timeslots = new ArrayList<>();
-
-                String[] days = { "Lun", "Mar", "Mie", "Jue", "Vie" };
-                int[] hours = { 7, 8, 9, 10, 11, 12, 13, 14 };
-
-                int counter = 0;
-                for (String day : days) {
-                        for (int hour : hours) {
-                                DayOfWeek dayOfWeek = switch (day) {
-                                        case "Lun" -> DayOfWeek.MONDAY;
-                                        case "Mar" -> DayOfWeek.TUESDAY;
-                                        case "Mie" -> DayOfWeek.WEDNESDAY;
-                                        case "Jue" -> DayOfWeek.THURSDAY;
-                                        case "Vie" -> DayOfWeek.FRIDAY;
-                                        default -> DayOfWeek.MONDAY;
-                                };
-
-                                String displayName = day + " " + (hour) + "-" + (hour + 1);
-                                timeslots.add(new Timeslot(
-                                                "slot_" + counter++,
-                                                dayOfWeek,
-                                                hour,
-                                                displayName));
-                        }
-                }
-
-                System.out.println("Generated " + timeslots.size() + " timeslots.");
-
-                return timeslots;
-        }
-
         private static List<Group> generateGroups(List<Room> rooms) {
                 List<Group> groups = new ArrayList<>();
 
@@ -430,8 +416,60 @@ public class DemoDataGenerator {
                 return groups;
         }
 
-        private static List<CourseAssignment> generateCourseAssignments(List<Group> groups, List<Course> courses) {
-                List<CourseAssignment> assignments = new ArrayList<>();
+        /**
+         * Generate block timeslots for block-based scheduling.
+         * Creates blocks of various lengths (1-4 hours) for each day and start hour.
+         *
+         * @return list of block timeslots
+         */
+        private static List<BlockTimeslot> generateBlockTimeslots() {
+                List<BlockTimeslot> slots = new ArrayList<>();
+                int id = 1;
+
+                DayOfWeek[] weekDays = {
+                                DayOfWeek.MONDAY,
+                                DayOfWeek.TUESDAY,
+                                DayOfWeek.WEDNESDAY,
+                                DayOfWeek.THURSDAY,
+                                DayOfWeek.FRIDAY
+                };
+
+                // Generate blocks of various lengths (1-4 hours)
+                for (DayOfWeek day : weekDays) {
+                        // Start hours: 7-14 (can't start at 15 because that's end of day)
+                        for (int startHour = 7; startHour <= 14; startHour++) {
+                                // Block lengths: 1-4 hours
+                                for (int length = 1; length <= 4; length++) {
+                                        int endHour = startHour + length;
+
+                                        // Don't create blocks that go past 15:00 (3pm)
+                                        if (endHour <= 15) {
+                                                slots.add(new BlockTimeslot(
+                                                                "block_" + id++,
+                                                                day,
+                                                                startHour,
+                                                                length));
+                                        }
+                                }
+                        }
+                }
+
+                System.out.println("Generated " + slots.size() + " block timeslots.");
+                return slots;
+        }
+
+        /**
+         * Generate course block assignments for block-based scheduling.
+         * Creates ONE block assignment per course per group (instead of multiple hour
+         * assignments).
+         *
+         * @param groups  list of student groups
+         * @param courses list of courses
+         * @return list of course block assignments
+         */
+        private static List<CourseBlockAssignment> generateCourseBlockAssignments(List<Group> groups,
+                        List<Course> courses) {
+                List<CourseBlockAssignment> assignments = new ArrayList<>();
 
                 int counter = 0;
                 for (Group group : groups) {
@@ -442,18 +480,17 @@ public class DemoDataGenerator {
                                                 .findFirst()
                                                 .orElseThrow();
 
-                                // Create an assignment for each hour required for the course
-                                for (int i = 0; i < course.getRequiredHoursPerWeek(); i++) {
-                                        CourseAssignment assignment = new CourseAssignment(
-                                                        "assignment_" + counter++,
-                                                        group,
-                                                        course,
-                                                        i);
-                                        assignments.add(assignment);
-                                }
+                                // Create ONE block assignment per course (not multiple hour assignments)
+                                int blockLength = course.getRequiredHoursPerWeek();
+                                CourseBlockAssignment assignment = new CourseBlockAssignment(
+                                                "block_assignment_" + counter++,
+                                                group,
+                                                course,
+                                                blockLength);
+                                assignments.add(assignment);
                         }
                 }
-                System.out.println("Generated " + assignments.size() + " assignments.");
+                System.out.println("Generated " + assignments.size() + " block assignments.");
 
                 return assignments;
         }

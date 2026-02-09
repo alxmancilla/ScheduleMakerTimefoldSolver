@@ -7,12 +7,13 @@ import ai.timefold.solver.core.api.domain.lookup.PlanningId;
 import java.util.Objects;
 
 @PlanningEntity
-public class CourseAssignment {
+public class CourseBlockAssignment {
     @PlanningId
     private String id;
     private Group group;
     private Course course;
-    private int sequenceIndex; // Which hour of the course (0, 1, 2, etc.)
+
+    private int blockLength;
 
     @PlanningPin
     private boolean pinned;
@@ -20,21 +21,21 @@ public class CourseAssignment {
     // @PlanningVariable(valueRangeProviderRefs = { "teacherRange" })
     private Teacher teacher;
 
-    @PlanningVariable(valueRangeProviderRefs = { "timeslotRange" })
-    private Timeslot timeslot;
+    @PlanningVariable(valueRangeProviderRefs = { "blockTimeslotRange" })
+    private BlockTimeslot timeslot;
 
     // @PlanningVariable(valueRangeProviderRefs = { "roomRange" })
     private Room room;
 
-    public CourseAssignment() {
+    public CourseBlockAssignment() {
         // No-arg constructor required by Timefold
     }
 
-    public CourseAssignment(String id, Group group, Course course, int sequenceIndex) {
+    public CourseBlockAssignment(String id, Group group, Course course, int blockLength) {
         this.id = id;
         this.group = group;
         this.course = course;
-        this.sequenceIndex = sequenceIndex;
+        this.blockLength = blockLength;
     }
 
     public String getId() {
@@ -61,12 +62,12 @@ public class CourseAssignment {
         this.course = course;
     }
 
-    public int getSequenceIndex() {
-        return sequenceIndex;
+    public int getBlockLength() {
+        return blockLength;
     }
 
-    public void setSequenceIndex(int sequenceIndex) {
-        this.sequenceIndex = sequenceIndex;
+    public void setBlockLength(int blockLength) {
+        this.blockLength = blockLength;
     }
 
     public Teacher getTeacher() {
@@ -77,11 +78,11 @@ public class CourseAssignment {
         this.teacher = teacher;
     }
 
-    public Timeslot getTimeslot() {
+    public BlockTimeslot getTimeslot() {
         return timeslot;
     }
 
-    public void setTimeslot(Timeslot timeslot) {
+    public void setTimeslot(BlockTimeslot timeslot) {
         this.timeslot = timeslot;
     }
 
@@ -107,7 +108,7 @@ public class CourseAssignment {
             return true;
         if (o == null || getClass() != o.getClass())
             return false;
-        CourseAssignment that = (CourseAssignment) o;
+        CourseBlockAssignment that = (CourseBlockAssignment) o;
         return Objects.equals(id, that.id);
     }
 
@@ -118,7 +119,7 @@ public class CourseAssignment {
 
     @Override
     public String toString() {
-        return String.format("%s [%s] slot=%s teacher=%s room=%s %s sequence=%d",
-                id, course, timeslot, teacher, room, pinned ? "PINNED" : "UNPINNED", sequenceIndex);
+        return String.format("%s [%s] slot=%s teacher=%s room=%s %s blockLength=%d",
+                id, course, timeslot, teacher, room, pinned ? "PINNED" : "UNPINNED", blockLength);
     }
 }

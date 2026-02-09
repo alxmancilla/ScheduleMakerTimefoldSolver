@@ -4,69 +4,103 @@ A comprehensive Java 17 application for school schedule generation using **Timef
 
 ## Current Status
 
-✅ **Build & Tests: PASSING** — Compiles successfully with Timefold 1.13.0 (1 test passing)  
-✅ **API Compatibility:** Fixed imports and method calls for Timefold 1.13.0  
-🏗️ **Core Implementation:** 17 domain/solver classes, 18 Java source files  
-⏱️ **Solver Config:** 2 minutes time limit, 1 minute unimproved limit, best score limit: `0hard/*soft`
+✅ **Build & Tests: PASSING** — Compiles successfully with Timefold 1.13.0
+✅ **Block-Based Scheduling:** Migrated from hour-based to block-based scheduling (multi-hour consecutive blocks)
+✅ **PostgreSQL Integration:** Full database support with schema, views, and data loading
+✅ **Production Dataset:** 484 course block assignments with 29 pinned assignments
+✅ **Perfect Score:** Achieved 0hard/-995soft (all hard constraints satisfied)
+⏱️ **Solver Config:** 15 minutes time limit, 5 minutes unimproved limit, best score limit: `0hard/*soft`
 
 ## Project Overview
 
 ### Problem Definition
-Generate a weekly school timetable that assigns:
-- **Teachers** to course hours (with qualifications and availability)
-- **Courses** to student groups (with required hours per week)
-- **Timeslots** (Monday–Friday, 7:00–15:00 hours)
-- **Rooms** (standard classrooms and labs)
+Generate a weekly school timetable using **block-based scheduling** that assigns:
+- **Teachers** to course blocks (with qualifications and per-day availability)
+- **Course Blocks** to student groups (multi-hour consecutive blocks, 1-4 hours)
+- **Block Timeslots** (Monday–Friday, 7:00–15:00, with variable block lengths)
+- **Rooms** (standard classrooms and specialized labs)
+
+### Scheduling Modes
+
+The system supports **block-based scheduling** (current implementation):
+
+**Block-Based Scheduling** (`MainBlockSchedulingApp`):
+- Uses `CourseBlockAssignment` entities representing multi-hour consecutive blocks
+- Supports blocks of 1-4 consecutive hours
+- **BASICAS courses**: Use multiple 1-hour blocks for maximum flexibility
+- **Non-BASICAS courses**: Use larger blocks (3-4 hours) to minimize fragmentation
+- Block decomposition strategy:
+  - 3 hours: 1×3-hour block
+  - 4 hours: 1×4-hour block
+  - 5 hours: 1×3-hour + 1×2-hour
+  - 6 hours: 2×3-hour blocks
+  - 7 hours: 1×4-hour + 1×3-hour
+  - 8 hours: 2×4-hour blocks
+  - 9 hours: 2×4-hour + 1×1-hour
+  - 11 hours: 2×4-hour + 1×3-hour
 
 ### Constraints
 
 #### Hard Constraints (Must be satisfied)
 1. **Teacher Qualification** — Teacher must be qualified for assigned course
-2. **Teacher Availability** — Teacher must be available at assigned timeslot
-3. **No Teacher Double-Booking** — Teacher cannot teach two courses simultaneously
-4. **No Room Double-Booking** — Room cannot host two courses simultaneously
-5. **Room Type Match** — Lab courses must use lab rooms; standard courses must use standard rooms
-6. **Group Time Conflict** — Student group cannot have two courses at the same time
-7. **Non-Lab Room Consistency** — All non-lab courses for a group prefer same room (hard, with lab exception)
+2. **Teacher Availability for Entire Block** — Teacher must be available for all hours in the block
+3. **No Teacher Double-Booking** — Teacher cannot teach two blocks that overlap
+4. **No Room Double-Booking** — Room cannot host two blocks that overlap
+5. **Room Type Match** — Lab courses must use lab rooms; standard courses can use any room
+6. **Group Time Conflict** — Student group cannot have overlapping blocks
+7. **Teacher Max Hours Per Week** — Teacher cannot exceed their weekly hour limit
 
 #### Soft Constraints (Quality optimization, weighted preferences)
-1. **Teacher Continuity** (weight 3) — Prefer same teacher for all hours of a course
-2. **Minimize Idle Gaps** (weight 1) — Reduce gaps between teacher's courses (same day)
-3. **Minimize Building Changes** (weight 1) — Reduce teacher building switches (same day)
-4. **Prefer Group Room** (weight 3) — Groups prefer their pre-assigned room when specified
+1. **Minimize Teacher Idle Gaps** (weight 1) — Reduce gaps between blocks for same teacher on same day (availability-aware)
+2. **Group Preferred Room** (weight 3) — Groups prefer their pre-assigned room when specified (excludes lab rooms)
+3. **Minimize Teacher Building Changes** (weight 1) — Reduce building switches for teachers on same day
+4. **Prefer Teachers with Less Capacity** (weight 1) — Favor assigning to teachers with lower max hours per week
 
 ## Features
 
-- **Flexible Teacher Management**: Teachers have a stable `id`, qualifications, a per-day availability map (hours available per DayOfWeek), and a `maxHoursPerWeek` workload limit.
-- **Multi-Room Scheduling**: Support for standard classrooms and specialized labs (room `type` and `building`).
-- **Group Constraints**: Prevent concurrent course scheduling for student groups and support optional preferred rooms.
-- **Pre-filled Excel Template**: `ExcelTemplateGenerator` now pre-fills a workbook from the demo data (teachers, courses, rooms, timeslots, groups, assignments) and includes teacher `id` and serialized per-day availability.
-- **PDF Reports**: `MainApp` uses `PdfReporter` to write three paginated PDF reports: violations, schedule-by-teacher, and schedule-by-group.
-- **Prioritization Strategies for Teachers**: Two strategies implemented to prefer assigning teachers with smaller weekly capacity:
-  - Heuristic bias: demo teachers are sorted ascending by `maxHoursPerWeek` (affects solver value ordering).
-  - Dynamic soft reward: a constraint (`preferTeachersWithLessCapacity`) rewards assignments to teachers with remaining capacity (scaled by a tunable `SCALE`).
-- **Scalable Architecture**: Timefold Constraint Streams for declarative, composable constraints.
-- **Comprehensive Reporting**: Console analysis and PDF outputs (violations and schedules).
+- **Block-Based Scheduling**: Multi-hour consecutive blocks (1-4 hours) for efficient timetabling
+- **PostgreSQL Integration**: Full database support with schema, views, and data loading scripts
+- **Pinned Assignments**: Support for locking specific course blocks to teachers, rooms, and timeslots
+- **Flexible Teacher Management**: Teachers have stable `id`, qualifications, per-day availability maps, and `maxHoursPerWeek` workload limits
+- **Multi-Room Scheduling**: Support for standard classrooms and specialized labs with building assignments
+- **Group Constraints**: Prevent overlapping blocks for student groups with optional preferred rooms
+- **PDF Reports**: Three paginated PDF reports generated: violations analysis, schedule-by-teacher, and schedule-by-group
+- **Database Views**: Pre-built views for teacher assignments, group schedules, and constraint validation
+- **Production Dataset**: Real-world dataset with 484 course block assignments across 20 student groups
+- **Scalable Architecture**: Timefold Constraint Streams for declarative, composable constraints
+- **Comprehensive Reporting**: Console analysis, PDF outputs, and database query support
 
 ## Project Structure
 
 ```
 src/
 ├── main/java/com/example/
-│   ├── MainApp.java                    # Entry point; runs solver and prints results
+│   ├── MainBlockSchedulingApp.java     # Entry point for block-based solver
 │   ├── domain/
-│   │   ├── Teacher.java                # Teacher with qualifications and availability
+│   │   ├── Teacher.java                # Teacher with qualifications and per-day availability
 │   │   ├── Course.java                 # Course with room requirement and hours
 │   │   ├── Room.java                   # Room with building and type (standard/lab)
-│   │   ├── Timeslot.java               # Timeslot with day and hour
+│   │   ├── BlockTimeslot.java          # Multi-hour block (day + start_hour + length)
 │   │   ├── Group.java                  # Student group with courses and optional preferred room
-│   │   ├── CourseAssignment.java       # @PlanningEntity: teacher, timeslot, room assignment
+│   │   ├── CourseBlockAssignment.java  # @PlanningEntity: block assignment with pinning support
 │   │   └── SchoolSchedule.java         # @PlanningSolution: problem and solution holder
 │   ├── solver/
-│   │   ├── SchoolConstraintProvider.java # All constraint definitions (hard & soft)
-│   │   └── SchoolSolverConfig.java     # Solver configuration (termination, time limits)
+│   │   ├── BlockConstraintProvider.java # All constraint definitions (hard & soft)
+│   │   └── BlockSolverConfig.java      # Solver configuration (termination, time limits)
+│   ├── analysis/
+│   │   └── BlockScheduleAnalyzer.java  # Analyzes constraint violations for blocks
+│   ├── util/
+│   │   ├── PdfReporter.java            # Generates PDF reports
+│   │   └── DataLoader.java             # Loads data from PostgreSQL database
 │   └── data/
-│       └── DemoDataGenerator.java      # Generates demo dataset (teachers, courses, rooms, groups)
+│       └── DemoDataGenerator.java      # Generates demo dataset (deprecated)
+├── database/
+│   ├── schema_block_scheduling.sql     # PostgreSQL schema (block-based only)
+│   ├── datasets/
+│   │   ├── load_demo_data_blocks.sql   # Demo dataset (932 lines)
+│   │   └── load_final_dataset_blocks.sql # Production dataset (2063 lines, 29 pinned)
+│   └── views/
+│       └── create_views.sql            # Database views for reporting
 └── test/
     └── java/com/example/AppTest.java
 ```
@@ -76,21 +110,54 @@ src/
 ### Prerequisites
 - **Java 17+**
 - **Maven 3.8+**
+- **PostgreSQL 12+** (for database integration)
+
+### Database Setup
+
+1. **Create database:**
+```bash
+createdb -U mancilla school_schedule
+```
+
+2. **Load schema:**
+```bash
+psql -U mancilla -d school_schedule -f database/schema_block_scheduling.sql
+```
+
+3. **Load dataset** (choose one):
+
+**Demo dataset** (smaller, for testing):
+```bash
+psql -U mancilla -d school_schedule -f database/datasets/load_demo_data_blocks.sql
+```
+
+**Production dataset** (real-world data with 484 assignments):
+```bash
+psql -U mancilla -d school_schedule -f database/datasets/load_final_dataset_blocks.sql
+```
+
+4. **Create views** (optional, for reporting):
+```bash
+psql -U mancilla -d school_schedule -f database/views/create_views.sql
+```
 
 ### Compile
 ```bash
 mvn clean compile
 ```
 
-### Run Solver
+### Run Block-Based Solver
 ```bash
-mvn exec:java -Dexec.mainClass="com.example.MainApp"
+mvn exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 ```
 
 This will:
-1. Generate demo data (22 teachers, 11 courses, 7 groups, 11 rooms, 40 timeslots)
+1. Load data from PostgreSQL database
 2. Run the solver (up to 15 minutes or until optimal score reached)
-3. Print the solved schedule grouped by day, teacher, and group
+3. Generate three PDF reports:
+   - `calendario-bloques-incumplimientos.pdf` - Constraint violations
+   - `calendario-bloques-por-maestro.pdf` - Schedule by teacher
+   - `calendario-bloques-por-grupo.pdf` - Schedule by student group
 4. Display constraint violation analysis
 
 ### Run Tests
@@ -98,30 +165,53 @@ This will:
 mvn test
 ```
 
-## Demo Data
+## Production Dataset
 
-### Teachers (22 total)
-- Qualified for specific courses
-- Available on specific days/hours
-- Examples: GUSTAVO MELO (Lengua y Comunicación), MONICA E. DIEGO (Inglés), DIANA R. LLUCK (Pensamiento Matemático)
+### Overview
+The production dataset (`load_final_dataset_blocks.sql`) contains real-world scheduling data:
+- **484 course block assignments** across 20 student groups
+- **29 pinned assignments** (locked teacher/room/timeslot combinations)
+- **42 teachers** with qualifications and per-day availability
+- **62 courses** (BASICAS and specialized courses)
+- **32 rooms** (standard classrooms and specialized labs)
+- **130 block timeslots** (1-4 hour blocks, Monday–Friday, 7:00–15:00)
 
-### Courses (11 total)
-- **Standard courses** (3–4 hours/week): Lengua y Comunicación, Inglés, Pensamiento Matemático, Humanidades, Ciencias Sociales
-- **Lab courses** (3 hours/week): Cultura Digital, La Materia y Sus Interacciones
-- **Extracurricular** (1–2 hours): Club de Ajedrez, Activación Física, Tutorias, Recursos Socioemocionales
+### Teachers (42 total)
+- Qualified for specific courses (e.g., SUSANA LEONOR for microbiological analysis)
+- Per-day availability maps (hours available per DayOfWeek)
+- Weekly hour limits (`maxHoursPerWeek`)
+- Examples: YARA ESTHER, ITZEL, LETICIA, ALFREDO, YASIR
 
-### Rooms (11 total)
-- **Standard** (6): Room 101–102 (Building A), Room 301 (Building B), Room 401–402 (Building C)
-- **Lab** (2): Lab 201–202 (Building A), Lab 302 (Building B)
+### Courses (62 total)
+- **BASICAS courses** (component='BASICAS'): Use 1-hour blocks for flexibility
+  - Examples: PENSAMIENTO MATEMATICO II (4 hours), INGLES II (3 hours), TUTORIAS II (1 hour)
+- **Specialized courses** (TPIAL, TPFV, etc.): Use larger blocks (3-4 hours)
+  - Examples: REALIZA ANALISIS FISICOS (8 hours), TRANSFORMA CARNE (11 hours)
 
-### Groups (7 total)
-- **Grupo 1o C**: Assigned courses + optional preferred room (Room 101)
-- **Grupo 1o G**: Assigned courses (flexible room)
-- Plus 5 additional groups
+### Rooms (32 total)
+- **Standard classrooms**: AULA 1–23 (various buildings)
+- **Specialized labs**: LQ 1 (chemistry), LMICRO (microbiology), LPIAL (food processing)
 
-### Timeslots (40 total)
-- Monday–Friday, 7:00–14:00 hours
-- One timeslot per hour
+### Student Groups (20 total)
+- **Semester 2**: 9 groups (2APIA, 2BPIA, 2CPIA, etc.)
+- **Semester 4**: 6 groups (4APIA, 4BPIA, etc.)
+- **Semester 6**: 5 groups (6APIA, 6AARH, 6APRO, 6ATEC, 6ATEM)
+
+### Block Timeslots (130 total)
+- Monday–Friday, 7:00–15:00 hours
+- Variable block lengths: 1, 2, 3, or 4 consecutive hours
+- Examples: Monday 7:00-10:00 (3h), Tuesday 9:00-11:00 (2h), Thursday 12:00-15:00 (3h)
+
+### Pinned Assignments (29 total)
+Locked assignments for specific courses:
+- **Course 15** (REALIZA ANALISIS FISICOS): 4 pinned blocks (2APIA, 2BPIA)
+- **Course 16** (REALIZA ANALISIS MICROBIOLOGICOS): 6 pinned blocks (2APIA, 2BPIA)
+- **Course 33** (TRANSFORMA FRUTAS Y VERDURAS): 2 pinned blocks (4APIA)
+- **Course 34** (TRANSFORMA CARNE): 3 pinned blocks (4APIA)
+- **Course 48** (HUMANISMO): 2 pinned blocks (6AARH)
+- **Course 49** (INTERACCIONES HUMANAS): 8 pinned blocks (6APIA, 6APRO, 6ATEC, 6ATEM)
+- **Course 53** (ANALISIS FISICOS/QUIMICOS/MICROBIOLOGICOS): 2 pinned blocks (6APIA)
+- **Course 54** (TRANSFORMA CEREALES): 2 pinned blocks (6APIA)
 
 ## Solution Output
 
@@ -130,75 +220,126 @@ mvn test
 - **X** = number of hard violations (0 = feasible)
 - **Y** = accumulated soft penalty (lower is better)
 
-### Example Run Output
+### Example Run Output (Production Dataset)
 ```
-=== School Schedule Solver ===
-Initial problem:
-  Teachers: 22
-  Courses: 11
-  Rooms: 11
-  Timeslots: 40
-  Groups: 7
-  Course Assignments: 77
+=== Block-Based School Schedule Solver ===
+Loading data from PostgreSQL database...
+
+Loaded 42 teachers
+Loaded 62 courses
+Loaded 32 rooms
+Loaded 130 block timeslots
+Loaded 20 groups
+Loaded 484 course block assignments
+Loaded 29 pinned block assignments
 
 Solving...
 
 === Solved Schedule ===
-Score: 0hard/-36soft
+Score: 0hard/-995soft
+Solving time: 12.2 seconds
 
 === Hard Constraint Violations (by rule) ===
 - Teacher must be qualified: 0
-- Teacher must be available at timeslot: 0
+- Teacher must be available for entire block: 0
 - No teacher double-booking: 0
 - No room double-booking: 0
 - Room type must satisfy course requirement: 0
 - Group cannot have two courses at same time: 0
-- Group non-lab courses must use same room: 0
+- Teacher exceeds max hours per week: 0
 
-=== Schedule by Day ===
-MONDAY:
-  Lun 8-9: LENGUA Y COMUNICACIÓN I (Group: Grupo 1o C, Teacher: GUSTAVO MELO, Room: Room 101)
+=== Soft Constraint Violations (by rule) ===
+- Minimize teacher idle gaps (availability-aware): 155 violations
+
+=== Schedule by Teacher ===
+YARA ESTHER:
+  MONDAY 07:00-10:00: TRANSFORMA CARNE Y SUS DERIVADOS (Group: 4APIA, Room: AULA 4) PINNED
+  MONDAY 10:00-13:00: TRANSFORMA CEREALES (Group: 6APIA, Room: AULA 4) PINNED
   ...
+
+=== Schedule by Group ===
+2APIA:
+  MONDAY 07:00-10:00: PENSAMIENTO MATEMATICO II (Teacher: DIANA, Room: AULA 1)
+  TUESDAY 07:00-11:00: REALIZA ANALISIS FISICOS (Teacher: SUSANA LEONOR, Room: LQ 1) PINNED
+  ...
+
+PDF reports written to:
+  - calendario-bloques-incumplimientos.pdf
+  - calendario-bloques-por-maestro.pdf
+  - calendario-bloques-por-grupo.pdf
 ```
 
 ## Recent Changes
 
-### January 2, 2026 (Current Release)
+### February 2026 (Current Release) - Block-Based Scheduling Migration
+
+- **Complete Migration to Block-Based Scheduling**
+  - Removed all hour-based scheduling code (`CourseAssignment`, `Timeslot`, etc.)
+  - Implemented `CourseBlockAssignment` with multi-hour consecutive blocks (1-4 hours)
+  - Created `BlockTimeslot` domain class (day + start_hour + length_hours)
+  - Updated all constraints to work with block overlaps and availability checking
+
+- **PostgreSQL Database Integration**
+  - Created `schema_block_scheduling.sql` with block-based tables only
+  - Implemented `DataLoader` for loading data from PostgreSQL
+  - Created database views for reporting and analysis
+  - Added support for pinned assignments via database
+
+- **Production Dataset**
+  - Translated `load_final_dataset.sql` (2188 lines) to block-based format
+  - Created `load_final_dataset_blocks.sql` with 484 course block assignments
+  - Translated 79 hour-based pinned assignments to 29 block-based pinned assignments
+  - Achieved perfect score: **0hard/-995soft** (all hard constraints satisfied)
+
+- **Block Decomposition Strategy**
+  - BASICAS courses: Multiple 1-hour blocks for maximum flexibility
+  - Non-BASICAS courses: Larger blocks (3-4 hours) to minimize fragmentation
+  - User-modified 5-hour strategy: 1×3 + 1×2 (instead of 1×4 + 1×1)
+
+- **Reporting & Analysis**
+  - Updated `PdfReporter` for block-based schedules
+  - Created `BlockScheduleAnalyzer` for constraint violation analysis
+  - Generated three PDF reports: violations, by-teacher, by-group
+
+### January 2, 2026
 
 - **Timefold 1.13.0 Validation & Fixes**
-  - Fixed syntax error in [src/main/java/com/example/solver/CourseAssignmentMoveFilter.java](src/main/java/com/example/solver/CourseAssignmentMoveFilter.java) (missing semicolon, wrong package).
-  - Updated imports to use correct Timefold 1.13.0 API: `ai.timefold.solver.core.impl.heuristic.selector.common.decorator.SelectionFilter`.
-  - Fixed method call: changed `getAssignments()` to `getCourseAssignments()` on `SchoolSchedule`.
-  - Cleaned up invalid code in `DemoDataGenerator.generateDemoData()` (removed undefined variables and logger references).
-  - All tests pass (`mvn test` returns 1 test, 0 failures, BUILD SUCCESS).
+  - Fixed syntax errors and updated imports for Timefold 1.13.0 API
+  - All tests pass (`mvn test` returns BUILD SUCCESS)
 
 ### November 2025
 
-- Domain model refactor
-  - `Teacher` now has a stable `id:String`, a per-day availability map (`Map<DayOfWeek, Set<Integer>> availabilityPerDay`) and `maxHoursPerWeek` (default 20).
-  - `Course` now has an `id:String` and retains `requiredHoursPerWeek`.
-
-- Excel & Reporting
-  - `ExcelTemplateGenerator` now pre-fills workbooks with demo data.
-  - `PdfReporter` generates three paginated reports: violations, by-teacher, and by-group.
-
-- Constraint improvements
-  - Hard constraints: teacher qualification, availability, no double-booking, room type matching, group time conflicts.
-  - Soft constraints: teacher continuity, idle gap minimization, building change reduction, group room preferences.
+- **Domain Model Refactor**
+  - `Teacher` with stable `id`, per-day availability map, and `maxHoursPerWeek`
+  - `Course` with `id` and `requiredHoursPerWeek`
+  - Excel template generation and PDF reporting
 
 ## Architecture
 
 ### Technology Stack
 - **Java 17** — Modern language features and performance
-- **Timefold Solver 1.x** — Constraint Streams API for declarative constraint modeling
+- **Timefold Solver 1.13.0** — Constraint Streams API for declarative constraint modeling
+- **PostgreSQL 12+** — Database for storing courses, teachers, rooms, and assignments
 - **Maven** — Build automation and dependency management
+- **Apache PDFBox** — PDF report generation
 - **HardSoftScore** — Two-level scoring (hard feasibility, soft quality)
 
+### Domain Model (Block-Based)
+- **`CourseBlockAssignment`** — @PlanningEntity representing a multi-hour block
+- **`BlockTimeslot`** — Multi-hour timeslot (day + start_hour + length_hours)
+- **`Teacher`** — With qualifications, per-day availability, and max hours per week
+- **`Course`** — With required hours per week and room requirements
+- **`Room`** — With type (standard/lab) and building
+- **`Group`** — Student group with assigned courses and optional preferred room
+- **`SchoolSchedule`** — @PlanningSolution holding all problem facts and planning entities
+
 ### Constraint Implementation
-- **Timefold Constraint Streams** — Programmatic, composable constraints
+- **Timefold Constraint Streams** — Declarative, composable constraints
+- **Block Overlap Detection** — Custom logic for detecting overlapping multi-hour blocks
+- **Availability Checking** — Validates teacher availability for entire block duration
+- **Pinning Support** — @PlanningPin annotation for locking assignments
 - **No-arg Constructors** — Required by Timefold for reflection
-- **@PlanningEntity/@PlanningSolution** — Domain model annotations
-- **@PlanningVariable** — Decision variables (teacher, timeslot, room)
+- **@PlanningVariable** — Decision variable: `blockTimeslot` (teacher and room pre-assigned from DB)
 - **@PlanningId** — Unique identifier for entity comparison
 
 ### Solver Configuration
@@ -211,43 +352,72 @@ MONDAY:
 
 ## Known Limitations
 
-1. **Capacity Constraints** — Rooms have no capacity limits (assumes single course per timeslot)
-2. **Soft Constraint Scaling** — Pairwise soft constraints (forEachUniquePair) scale as O(n²); consider refactoring for very large problem sizes
-3. **No Multi-Teacher Courses** — Each course hour is assigned to exactly one teacher
-4. **Fixed Timeslots** — Timeslots cannot be adjusted; only room/teacher assignments are flexible
+1. **Room Capacity** — Rooms have no capacity limits (assumes single course per block timeslot)
+2. **Pre-assigned Teachers** — Teachers are pre-assigned from database; solver only assigns timeslots
+3. **Pre-assigned Rooms** — Rooms are pre-assigned from database; solver only assigns timeslots
+4. **Fixed Block Lengths** — Block lengths are determined by course hours and component type (BASICAS vs non-BASICAS)
+5. **No Multi-Teacher Courses** — Each course block is assigned to exactly one teacher
+6. **Soft Constraint Scaling** — Pairwise soft constraints scale as O(n²); may need optimization for very large datasets
 
 ## Future Enhancements
 
-- [ ] Room capacity constraints
-- [ ] Teacher workload balancing
-- [ ] Student preferences (elective course scheduling)
-- [ ] Lunch break constraints
-- [ ] Rest period constraints (no back-to-back courses for teachers)
-- [ ] Multi-day course hour patterns (instead of weekly repetition)
-- [ ] Integration with calendar systems (iCal export)
+- [ ] Dynamic teacher/room assignment (currently pre-assigned from database)
+- [ ] Room capacity constraints based on student group size
+- [ ] Teacher workload balancing across weeks
+- [ ] Student preferences for elective courses
+- [ ] Mandatory lunch break constraints (e.g., 12:00-13:00)
+- [ ] Rest period constraints (minimum gap between blocks for teachers)
+- [ ] Multi-week scheduling patterns
+- [ ] Integration with calendar systems (iCal/Google Calendar export)
+- [ ] Web UI for viewing and editing schedules
+- [ ] Real-time constraint violation feedback during manual edits
 
 ## Testing & Validation
 
-### Constraint Analysis Report
-See `CONSTRAINT_ANALYSIS_REPORT.md` for detailed analysis of:
-- Hard constraint satisfaction
-- Soft constraint optimization
-- Violation breakdown
-- Root cause analysis
+### Database Queries for Validation
+
+**Check total assignments:**
+```sql
+SELECT COUNT(*) FROM course_block_assignment;
+```
+
+**Check pinned assignments:**
+```sql
+SELECT COUNT(*) FILTER (WHERE pinned=TRUE) AS pinned_count
+FROM course_block_assignment;
+```
+
+**View teacher schedules:**
+```sql
+SELECT * FROM v_teacher_schedule ORDER BY teacher_id, day_of_week, start_hour;
+```
+
+**View group schedules:**
+```sql
+SELECT * FROM v_group_schedule ORDER BY group_id, day_of_week, start_hour;
+```
+
+**Check for constraint violations:**
+```sql
+-- Teacher double-booking
+SELECT teacher_id, day_of_week, start_hour, COUNT(*)
+FROM course_block_assignment cba
+JOIN block_timeslot bt ON cba.block_timeslot_id = bt.id
+GROUP BY teacher_id, day_of_week, start_hour
+HAVING COUNT(*) > 1;
+```
 
 ### Running Diagnostics
-To analyze constraint violations in the current solution, modify `MainApp.java` to call:
-```java
-Map<String, Integer> violations = analyzeHardConstraintViolations(solvedSchedule);
-violations.forEach((k, v) -> System.out.println("- " + k + ": " + v));
-```
+The solver automatically analyzes constraint violations and displays them in the console output and PDF reports.
 
 ## Contributing
 
 To modify constraints or data:
-1. Edit `SchoolConstraintProvider.java` for constraint logic
-2. Edit `DemoDataGenerator.java` for data initialization
-3. Run `mvn clean compile` and `mvn exec:java -Dexec.mainClass="com.example.MainApp"` to verify
+1. **Edit constraints**: Modify `BlockConstraintProvider.java` for constraint logic
+2. **Edit database schema**: Update `database/schema_block_scheduling.sql`
+3. **Edit dataset**: Modify `database/datasets/load_final_dataset_blocks.sql`
+4. **Reload data**: Run `psql -U mancilla -d school_schedule -f database/datasets/load_final_dataset_blocks.sql`
+5. **Test changes**: Run `mvn clean compile` and `mvn exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"`
 
 ## License
 

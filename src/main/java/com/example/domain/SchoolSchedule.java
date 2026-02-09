@@ -14,9 +14,9 @@ public class SchoolSchedule {
     @ProblemFactCollectionProperty
     private List<Teacher> teachers;
 
-    @ValueRangeProvider(id = "timeslotRange")
+    @ValueRangeProvider(id = "blockTimeslotRange")
     @ProblemFactCollectionProperty
-    private List<Timeslot> timeslots;
+    private List<BlockTimeslot> blockTimeslots;
 
     @ValueRangeProvider(id = "roomRange")
     @ProblemFactCollectionProperty
@@ -29,7 +29,7 @@ public class SchoolSchedule {
     private List<Group> groups;
 
     @PlanningEntityCollectionProperty
-    private List<CourseAssignment> courseAssignments;
+    private List<CourseBlockAssignment> courseBlockAssignments;
 
     @PlanningScore
     private HardSoftScore score;
@@ -38,22 +38,36 @@ public class SchoolSchedule {
         // No-arg constructor required by Timefold
     }
 
-    public SchoolSchedule(List<Teacher> teachers, List<Timeslot> timeslots, List<Room> rooms,
-            List<Course> courses, List<Group> groups, List<CourseAssignment> courseAssignments) {
+    /**
+     * Constructor for block-based scheduling.
+     *
+     * @param teachers               list of teachers
+     * @param blockTimeslots         list of block timeslots
+     * @param rooms                  list of rooms
+     * @param courses                list of courses
+     * @param groups                 list of student groups
+     * @param courseBlockAssignments list of course block assignments
+     */
+    public SchoolSchedule(List<Teacher> teachers, List<BlockTimeslot> blockTimeslots, List<Room> rooms,
+            List<Course> courses, List<Group> groups, List<CourseBlockAssignment> courseBlockAssignments) {
         this.teachers = teachers;
-        this.timeslots = timeslots;
+        this.blockTimeslots = blockTimeslots;
         this.rooms = rooms;
         this.courses = courses;
         this.groups = groups;
-        this.courseAssignments = courseAssignments;
+        this.courseBlockAssignments = courseBlockAssignments;
     }
 
     public List<Teacher> getTeachers() {
         return teachers;
     }
 
-    public List<Timeslot> getTimeslots() {
-        return timeslots;
+    public List<BlockTimeslot> getBlockTimeslots() {
+        return blockTimeslots;
+    }
+
+    public void setBlockTimeslots(List<BlockTimeslot> blockTimeslots) {
+        this.blockTimeslots = blockTimeslots;
     }
 
     public List<Room> getRooms() {
@@ -68,12 +82,12 @@ public class SchoolSchedule {
         return groups;
     }
 
-    public List<CourseAssignment> getCourseAssignments() {
-        return courseAssignments;
+    public List<CourseBlockAssignment> getCourseBlockAssignments() {
+        return courseBlockAssignments;
     }
 
-    public void setCourseAssignments(List<CourseAssignment> courseAssignments) {
-        this.courseAssignments = courseAssignments;
+    public void setCourseBlockAssignments(List<CourseBlockAssignment> courseBlockAssignments) {
+        this.courseBlockAssignments = courseBlockAssignments;
     }
 
     public HardSoftScore getScore() {
@@ -82,5 +96,34 @@ public class SchoolSchedule {
 
     public void setScore(HardSoftScore score) {
         this.score = score;
+    }
+
+    /**
+     * Static factory method for creating a block-based schedule.
+     * Provides a convenient way to construct a SchoolSchedule instance.
+     *
+     * @param teachers               list of teachers
+     * @param blockTimeslots         list of block timeslots
+     * @param rooms                  list of rooms
+     * @param courses                list of courses
+     * @param groups                 list of student groups
+     * @param courseBlockAssignments list of course block assignments
+     * @return new SchoolSchedule instance for block-based scheduling
+     */
+    public static SchoolSchedule forBlockScheduling(
+            List<Teacher> teachers,
+            List<BlockTimeslot> blockTimeslots,
+            List<Room> rooms,
+            List<Course> courses,
+            List<Group> groups,
+            List<CourseBlockAssignment> courseBlockAssignments) {
+        SchoolSchedule schedule = new SchoolSchedule();
+        schedule.teachers = teachers;
+        schedule.blockTimeslots = blockTimeslots;
+        schedule.rooms = rooms;
+        schedule.courses = courses;
+        schedule.groups = groups;
+        schedule.courseBlockAssignments = courseBlockAssignments;
+        return schedule;
     }
 }

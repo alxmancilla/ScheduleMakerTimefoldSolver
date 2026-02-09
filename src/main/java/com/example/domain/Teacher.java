@@ -159,21 +159,39 @@ public class Teacher {
         return qualifications.contains(course);
     }
 
-    public boolean isAvailableAt(Timeslot timeslot) {
-        if (timeslot == null) {
-            return false;
-        }
-        java.util.Set<Integer> hours = availabilityPerDay.get(timeslot.getDayOfWeek());
-        return hours != null && hours.contains(timeslot.getHour());
-    }
-
     /**
      * Check if teacher is available at a specific day and hour.
-     * This is a convenience method that doesn't require a Timeslot object.
+     * This is a convenience method for checking availability.
      */
     public boolean isAvailableAt(DayOfWeek day, int hour) {
         java.util.Set<Integer> hours = availabilityPerDay.get(day);
         return hours != null && hours.contains(hour);
+    }
+
+    /**
+     * Check if teacher is available for an entire block timeslot.
+     * Returns true only if the teacher is available for ALL hours in the block.
+     *
+     * @param blockTimeslot the block timeslot to check
+     * @return true if teacher is available for all hours in the block, false
+     *         otherwise
+     */
+    public boolean isAvailableForBlock(BlockTimeslot blockTimeslot) {
+        if (blockTimeslot == null) {
+            return false;
+        }
+
+        // Check availability for each hour in the block
+        int startHour = blockTimeslot.getStartHour();
+        int endHour = startHour + blockTimeslot.getLengthHours();
+
+        for (int hour = startHour; hour < endHour; hour++) {
+            if (!isAvailableAt(blockTimeslot.getDayOfWeek(), hour)) {
+                return false; // Teacher not available for this hour
+            }
+        }
+
+        return true; // Teacher available for all hours in the block
     }
 
     @Override

@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a school scheduling constraint optimization system built with **Timefold Solver 1.x** and **Java 17**. The solver automatically generates weekly timetables by assigning teachers, courses, timeslots, and rooms while satisfying hard constraints and optimizing soft preferences.
 
+The system supports **two scheduling modes**:
+1. **Hour-based scheduling** - Traditional approach with individual hour assignments
+2. **Block-based scheduling** - Modern approach with multi-hour block assignments (NEW)
+
 ## Essential Commands
 
 ### Build and Run
@@ -13,8 +17,11 @@ This is a school scheduling constraint optimization system built with **Timefold
 # Compile the project
 mvn clean compile
 
-# Run the solver (main application)
+# Run the hour-based solver
 mvn exec:java -Dexec.mainClass="com.example.MainApp"
+
+# Run the block-based solver (NEW)
+mvn exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 
 # Run tests
 mvn test
@@ -24,10 +31,16 @@ mvn -X clean compile
 ```
 
 ### Output Files
-The solver generates three PDF reports in the project root:
-- `schedule-report-violations.pdf` - Constraint violation analysis
-- `schedule-report-by-teacher.pdf` - Schedule grouped by teacher
-- `schedule-report-by-group.pdf` - Schedule grouped by student group
+
+**Hour-based scheduling** generates three PDF reports:
+- `calendario-incumplimientos.pdf` - Constraint violation analysis
+- `calendario-por-maestro.pdf` - Schedule grouped by teacher
+- `calendario-por-grupo.pdf` - Schedule grouped by student group
+
+**Block-based scheduling** generates three PDF reports:
+- `calendario-bloques-incumplimientos.pdf` - Constraint violation analysis
+- `calendario-bloques-por-maestro.pdf` - Schedule grouped by teacher
+- `calendario-bloques-por-grupo.pdf` - Schedule grouped by student group
 
 ## Architecture Overview
 
@@ -38,17 +51,26 @@ The solver generates three PDF reports in the project root:
 - Contains value range providers for teachers, timeslots, and rooms
 - Holds the `HardSoftScore` calculated by the constraint provider
 
-**Planning Entity** (`CourseAssignment`):
+**Planning Entity**:
+
+*Hour-based* (`CourseAssignment`):
 - The `@PlanningEntity` with three `@PlanningVariable` fields: `teacher`, `timeslot`, `room`
 - Represents one hour of a course for a specific group
 - Each assignment has a `sequenceIndex` to track which hour of the multi-hour course it represents
+
+*Block-based* (`CourseBlockAssignment`) - **NEW**:
+- The `@PlanningEntity` with one `@PlanningVariable` field: `timeslot` (teacher and room pre-assigned from database)
+- Represents a block of consecutive hours for a course
+- Has `blockLength` field indicating the number of consecutive hours
+- Uses `BlockTimeslot` (start hour + length) instead of single-hour `Timeslot`
 
 **Problem Facts**:
 - `Teacher` - Has stable `id`, qualifications (Set<String>), per-day availability map (`Map<DayOfWeek, Set<Integer>>`), and `maxHoursPerWeek` workload limit
 - `Course` - Has `id`, name, `roomRequirement` ("standard" or "lab"), and `requiredHoursPerWeek`
 - `Group` - Student group with assigned courses and optional `preferredRoom`
 - `Room` - Classroom with `type` ("standard" or "lab") and `building` designation
-- `Timeslot` - Specific day (`DayOfWeek`) and hour (int, 7-15)
+- `Timeslot` - Specific day (`DayOfWeek`) and hour (int, 7-15) - used for hour-based scheduling
+- `BlockTimeslot` - Specific day (`DayOfWeek`), start hour (int, 7-14), and length in hours (int, 1-4) - used for block-based scheduling
 
 ### Constraint System
 
@@ -88,12 +110,18 @@ Located in `SchoolSolverConfig`:
 ### Analysis and Reporting
 
 **ScheduleAnalyzer** (`com.example.analysis.ScheduleAnalyzer`):
-- Analyzes hard and soft constraint violations by manually checking the solution against each rule
+- Analyzes hard and soft constraint violations for hour-based scheduling
+- Returns violation counts and detailed offender descriptions
+
+**BlockScheduleAnalyzer** (`com.example.analysis.BlockScheduleAnalyzer`) - **NEW**:
+- Analyzes hard and soft constraint violations for block-based scheduling
+- Handles block overlap detection and availability checking for multi-hour blocks
 - Returns violation counts and detailed offender descriptions
 
 **PdfReporter** (`com.example.util.PdfReporter`):
 - Generates paginated PDF reports using Apache PDFBox
-- Three reports: violations, by-teacher schedule, by-group schedule
+- Three reports for hour-based: violations, by-teacher schedule, by-group schedule
+- Three reports for block-based: violations, by-teacher schedule, by-group schedule (NEW)
 
 **ExcelTemplateGenerator** (`com.example.util.ExcelTemplateGenerator`):
 - Uses Apache POI to pre-fill Excel workbook with demo data
