@@ -27,9 +27,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 teacherMustBeAvailable(constraintFactory), // #1: Most likely to fail (~30% rejection rate)
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
-                nonBasicasCourseMustFinishBy2pm(constraintFactory), // #4: Non-BASICAS courses must end by 14:00
-                nonStandardRoomsMustFinishBy2pm(constraintFactory), // #5: Non-standard rooms must end by 14:00
-                maxOneBlockPerCoursePerGroupPerDay(constraintFactory), // #6: Max 1 block per course per group per day
+                maxOneBlockPerCoursePerGroupPerDay(constraintFactory), // #5: Max 1 block per course per group per day
                                                                        // (non-BASICAS only)
 
                 // ========== TIER 2: High-Selectivity HARD Pair Constraints ==========
@@ -46,16 +44,18 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // consecutive)
                 // - sameTeacherForAllCourseHours: OBSOLETE (only one block per course per
                 // group)
-
-                // ========== TIER 3: Medium-Selectivity HARD Pair Constraints ==========
-                basicasBlocksShouldBeConsecutive(constraintFactory), // #7: BASICAS blocks must be consecutive
+                // - basicasBlocksShouldBeConsecutive: MOVED TO SOFT (now a preference, not
+                // requirement)
 
                 // ========== TIER 4: SOFT Constraints - Quality Optimization ==========
                 // These optimize quality, evaluated last:
                 // - Don't affect feasibility (can be violated)
                 // - Evaluated only if all HARD constraints pass
                 // - Order by computational cost (most expensive first)
-                minimizeTeacherIdleGaps(constraintFactory), // #9: ~1,000 pairs (most expensive SOFT)
+                basicasBlocksShouldBeConsecutive(constraintFactory), // SOFT: Prefer BASICAS blocks to be consecutive
+                mustFinishBy2pm(constraintFactory), // SOFT: Prefer non-BASICAS courses in non-standard rooms to
+                                                    // finish by 2pm
+                minimizeTeacherIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (most expensive SOFT)
                 // limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // #11: groupBy
                 // aggregation (weight 15,
                 // concentrate non-BASICAS)
@@ -134,8 +134,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getTeacher),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> a1.getTeacher() != null
-                        && a1.getTimeslot() != null
+                .filter((a1, a2) -> a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -149,8 +148,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getRoom),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> a1.getRoom() != null
-                        && a1.getTimeslot() != null
+                .filter((a1, a2) -> a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -180,16 +178,29 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Group cannot have two courses at same time");
     }
 
-    private Constraint nonBasicasCourseMustFinishBy2pm(ConstraintFactory constraintFactory) {
-        // Non-BASICAS courses (TADHR, TEM, TPIAL, etc.) must finish by 2pm (14:00)
-        // This ensures specialized/technical courses don't run into late afternoon
-        // hours
-        // BASICAS courses can run until 3pm (15:00) for more flexibility
-        // Pinned assignments are exempt (they are fixed from the database)
+    private Constraint mustFinishBy2pm(ConstraintFactory constraintFactory) {
+        // SOFT: Prefer non-BASICAS courses AND non-standard rooms to finish by 2pm
+        // (14:00)
+        //
+        // This soft constraint encourages (but doesn't require):
+        // - Non-BASICAS courses (TADHR, TEM, TPIAL, etc.) using non-standard rooms to
+        // finish by 2pm
+        // - Ensures specialized/technical courses in specialized facilities finish
+        // earlier
+        // - Allows flexibility when needed (can be violated if necessary for
+        // feasibility)
+        //
+        // Benefits:
+        // - Specialized facilities available for maintenance and cleanup
+        // - Technical courses don't run into late afternoon hours
+        //
+        // Exemptions:
+        // - BASICAS courses in standard rooms can run until 3pm (15:00) for flexibility
+        // - Pinned assignments are exempt (they are fixed from the database)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(assignment -> {
-                    // Check if course is non-BASICAS
+                    // Basic validation
                     if (assignment.getCourse() == null || assignment.getTimeslot() == null)
                         return false;
 
@@ -197,47 +208,28 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (assignment.isPinned())
                         return false;
 
-                    String component = assignment.getCourse().getComponent();
-                    if (component == null || component.equalsIgnoreCase("BASICAS"))
-                        return false; // BASICAS courses are exempt
-
-                    // Check if block ends after 2pm (14:00)
-                    int endHour = assignment.getTimeslot().getStartHour() + assignment.getTimeslot().getLengthHours();
-                    return endHour > 14; // Violates if ends after 14:00
-                })
-                .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Non-BASICAS courses must finish by 2pm");
-    }
-
-    private Constraint nonStandardRoomsMustFinishBy2pm(ConstraintFactory constraintFactory) {
-        // Courses using non-standard rooms (labs, workshops, computer centers, etc.)
-        // must finish by 2pm (14:00)
-        // This ensures specialized facilities are available for maintenance and cleanup
-        // Standard rooms can be used until 3pm (15:00)
-        // Pinned assignments are exempt (they are fixed from the database)
-        return constraintFactory
-                .forEach(CourseBlockAssignment.class)
-                .filter(assignment -> {
-                    // Check if assignment has a room and timeslot
-                    if (assignment.getRoom() == null || assignment.getTimeslot() == null)
-                        return false;
-
-                    // Exempt pinned assignments (they are fixed from database)
-                    if (assignment.isPinned())
-                        return false;
-
-                    // Check if room type is non-standard
-                    String roomType = assignment.getRoom().getType();
-                    if (roomType == null || roomType.equalsIgnoreCase("estándar"))
-                        return false; // Standard rooms are exempt
-
-                    // Check if block ends at or after 2pm (14:00)
+                    // Check if block ends before 2pm (14:00)
                     // "Finish by 2pm" means the last hour should be 13:00 (1pm-2pm)
                     int endHour = assignment.getTimeslot().getStartHour() + assignment.getTimeslot().getLengthHours();
-                    return endHour > 13; // Violates if ends at 14:00 or later
+                    if (endHour < 14)
+                        return false; // Ends before 2pm, no violation
+
+                    // Check if this is a non-BASICAS course
+                    String component = assignment.getCourse().getComponent();
+                    boolean isNonBasicas = (component == null || !component.equalsIgnoreCase("BASICAS"));
+
+                    // Check if this uses a non-standard room
+                    boolean isNonStandardRoom = false;
+                    if (assignment.getRoom() != null) {
+                        String roomType = assignment.getRoom().getType();
+                        isNonStandardRoom = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                    }
+
+                    // Penalize if BOTH conditions are true (non-BASICAS AND non-standard room)
+                    return isNonBasicas && isNonStandardRoom;
                 })
-                .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Non-standard rooms must finish by 2pm");
+                .penalize(HardSoftScore.ONE_SOFT)
+                .asConstraint("Prefer non-BASICAS courses in non-standard rooms to finish by 2pm");
     }
 
     private Constraint maxOneBlockPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
@@ -245,27 +237,29 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // This prevents specialized courses from having multiple blocks on the same day
         // BASICAS courses are exempt and can have multiple blocks per day for
         // flexibility
+        // OPTIMIZED: Uses Joiners to pre-filter pairs by group, course, and day
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
-                .filter(a -> a.getTimeslot() != null
-                        && a.getCourse() != null
-                        && a.getCourse().getComponent() != null
-                        && !a.getCourse().getComponent().equalsIgnoreCase("BASICAS"))
-                .groupBy(CourseBlockAssignment::getGroup,
-                        CourseBlockAssignment::getCourse,
-                        a -> a.getTimeslot().getDayOfWeek(),
-                        ConstraintCollectors.count())
-                .filter((group, course, day, count) -> count > 1)
-                .penalize(HardSoftScore.ONE_HARD,
-                        (group, course, day, count) -> count - 1)
+                .forEachUniquePair(CourseBlockAssignment.class,
+                        Joiners.equal(CourseBlockAssignment::getGroup),
+                        Joiners.equal(CourseBlockAssignment::getCourse),
+                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                .filter((a1, a2) -> {
+                    // Only apply to non-BASICAS courses
+                    // Note: Joiners already filter out null groups and courses
+                    String component = a1.getCourse().getComponent();
+                    return component != null && !component.equalsIgnoreCase("BASICAS");
+                })
+                .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Maximum 1 block per non-BASICAS course per group per day");
     }
 
     private Constraint basicasBlocksShouldBeConsecutive(ConstraintFactory constraintFactory) {
-        // When BASICAS courses have multiple blocks on the same day for the same group,
-        // they MUST be consecutive to minimize fragmentation and improve student
+        // SOFT: When BASICAS courses have multiple blocks on the same day for the same
+        // group,
+        // prefer them to be consecutive to minimize fragmentation and improve student
         // experience
-        // This is a HARD constraint - it requires consecutive blocks
+        // This is a SOFT constraint - it encourages but doesn't require consecutive
+        // blocks
         return constraintFactory
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getGroup),
@@ -273,9 +267,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
                 .filter((a1, a2) -> {
                     // Only apply to BASICAS courses
-                    if (a1.getCourse() == null || a1.getTimeslot() == null || a2.getTimeslot() == null)
-                        return false;
-
+                    // Note: Joiners already filter out null groups and courses
                     String component = a1.getCourse().getComponent();
                     if (component == null || !component.equalsIgnoreCase("BASICAS"))
                         return false;
@@ -292,8 +284,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Penalize if NOT consecutive
                     return !areConsecutive;
                 })
-                .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("BASICAS blocks must be consecutive on same day");
+                .penalize(HardSoftScore.ONE_SOFT)
+                .asConstraint("Prefer BASICAS blocks to be consecutive on same day");
     }
 
     // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================

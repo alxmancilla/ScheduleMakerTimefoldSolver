@@ -121,20 +121,76 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Teacher exceeds max hours per week", teacherMaxViolations);
 
-        // Non-BASICAS courses must finish by 2pm
-        int nonBasicasAfter2pm = 0;
+        // Prefer non-BASICAS courses in non-standard rooms to finish by 2pm (SOFT)
+        int mustFinishBy2pm = 0;
         for (CourseBlockAssignment a : list) {
-            if (a.getCourse() != null && a.getTimeslot() != null) {
-                String component = a.getCourse().getComponent();
-                if (component != null && !component.equalsIgnoreCase("BASICAS")) {
-                    int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                    if (endHour > 14) {
-                        nonBasicasAfter2pm++;
+            if (a.getCourse() != null && a.getTimeslot() != null && !a.isPinned()) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour >= 14) {
+                    // Check if non-BASICAS course
+                    String component = a.getCourse().getComponent();
+                    boolean isNonBasicas = (component == null || !component.equalsIgnoreCase("BASICAS"));
+
+                    // Check if non-standard room
+                    boolean isNonStandardRoom = false;
+                    if (a.getRoom() != null) {
+                        String roomType = a.getRoom().getType();
+                        isNonStandardRoom = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                    }
+
+                    // Penalize if BOTH conditions are true (AND logic)
+                    if (isNonBasicas && isNonStandardRoom) {
+                        mustFinishBy2pm++;
                     }
                 }
             }
         }
-        result.put("Non-BASICAS courses must finish by 2pm", nonBasicasAfter2pm);
+        result.put("Prefer non-BASICAS courses in non-standard rooms to finish by 2pm", mustFinishBy2pm);
+
+        // Prefer BASICAS blocks to be consecutive on same day (SOFT)
+        int basicasNonConsecutive = 0;
+        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> basicasGroupCourseDayBlocks = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
+                String component = a.getCourse().getComponent();
+                if (component != null && component.equalsIgnoreCase("BASICAS")) {
+                    String groupId = a.getGroup().getId();
+                    String courseId = a.getCourse().getId();
+                    DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                    basicasGroupCourseDayBlocks
+                            .computeIfAbsent(groupId, k -> new HashMap<>())
+                            .computeIfAbsent(courseId, k -> new HashMap<>())
+                            .computeIfAbsent(day, k -> new ArrayList<>())
+                            .add(a);
+                }
+            }
+        }
+        // Check for non-consecutive blocks
+        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayBlocks : basicasGroupCourseDayBlocks
+                .values()) {
+            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayBlocks : courseDayBlocks.values()) {
+                for (List<CourseBlockAssignment> blocks : dayBlocks.values()) {
+                    if (blocks.size() > 1) {
+                        // Check if all blocks are consecutive
+                        for (int i = 0; i < blocks.size(); i++) {
+                            for (int j = i + 1; j < blocks.size(); j++) {
+                                CourseBlockAssignment a1 = blocks.get(i);
+                                CourseBlockAssignment a2 = blocks.get(j);
+                                int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                                int start2 = a2.getTimeslot().getStartHour();
+                                int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                                int start1 = a1.getTimeslot().getStartHour();
+                                boolean areConsecutive = (end1 == start2 || end2 == start1);
+                                if (!areConsecutive) {
+                                    basicasNonConsecutive++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        result.put("Prefer BASICAS blocks to be consecutive on same day", basicasNonConsecutive);
 
         // Maximum 1 block per non-BASICAS course per group per day
         int maxOneBlockPerCoursePerDay = 0;
@@ -277,21 +333,81 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Teacher exceeds max hours per week", teacherMaxExcess);
 
-        // Non-BASICAS courses must finish by 2pm
-        List<String> nonBasicasAfter2pm = new ArrayList<>();
+        // Prefer non-BASICAS courses in non-standard rooms to finish by 2pm (SOFT)
+        List<String> mustFinishBy2pm = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
-            if (a.getCourse() != null && a.getTimeslot() != null) {
-                String component = a.getCourse().getComponent();
-                if (component != null && !component.equalsIgnoreCase("BASICAS")) {
-                    int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                    if (endHour > 14) {
-                        nonBasicasAfter2pm.add(String.format("%s (component=%s, ends at %d:00)",
-                                blockAssignmentToString(a), component, endHour));
+            if (a.getCourse() != null && a.getTimeslot() != null && !a.isPinned()) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour >= 14) {
+                    // Check if non-BASICAS course
+                    String component = a.getCourse().getComponent();
+                    boolean isNonBasicas = (component == null || !component.equalsIgnoreCase("BASICAS"));
+
+                    // Check if non-standard room
+                    boolean isNonStandardRoom = false;
+                    String roomType = null;
+                    if (a.getRoom() != null) {
+                        roomType = a.getRoom().getType();
+                        isNonStandardRoom = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                    }
+
+                    // Penalize if BOTH conditions are true (AND logic)
+                    if (isNonBasicas && isNonStandardRoom) {
+                        String reason = String.format("(component=%s, room_type=%s, ends at %d:00)",
+                                component, roomType, endHour);
+                        mustFinishBy2pm.add(blockAssignmentToString(a) + " " + reason);
                     }
                 }
             }
         }
-        details.put("Non-BASICAS courses must finish by 2pm", nonBasicasAfter2pm);
+        details.put("Prefer non-BASICAS courses in non-standard rooms to finish by 2pm", mustFinishBy2pm);
+
+        // Prefer BASICAS blocks to be consecutive on same day (SOFT)
+        List<String> basicasNonConsecutiveDetails = new ArrayList<>();
+        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> basicasGroupCourseDayBlocks2 = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
+                String component = a.getCourse().getComponent();
+                if (component != null && component.equalsIgnoreCase("BASICAS")) {
+                    String groupId = a.getGroup().getId();
+                    String courseId = a.getCourse().getId();
+                    DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                    basicasGroupCourseDayBlocks2
+                            .computeIfAbsent(groupId, k -> new HashMap<>())
+                            .computeIfAbsent(courseId, k -> new HashMap<>())
+                            .computeIfAbsent(day, k -> new ArrayList<>())
+                            .add(a);
+                }
+            }
+        }
+        // Generate detailed violation messages
+        for (Map.Entry<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupEntry : basicasGroupCourseDayBlocks2
+                .entrySet()) {
+            for (Map.Entry<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseEntry : groupEntry.getValue()
+                    .entrySet()) {
+                for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : courseEntry.getValue().entrySet()) {
+                    List<CourseBlockAssignment> blocks = dayEntry.getValue();
+                    if (blocks.size() > 1) {
+                        for (int i = 0; i < blocks.size(); i++) {
+                            for (int j = i + 1; j < blocks.size(); j++) {
+                                CourseBlockAssignment a1 = blocks.get(i);
+                                CourseBlockAssignment a2 = blocks.get(j);
+                                int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                                int start2 = a2.getTimeslot().getStartHour();
+                                int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                                int start1 = a1.getTimeslot().getStartHour();
+                                boolean areConsecutive = (end1 == start2 || end2 == start1);
+                                if (!areConsecutive) {
+                                    basicasNonConsecutiveDetails.add(
+                                            blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        details.put("Prefer BASICAS blocks to be consecutive on same day", basicasNonConsecutiveDetails);
 
         // Maximum 1 block per non-BASICAS course per group per day
         List<String> maxOneBlockPerCoursePerDay = new ArrayList<>();

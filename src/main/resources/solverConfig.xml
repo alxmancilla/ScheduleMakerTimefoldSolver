@@ -42,9 +42,9 @@
             <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
             <!-- Or after 10 minutes total -->
-            <minutesSpentLimit>1</minutesSpentLimit>
-            <!-- Or after 3 minutes without improvement -->
-            <unimprovedMinutesSpentLimit>1</unimprovedMinutesSpentLimit>
+            <minutesSpentLimit>10</minutesSpentLimit>
+            <!-- Or after 5 minutes without improvement -->
+            <unimprovedMinutesSpentLimit>2</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>
