@@ -24,11 +24,13 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // - Cheapest to evaluate (O(n) single-entity checks)
                 // - Most likely to fail (high selectivity)
                 // - Enable early exit (skip remaining constraints if violated)
+                blockLengthMustMatchTimeslotLength(constraintFactory), // #0: CRITICAL - Block length must match
+                                                                       // timeslot
                 teacherMustBeAvailable(constraintFactory), // #1: Most likely to fail (~30% rejection rate)
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
                 maxOneBlockPerCoursePerGroupPerDay(constraintFactory), // #5: Max 1 block per course per group per day
-                                                                       // (non-BASICAS only)
+                                                                       // (BASICAS only)
 
                 // ========== TIER 2: High-Selectivity HARD Pair Constraints ==========
                 // These detect the most common conflicts:
@@ -53,22 +55,19 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // - Evaluated only if all HARD constraints pass
                 // - Order by computational cost (most expensive first)
                 basicasBlocksShouldBeConsecutive(constraintFactory), // SOFT: Prefer BASICAS blocks to be consecutive
-                mustFinishBy2pm(constraintFactory), // SOFT: Prefer non-BASICAS courses in non-standard rooms to
-                                                    // finish by 2pm
                 minimizeTeacherIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (most expensive SOFT)
-                // limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // #11: groupBy
-                // aggregation (weight 15,
-                // concentrate non-BASICAS)
-                teacherMaxHoursPerWeek(constraintFactory), // #12: groupBy aggregation (workload balance)
+                teacherMaxHoursPerWeek(constraintFactory), // SOFT: groupBy aggregation (workload balance)
+                groupPreferredRoomConstraint(constraintFactory), // SOFT: prefer group's pre-assigned room
+                minimizeTeacherBuildingChanges(constraintFactory), // SOFT: minimize teacher travel
 
                 // ========== COMMENTED OUT CONSTRAINTS ==========
                 // Uncomment these if needed:
+                // mustFinishBy2pm(constraintFactory), // SOFT: Prefer non-BASICAS courses in
+                // non-standard rooms to finish by 2pm
+                // limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // SOFT:
+                // concentrate non-BASICAS
                 // groupCoursesInSameRoomByType(constraintFactory), // HARD: same room type
                 // consistency
-                // groupPreferredRoomConstraint(constraintFactory), // SOFT: prefer group's
-                // pre-assigned room
-                // minimizeTeacherBuildingChanges(constraintFactory), // SOFT: minimize teacher
-                // travel
                 // balanceTeacherWorkload(constraintFactory), // SOFT: balance workload
                 // distribution
                 // preferUsingTeachersWithMoreAvailability(constraintFactory), // SOFT: prefer
@@ -108,10 +107,37 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         return start1 < end2 && start2 < end1;
     }
 
+    /**
+     * CRITICAL CONSTRAINT: Block length must match timeslot length.
+     * A 1-hour block can only be assigned to a 1-hour timeslot.
+     * A 2-hour block can only be assigned to a 2-hour timeslot, etc.
+     *
+     * This prevents data corruption where a 1-hour block is assigned to a 3-hour
+     * timeslot,
+     * which causes overlapping assignments and double-booking violations.
+     */
+    private Constraint blockLengthMustMatchTimeslotLength(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEach(CourseBlockAssignment.class)
+                .filter(assignment -> {
+                    if (assignment.getTimeslot() == null) {
+                        return false; // Unassigned timeslots are handled elsewhere
+                    }
+                    // Penalize if block length doesn't match timeslot length
+                    // NOTE: This constraint is NOT excluded for pinned assignments because it's a
+                    // data integrity constraint, not a business rule. If a pinned assignment
+                    // violates this, it indicates a database error that must be fixed.
+                    return assignment.getBlockLength() != assignment.getTimeslot().getLengthHours();
+                })
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Block length must match timeslot length");
+    }
+
     private Constraint teacherMustBeQualified(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
-                .filter(assignment -> assignment.getTeacher() != null
+                .filter(assignment -> !assignment.isPinned() // Exclude pinned assignments
+                        && assignment.getTeacher() != null
                         && !assignment.getTeacher().isQualifiedFor(assignment.getCourse().getName()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Teacher must be qualified");
@@ -121,6 +147,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // UPDATED: Check teacher availability for entire block duration
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
+                .filter(assignment -> !assignment.isPinned()) // Exclude pinned assignments
                 .filter(assignment -> assignment.getTeacher() != null && assignment.getTimeslot() != null
                         && !assignment.getTeacher().isAvailableForBlock(assignment.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -134,7 +161,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getTeacher),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> a1.getTimeslot() != null
+                .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
+                        && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -148,7 +176,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getRoom),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> a1.getTimeslot() != null
+                .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
+                        && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -158,7 +187,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     private Constraint roomTypeMustSatisfyRequirement(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
-                .filter(assignment -> assignment.getRoom() != null
+                .filter(assignment -> !assignment.isPinned() // Exclude pinned assignments
+                        && assignment.getRoom() != null
                         && !assignment.getRoom().satisfiesRequirement(assignment.getCourse().getRoomRequirement()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Room type must satisfy course requirement");
@@ -171,7 +201,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getGroup),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> a1.getTimeslot() != null
+                .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
+                        && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -233,9 +264,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint maxOneBlockPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
-        // Each group can have at most 1 block per non-BASICAS course per day
+        // Each group can have at most 1 block per BASICAS course per day
         // This prevents specialized courses from having multiple blocks on the same day
-        // BASICAS courses are exempt and can have multiple blocks per day for
+        // non-BASICAS courses are exempt and can have multiple blocks per day for
         // flexibility
         // OPTIMIZED: Uses Joiners to pre-filter pairs by group, course, and day
         return constraintFactory
@@ -244,13 +275,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(CourseBlockAssignment::getCourse),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
                 .filter((a1, a2) -> {
-                    // Only apply to non-BASICAS courses
+                    // Exclude pinned assignments
+                    if (a1.isPinned() || a2.isPinned()) {
+                        return false;
+                    }
+                    // Only apply to BASICAS courses
                     // Note: Joiners already filter out null groups and courses
                     String component = a1.getCourse().getComponent();
-                    return component != null && !component.equalsIgnoreCase("BASICAS");
+                    return component != null && component.equalsIgnoreCase("BASICAS");
                 })
                 .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("Maximum 1 block per non-BASICAS course per group per day");
+                .asConstraint("Maximum 1 block per BASICAS course per group per day");
     }
 
     private Constraint basicasBlocksShouldBeConsecutive(ConstraintFactory constraintFactory) {
@@ -260,12 +295,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // experience
         // This is a SOFT constraint - it encourages but doesn't require consecutive
         // blocks
+        // WEIGHT: 3 (High priority - student experience)
         return constraintFactory
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getGroup),
                         Joiners.equal(CourseBlockAssignment::getCourse),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
                 .filter((a1, a2) -> {
+                    // Exclude pinned assignments
+                    if (a1.isPinned() || a2.isPinned()) {
+                        return false;
+                    }
                     // Only apply to BASICAS courses
                     // Note: Joiners already filter out null groups and courses
                     String component = a1.getCourse().getComponent();
@@ -284,7 +324,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Penalize if NOT consecutive
                     return !areConsecutive;
                 })
-                .penalize(HardSoftScore.ONE_SOFT)
+                .penalize(HardSoftScore.ofSoft(3))
                 .asConstraint("Prefer BASICAS blocks to be consecutive on same day");
     }
 
@@ -323,14 +363,60 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
     }
 
-    @Deprecated
     private Constraint groupPreferredRoomConstraint(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
+        // SOFT: Prefer assigning groups to their preferred room
+        // This reduces room changes for students and improves familiarity
+        // WEIGHT: 2 (Medium priority - operational efficiency)
+        return constraintFactory
+                .forEach(CourseBlockAssignment.class)
+                .filter(assignment -> {
+                    // Exclude pinned assignments
+                    if (assignment.isPinned()) {
+                        return false;
+                    }
+                    if (assignment.getGroup() == null || assignment.getRoom() == null) {
+                        return false;
+                    }
+                    // Only apply to non-lab courses (labs must use lab rooms)
+                    if (assignment.getCourse() != null &&
+                            "laboratorio".equalsIgnoreCase(assignment.getCourse().getRoomRequirement())) {
+                        return false;
+                    }
+                    // Check if group has a preferred room
+                    var preferredRoom = assignment.getGroup().getPreferredRoom();
+                    if (preferredRoom == null) {
+                        return false;
+                    }
+                    // Penalize if NOT using preferred room
+                    return !preferredRoom.equals(assignment.getRoom());
+                })
+                .penalize(HardSoftScore.ofSoft(2))
+                .asConstraint("Prefer group's preferred room");
     }
 
-    @Deprecated
     private Constraint minimizeTeacherBuildingChanges(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
+        // SOFT: Minimize teacher building changes on same day
+        // Reduces teacher travel time and improves satisfaction
+        // WEIGHT: 1 (Low priority - nice to have)
+        return constraintFactory
+                .forEachUniquePair(CourseBlockAssignment.class,
+                        Joiners.equal(CourseBlockAssignment::getTeacher),
+                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                .filter((a1, a2) -> {
+                    // Exclude pinned assignments
+                    if (a1.isPinned() || a2.isPinned()) {
+                        return false;
+                    }
+                    if (a1.getRoom() == null || a2.getRoom() == null) {
+                        return false;
+                    }
+                    // Penalize if different buildings
+                    String building1 = a1.getRoom().getBuilding();
+                    String building2 = a2.getRoom().getBuilding();
+                    return building1 != null && building2 != null && !building1.equals(building2);
+                })
+                .penalize(HardSoftScore.ofSoft(1))
+                .asConstraint("Minimize teacher building changes");
     }
 
     @Deprecated
@@ -353,14 +439,18 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     private Constraint teacherMaxHoursPerWeek(ConstraintFactory constraintFactory) {
         // UPDATED: Sum blockLength instead of counting assignments
         // Each CourseBlockAssignment has a blockLength (number of hours)
+        // IMPORTANT: Includes BOTH pinned and unpinned assignments because pinned
+        // assignments
+        // represent real teaching hours that count toward the teacher's workload limit.
+        // WEIGHT: 5 (Highest priority - legal/union requirement)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
-                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null)
+                .filter(a -> a.getTeacher() != null && a.getTimeslot() != null) // Include ALL assignments
                 .groupBy(CourseBlockAssignment::getTeacher,
                         ConstraintCollectors.sum(CourseBlockAssignment::getBlockLength))
                 .filter((teacher, totalHours) -> totalHours > teacher.getMaxHoursPerWeek())
                 .penalize(HardSoftScore.ONE_SOFT,
-                        (teacher, totalHours) -> totalHours - teacher.getMaxHoursPerWeek())
+                        (teacher, totalHours) -> (totalHours - teacher.getMaxHoursPerWeek()) * 5)
                 .asConstraint("Teacher exceeds max hours per week");
     }
 
@@ -371,12 +461,16 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // 2. No penalty if teacher is unavailable (gap is unavoidable)
         // 3. Uses Joiners for better performance (pre-filters pairs)
         // 4. Works with block end times and start times
+        // WEIGHT: 2 (Medium priority - teacher satisfaction)
         return constraintFactory
                 .forEachUniquePair(CourseBlockAssignment.class,
                         // Performance optimization: pre-filter pairs with Joiners
                         Joiners.equal(CourseBlockAssignment::getTeacher),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
                 .filter((a1, a2) -> {
+                    // Exclude pinned assignments
+                    if (a1.isPinned() || a2.isPinned())
+                        return false;
                     // Additional filters after Joiners
                     if (a1.getTeacher() == null || a1.getTimeslot() == null || a2.getTimeslot() == null)
                         return false;
@@ -431,8 +525,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         gapSize = start1 - end2;
                     }
 
-                    // Standard penalty: 1x per gap hour
-                    return gapSize;
+                    // Weighted penalty: 2x per gap hour (medium priority)
+                    return gapSize * 2;
                 })
                 .asConstraint("Minimize teacher idle gaps (availability-aware)");
     }

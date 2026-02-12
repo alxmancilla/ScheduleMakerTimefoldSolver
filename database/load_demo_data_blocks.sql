@@ -717,25 +717,28 @@ CREATE OR REPLACE FUNCTION generate_course_blocks(
 ) RETURNS VOID AS $$
 DECLARE
     v_block_index INTEGER := 0;
-    v_is_basicas BOOLEAN;
 BEGIN
-    v_is_basicas := (p_component = 'BASICAS');
-
-    IF v_is_basicas THEN
-        -- BASICAS: Create multiple 1-hour blocks
+    -- For courses with less than 2 hours: always use 1-hour blocks (maximum flexibility)
+    -- For courses with 2+ hours: use optimized block patterns
+    IF p_hours < 2 THEN
+        -- Create multiple 1-hour blocks for short courses (regardless of component)
         FOR i IN 0..(p_hours - 1) LOOP
             INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
             VALUES (p_group_id || '_' || p_course_id || '_' || i, p_group_id, p_course_id, 1, NULL, NULL, NULL, FALSE);
         END LOOP;
     ELSE
-        -- Non-BASICAS: Create larger blocks (3-4 hours)
+        -- For courses with 2+ hours: use optimized block patterns
         CASE p_hours
             WHEN 3 THEN
                 INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
-                VALUES (p_group_id || '_' || p_course_id || '_0', p_group_id, p_course_id, 3, NULL, NULL, NULL, FALSE);
+                VALUES 
+					(p_group_id || '_' || p_course_id || '_0', p_group_id, p_course_id, 2, NULL, NULL, NULL, FALSE),
+					(p_group_id || '_' || p_course_id || '_1', p_group_id, p_course_id, 1, NULL, NULL, NULL, FALSE);
             WHEN 4 THEN
                 INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
-                VALUES (p_group_id || '_' || p_course_id || '_0', p_group_id, p_course_id, 4, NULL, NULL, NULL, FALSE);
+                VALUES 
+					(p_group_id || '_' || p_course_id || '_0', p_group_id, p_course_id, 2, NULL, NULL, NULL, FALSE),
+					(p_group_id || '_' || p_course_id || '_1', p_group_id, p_course_id, 2, NULL, NULL, NULL, FALSE);
             WHEN 5 THEN
                 INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
                 VALUES
@@ -760,8 +763,8 @@ BEGIN
                 INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
                 VALUES
                     (p_group_id || '_' || p_course_id || '_0', p_group_id, p_course_id, 4, NULL, NULL, NULL, FALSE),
-                    (p_group_id || '_' || p_course_id || '_1', p_group_id, p_course_id, 4, NULL, NULL, NULL, FALSE),
-                    (p_group_id || '_' || p_course_id || '_2', p_group_id, p_course_id, 1, NULL, NULL, NULL, FALSE);
+                    (p_group_id || '_' || p_course_id || '_1', p_group_id, p_course_id, 3, NULL, NULL, NULL, FALSE),
+                    (p_group_id || '_' || p_course_id || '_2', p_group_id, p_course_id, 2, NULL, NULL, NULL, FALSE);
             WHEN 10 THEN
                 INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
                 VALUES
@@ -772,8 +775,9 @@ BEGIN
                 INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
                 VALUES
                     (p_group_id || '_' || p_course_id || '_0', p_group_id, p_course_id, 4, NULL, NULL, NULL, FALSE),
-                    (p_group_id || '_' || p_course_id || '_1', p_group_id, p_course_id, 4, NULL, NULL, NULL, FALSE),
-                    (p_group_id || '_' || p_course_id || '_2', p_group_id, p_course_id, 3, NULL, NULL, NULL, FALSE);
+                    (p_group_id || '_' || p_course_id || '_1', p_group_id, p_course_id, 3, NULL, NULL, NULL, FALSE),
+                    (p_group_id || '_' || p_course_id || '_2', p_group_id, p_course_id, 2, NULL, NULL, NULL, FALSE),
+                    (p_group_id || '_' || p_course_id || '_3', p_group_id, p_course_id, 2, NULL, NULL, NULL, FALSE);
             ELSE
                 RAISE NOTICE 'Unexpected hours count: % for course %', p_hours, p_course_name;
         END CASE;
@@ -806,52 +810,52 @@ DROP FUNCTION IF EXISTS generate_course_blocks(VARCHAR, VARCHAR, VARCHAR, INTEGE
 -- These are courses that have been manually scheduled and should not be changed by the solver
 
 -- TUTORIAS II assignments (all pinned to specific teachers)
-UPDATE course_block_assignment SET teacher_id='48JBWT', pinned=FALSE WHERE course_id='7' AND group_id='2AARH';
-UPDATE course_block_assignment SET teacher_id='46IUAW', pinned=FALSE WHERE course_id='7' AND group_id='2APIA';
-UPDATE course_block_assignment SET teacher_id='46IUAW', pinned=FALSE WHERE course_id='7' AND group_id='2BPIA';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=FALSE WHERE course_id='7' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=FALSE WHERE course_id='7' AND group_id='2BTEM';
-UPDATE course_block_assignment SET teacher_id='46LDNRS', pinned=FALSE WHERE course_id='7' AND group_id='2ATCS';
-UPDATE course_block_assignment SET teacher_id='48JBWT', pinned=FALSE WHERE course_id='7' AND group_id='2APRO';
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=FALSE WHERE course_id='7' AND group_id='2ATIA';
+UPDATE course_block_assignment SET teacher_id='48JBWT', pinned=TRUE WHERE course_id='7' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='46IUAW', pinned=TRUE WHERE course_id='7' AND group_id='2APIA';
+UPDATE course_block_assignment SET teacher_id='46IUAW', pinned=TRUE WHERE course_id='7' AND group_id='2BPIA';
+UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='7' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='7' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='46LDNRS', pinned=TRUE WHERE course_id='7' AND group_id='2ATCS';
+UPDATE course_block_assignment SET teacher_id='48JBWT', pinned=TRUE WHERE course_id='7' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='7' AND group_id='2ATIA';
 
 -- GESTIONA DOCUMENTACION assignments
-UPDATE course_block_assignment SET teacher_id='47SVPE', pinned=FALSE WHERE course_id='9' AND group_id='2AARH';
-UPDATE course_block_assignment SET teacher_id='48ABCJ', pinned=FALSE WHERE course_id='9' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='47SVPE', pinned=TRUE WHERE course_id='9' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='48ABCJ', pinned=TRUE WHERE course_id='9' AND group_id='2AARH';
 
 -- EJECUTA PROCEDIMIENTOS assignments
-UPDATE course_block_assignment SET teacher_id='47SVPE', pinned=FALSE WHERE course_id='8' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='47SVPE', pinned=TRUE WHERE course_id='8' AND group_id='2AARH';
 
 -- AUXILIA/VERIFICA assignments for TCIA
-UPDATE course_block_assignment SET teacher_id='47FRSO', pinned=FALSE WHERE course_id='13' AND group_id='2ACIA';
-UPDATE course_block_assignment SET teacher_id='47FRSO', pinned=FALSE WHERE course_id='14' AND group_id='2ACIA';
+UPDATE course_block_assignment SET teacher_id='47FRSO', pinned=TRUE WHERE course_id='13' AND group_id='2ACIA';
+UPDATE course_block_assignment SET teacher_id='47FRSO', pinned=TRUE WHERE course_id='14' AND group_id='2ACIA';
 
 -- REALIZA ANALISIS assignments for PIAL groups
-UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=FALSE WHERE course_id='15' AND group_id='2APIA';
-UPDATE course_block_assignment SET teacher_id='48YESMR', pinned=FALSE WHERE course_id='15' AND group_id='2BPIA';
-UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=FALSE WHERE course_id='16' AND group_id='2APIA';
-UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=FALSE WHERE course_id='16' AND group_id='2BPIA';
+UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=TRUE WHERE course_id='15' AND group_id='2APIA';
+UPDATE course_block_assignment SET teacher_id='48YESMR', pinned=TRUE WHERE course_id='15' AND group_id='2BPIA';
+UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=TRUE WHERE course_id='16' AND group_id='2APIA';
+UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=TRUE WHERE course_id='16' AND group_id='2BPIA';
 
 -- TEM assignments
-UPDATE course_block_assignment SET teacher_id='46MASOC', pinned=FALSE WHERE course_id='10' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='46MASOC', pinned=FALSE WHERE course_id='10' AND group_id='2BTEM';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=FALSE WHERE course_id='11' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=FALSE WHERE course_id='11' AND group_id='2BTEM';
-UPDATE course_block_assignment SET teacher_id='47CGHV', pinned=FALSE WHERE course_id='12' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='47CGHV', pinned=FALSE WHERE course_id='12' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='46MASOC', pinned=TRUE WHERE course_id='10' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='46MASOC', pinned=TRUE WHERE course_id='10' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='11' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='11' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='47CGHV', pinned=TRUE WHERE course_id='12' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='47CGHV', pinned=TRUE WHERE course_id='12' AND group_id='2BTEM';
 
 -- TCS assignments
-UPDATE course_block_assignment SET teacher_id='48ISOT', pinned=FALSE WHERE course_id='17' AND group_id='2ATCS';
-UPDATE course_block_assignment SET teacher_id='48HGRO', pinned=FALSE WHERE course_id='18' AND group_id='2ATCS';
+UPDATE course_block_assignment SET teacher_id='48ISOT', pinned=TRUE WHERE course_id='17' AND group_id='2ATCS';
+UPDATE course_block_assignment SET teacher_id='48HGRO', pinned=TRUE WHERE course_id='18' AND group_id='2ATCS';
 
 -- TPROG assignments
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=FALSE WHERE course_id='19' AND group_id='2APRO';
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=FALSE WHERE course_id='20' AND group_id='2APRO';
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=FALSE WHERE course_id='21' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='19' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='20' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='21' AND group_id='2APRO';
 
 -- TIA assignments
-UPDATE course_block_assignment SET teacher_id='45MVVT', pinned=FALSE WHERE course_id='22' AND group_id='2ATIA';
-UPDATE course_block_assignment SET teacher_id='48ERNE', pinned=FALSE WHERE course_id='23' AND group_id='2ATIA';
+UPDATE course_block_assignment SET teacher_id='45MVVT', pinned=TRUE WHERE course_id='22' AND group_id='2ATIA';
+UPDATE course_block_assignment SET teacher_id='48ERNE', pinned=TRUE WHERE course_id='23' AND group_id='2ATIA';
 
 -- ============================================================================
 -- VERIFICATION QUERIES

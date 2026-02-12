@@ -45,6 +45,7 @@ DROP VIEW IF EXISTS v_schedule CASCADE;
 DROP VIEW IF EXISTS v_teacher_workload CASCADE;
 DROP VIEW IF EXISTS v_room_utilization CASCADE;
 DROP VIEW IF EXISTS v_group_course_teachers CASCADE;
+DROP FUNCTION IF EXISTS generate_block_timeslots() CASCADE;
 
 -- ============================================================================
 -- CORE TABLES (Shared by both scheduling modes)
@@ -470,7 +471,7 @@ SELECT
     c.room_requirement,
     t.id AS teacher_id,
     CONCAT(t.name, ' ', t.last_name) AS teacher_name,
-    COUNT(DISTINCT cba.id) AS total_assignments,
+    COUNT(DISTINCT cba.id) AS total_block_assignments,
     COALESCE(SUM(cba.block_length), 0) AS scheduled_hours,
     STRING_AGG(
         CASE bt.day_of_week
@@ -484,6 +485,7 @@ SELECT
         END || ' ' || bt.start_hour || '-' || (bt.start_hour + bt.length_hours),
         ', ' ORDER BY bt.day_of_week, bt.start_hour
     ) AS scheduled_timeslots,
+    ARRAY_AGG(bt.length_hours ORDER BY bt.day_of_week, bt.start_hour) FILTER (WHERE bt.length_hours IS NOT NULL) AS block_lengths,
     STRING_AGG(DISTINCT cba.room_name, ', ' ORDER BY cba.room_name) AS assigned_rooms,
     CASE
         WHEN COALESCE(SUM(cba.block_length), 0) >= c.required_hours_per_week THEN 'Complete'
@@ -500,7 +502,7 @@ GROUP BY sg.id, sg.name, c.id, c.name, c.abbreviation, c.required_hours_per_week
          c.semester, c.component, c.room_requirement, t.id, t.name, t.last_name
 ORDER BY sg.name, c.name, teacher_name;
 
-COMMENT ON VIEW v_group_course_teachers IS 'Shows courses and their assigned teachers for each student group with scheduling status (block-based)';
+COMMENT ON VIEW v_group_course_teachers IS 'Shows courses and their assigned teachers for each student group with scheduling status and block lengths array (block-based)';
 
 -- ============================================================================
 -- TEACHER AVAILABILITY VIEWS

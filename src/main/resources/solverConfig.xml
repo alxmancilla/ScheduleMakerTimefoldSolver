@@ -7,31 +7,61 @@
         <constraintProviderClass>com.example.solver.SchoolConstraintProvider</constraintProviderClass>
     </scoreDirectorFactory>
 
-    <!-- Phase 1: Construction Heuristic -->
-    <!-- FIRST_FIT processes block assignments in natural order (by group, course, blockLength).
-         This is optimal for pre-assigned data where teachers and rooms are already set,
-         and only block timeslots need assignment. Natural ordering helps distribute blocks
-         efficiently across the schedule. -->
+    <!-- Phase 1: Custom Phase - Assign timeslots with matching lengths -->
+    <!-- This phase ensures that each block is assigned to a timeslot with matching length
+         BEFORE the construction heuristic runs. This prevents the construction heuristic
+         from creating invalid assignments. -->
+    <customPhase>
+        <customPhaseCommandClass>com.example.solver.MatchingLengthTimeslotAssigner</customPhaseCommandClass>
+    </customPhase>
+
+    <!-- Phase 2: Construction Heuristic - ENABLED -->
+    <!-- FIRST_FIT_DECREASING: Assigns values to planning variables in decreasing difficulty order.
+         Uses BlockLengthDifficultyComparator to schedule longer blocks (4h, 3h) first,
+         leaving shorter blocks (1h, 2h) to fill gaps. This reduces fragmentation.
+
+         IMPORTANT: Phase 1 pre-assigns timeslots with matching lengths, so Construction Heuristic
+         only needs to assign timeslots to remaining unassigned blocks (if any).
+         Move filters in Phase 4 ensure that Construction Heuristic respects block length constraints. -->
     <constructionHeuristic>
-        <constructionHeuristicType>FIRST_FIT</constructionHeuristicType>
+        <constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>
     </constructionHeuristic>
 
-    <!-- Phase 2: Local Search (Improvement) -->
+    <!-- Phase 3: Defragmentation Phase - Fix schedule fragmentation -->
+    <!-- This phase runs AFTER the construction heuristic to detect and fix fragmentation.
+         Fragmentation occurs when a day's schedule is filled with small blocks (e.g., 1-hour BASICAS)
+         that prevent larger blocks (e.g., 3-4 hour non-BASICAS) from being assigned to contiguous timeslots.
+         This phase:
+         1. Detects blocks with mismatched lengths (violations)
+         2. Finds suitable contiguous timeslots for these blocks
+         3. Moves conflicting smaller blocks to create space
+         4. Assigns the larger block to the cleared contiguous slot -->
+    <customPhase>
+        <customPhaseCommandClass>com.example.solver.BlockDefragmenter</customPhaseCommandClass>
+    </customPhase>
+
+    <!-- Phase 4: Local Search (Improvement) -->
     <!-- Uses multiple algorithms for better exploration:
          - Late Acceptance: Good for escaping local optima
          - Tabu Search: Prevents cycling back to recent solutions -->
     <localSearch>
         <unionMoveSelector>
             <!-- Change 1 variable (timeslot) -->
-            <changeMoveSelector/>
+            <!-- Filter to ensure block length matches timeslot length -->
+            <changeMoveSelector>
+                <filterClass>com.example.solver.MatchingLengthMoveFilter</filterClass>
+            </changeMoveSelector>
             <!-- Swap assignments between two entities -->
-            <swapMoveSelector/>
+            <!-- Filter to prevent swaps between assignments with different block lengths -->
+            <swapMoveSelector>
+                <filterClass>com.example.solver.MatchingLengthSwapFilter</filterClass>
+            </swapMoveSelector>
             <!-- Pillar swap: swap groups of assignments with same value -->
             <!-- <pillarSwapMoveSelector/> -->
         </unionMoveSelector>
         <acceptor>
             <!-- Late Acceptance: accepts moves based on score from N steps ago -->
-            <lateAcceptanceSize>1000</lateAcceptanceSize>
+            <lateAcceptanceSize>500</lateAcceptanceSize>
             <!-- Tabu Search: prevents cycling back to recent solutions -->
             <entityTabuSize>7</entityTabuSize>
         </acceptor>
@@ -41,10 +71,10 @@
         <termination>
             <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
-            <!-- Or after 10 minutes total -->
-            <minutesSpentLimit>10</minutesSpentLimit>
-            <!-- Or after 5 minutes without improvement -->
-            <unimprovedMinutesSpentLimit>2</unimprovedMinutesSpentLimit>
+            <!-- Or after 30 minutes total -->
+            <minutesSpentLimit>30</minutesSpentLimit>
+            <!-- Or after 8 minutes without improvement -->
+            <unimprovedMinutesSpentLimit>8</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>

@@ -18,6 +18,7 @@ release.properties
 
 # Datasets
 database/datasets/
+md_files/
 
 # Build artifacts
 *.jar
