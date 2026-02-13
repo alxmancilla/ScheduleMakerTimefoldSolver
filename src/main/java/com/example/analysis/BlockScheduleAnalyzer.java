@@ -223,37 +223,34 @@ public final class BlockScheduleAnalyzer {
         // result.put("Prefer BASICAS blocks to be consecutive on same day",
         // basicasNonConsecutive);
 
-        // Maximum 1 block per non-BASICAS course per group per day
-        int maxOneBlockPerCoursePerDay = 0;
+        // Maximum 2 blocks per course per group per day (ALL courses)
+        int maxTwoBlocksPerCoursePerDay = 0;
         Map<String, Map<String, Map<DayOfWeek, Integer>>> groupCourseDayCount = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
-                String component = a.getCourse().getComponent();
-                if (component != null && !component.equalsIgnoreCase("BASICAS")) {
-                    String groupId = a.getGroup().getId();
-                    String courseId = a.getCourse().getId();
-                    DayOfWeek day = a.getTimeslot().getDayOfWeek();
-                    groupCourseDayCount
-                            .computeIfAbsent(groupId, k -> new HashMap<>())
-                            .computeIfAbsent(courseId, k -> new HashMap<>())
-                            .merge(day, 1, Integer::sum);
-                }
+                String groupId = a.getGroup().getId();
+                String courseId = a.getCourse().getId();
+                DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                groupCourseDayCount
+                        .computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(courseId, k -> new HashMap<>())
+                        .merge(day, 1, Integer::sum);
             }
         }
         for (Map<String, Map<DayOfWeek, Integer>> courseDayCounts : groupCourseDayCount.values()) {
             for (Map<DayOfWeek, Integer> dayCounts : courseDayCounts.values()) {
                 for (int count : dayCounts.values()) {
-                    if (count > 1) {
-                        maxOneBlockPerCoursePerDay += (count - 1);
+                    if (count > 2) {
+                        maxTwoBlocksPerCoursePerDay += (count - 2);
                     }
                 }
             }
         }
-        result.put("Maximum 1 block per non-BASICAS course per group per day",
-                maxOneBlockPerCoursePerDay);
+        result.put("Maximum 2 blocks per course per group per day",
+                maxTwoBlocksPerCoursePerDay);
 
-        // Prefer BASICAS blocks to be consecutive on same day (SOFT)
-        int basicasNonConsecutive = 0;
+        // Prefer course blocks to be consecutive on same day (SOFT) - ALL courses
+        int courseBlocksNonConsecutive = 0;
         for (int i = 0; i < list.size(); i++) {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
@@ -263,21 +260,19 @@ public final class BlockScheduleAnalyzer {
                         a1.getCourse() != null && a1.getCourse().equals(a2.getCourse()) &&
                         a1.getTimeslot() != null && a2.getTimeslot() != null &&
                         a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                    String component = a1.getCourse().getComponent();
-                    if (component != null && component.equalsIgnoreCase("BASICAS")) {
-                        int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                        int start2 = a2.getTimeslot().getStartHour();
-                        int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                        int start1 = a1.getTimeslot().getStartHour();
-                        boolean areConsecutive = (end1 == start2 || end2 == start1);
-                        if (!areConsecutive) {
-                            basicasNonConsecutive++;
-                        }
+                    // Apply to ALL courses (removed BASICAS-only filter)
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+                    boolean areConsecutive = (end1 == start2 || end2 == start1);
+                    if (!areConsecutive) {
+                        courseBlocksNonConsecutive++;
                     }
                 }
             }
         }
-        result.put("Prefer BASICAS blocks to be consecutive on same day", basicasNonConsecutive);
+        result.put("Prefer course blocks to be consecutive on same day", courseBlocksNonConsecutive);
 
         // Prefer group's preferred room (SOFT)
         int preferredRoomViolations = 0;
@@ -527,22 +522,19 @@ public final class BlockScheduleAnalyzer {
         // details.put("Prefer BASICAS blocks to be consecutive on same day",
         // basicasNonConsecutiveDetails);
 
-        // Maximum 1 block per non-BASICAS course per group per day
-        List<String> maxOneBlockPerCoursePerDay = new ArrayList<>();
+        // Maximum 2 blocks per course per group per day (ALL courses)
+        List<String> maxTwoBlocksPerCoursePerDay = new ArrayList<>();
         Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
-                String component = a.getCourse().getComponent();
-                if (component != null && !component.equalsIgnoreCase("BASICAS")) {
-                    String groupId = a.getGroup().getId();
-                    String courseId = a.getCourse().getId();
-                    DayOfWeek day = a.getTimeslot().getDayOfWeek();
-                    groupCourseDayAssignments
-                            .computeIfAbsent(groupId, k -> new HashMap<>())
-                            .computeIfAbsent(courseId, k -> new HashMap<>())
-                            .computeIfAbsent(day, k -> new ArrayList<>())
-                            .add(a);
-                }
+                String groupId = a.getGroup().getId();
+                String courseId = a.getCourse().getId();
+                DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                groupCourseDayAssignments
+                        .computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(courseId, k -> new HashMap<>())
+                        .computeIfAbsent(day, k -> new ArrayList<>())
+                        .add(a);
             }
         }
         for (Map.Entry<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupEntry : groupCourseDayAssignments
@@ -554,7 +546,7 @@ public final class BlockScheduleAnalyzer {
                 for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : courseEntry.getValue().entrySet()) {
                     DayOfWeek day = dayEntry.getKey();
                     List<CourseBlockAssignment> assignments = dayEntry.getValue();
-                    if (assignments.size() > 1) {
+                    if (assignments.size() > 2) {
                         StringBuilder sb = new StringBuilder();
                         String courseName = assignments.get(0).getCourse().getName();
                         sb.append(String.format("Group %s, Course [%s] on %s has %d blocks: ",
@@ -565,13 +557,13 @@ public final class BlockScheduleAnalyzer {
                             CourseBlockAssignment a = assignments.get(i);
                             sb.append(formatBlockTimeslot(a.getTimeslot()));
                         }
-                        maxOneBlockPerCoursePerDay.add(sb.toString());
+                        maxTwoBlocksPerCoursePerDay.add(sb.toString());
                     }
                 }
             }
         }
-        details.put("Maximum 1 block per non-BASICAS course per group per day",
-                maxOneBlockPerCoursePerDay);
+        details.put("Maximum 2 blocks per course per group per day",
+                maxTwoBlocksPerCoursePerDay);
 
         return details;
     }

@@ -18,6 +18,7 @@ release.properties
 
 # Datasets
 database/datasets/
+database/migrations/
 md_files/
 
 # Build artifacts
