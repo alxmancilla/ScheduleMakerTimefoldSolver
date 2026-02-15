@@ -282,7 +282,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
                     return isNonStandard; // Penalize if non-standard room after 2pm
                 })
-                .penalize(HardSoftScore.ONE_HARD)
+                .penalize(HardSoftScore.ofSoft(10)) // Changed from HARD to SOFT with high weight
                 .asConstraint("Non-standard rooms should finish by 2pm");
     }
 

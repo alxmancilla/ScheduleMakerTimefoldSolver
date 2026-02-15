@@ -116,21 +116,6 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Group cannot have two courses at same time", groupConflict);
 
-        // Non-standard rooms should finish by 2pm (HARD)
-        int nonStandardAfter2pm = 0;
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
-                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                if (endHour > 14) {
-                    String roomType = a.getRoom().getType();
-                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
-                        nonStandardAfter2pm++;
-                    }
-                }
-            }
-        }
-        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
-
         // Prefer non-BASICAS courses in non-standard rooms to finish by 2pm (SOFT) -
         // COMMENTED OUT
         // int mustFinishBy2pm = 0;
@@ -279,7 +264,7 @@ public final class BlockScheduleAnalyzer {
         // Teacher must be available for entire block
         List<String> unavailable = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
-            if (a.getTeacher() != null && a.getTimeslot() != null
+            if (!a.isPinned() && a.getTeacher() != null && a.getTimeslot() != null
                     && !a.getTeacher().isAvailableForBlock(a.getTimeslot())) {
                 unavailable.add(blockAssignmentToString(a));
             }
@@ -292,7 +277,8 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     teacherDouble.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
@@ -307,7 +293,8 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     roomDouble.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
@@ -334,7 +321,8 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (a1.getGroup().equals(a2.getGroup())
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup().equals(a2.getGroup())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     groupConflict.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
@@ -342,23 +330,6 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Group cannot have two courses at same time", groupConflict);
-
-        // Non-standard rooms should finish by 2pm (HARD) - Detailed
-        List<String> nonStandardAfter2pmDetails = new ArrayList<>();
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
-                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                if (endHour > 14) {
-                    String roomType = a.getRoom().getType();
-                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
-                        String reason = String.format("(room_type=%s, ends at %d:00)",
-                                roomType, endHour);
-                        nonStandardAfter2pmDetails.add(blockAssignmentToString(a) + " " + reason);
-                    }
-                }
-            }
-        }
-        details.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pmDetails);
 
         // Teacher max hours per week
         List<String> teacherMaxExcess = new ArrayList<>();
@@ -758,6 +729,21 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Prefer block's specified room", blockSpecifiedRoomViolations);
+
+        // Non-standard rooms should finish by 2pm (SOFT, weight 10)
+        int nonStandardAfter2pm = 0;
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour > 14) {
+                    String roomType = a.getRoom().getType();
+                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
+                        nonStandardAfter2pm++;
+                    }
+                }
+            }
+        }
+        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
 
         return result;
     }
