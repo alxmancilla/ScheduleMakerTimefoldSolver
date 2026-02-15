@@ -77,7 +77,7 @@
         </forager>
         <termination>
             <!-- Stop when we find a feasible solution (0 hard violations) -->
-            <bestScoreLimit>0hard/*soft</bestScoreLimit>
+            <bestScoreLimit>0hard/-800soft</bestScoreLimit>
             <!-- Or after 120 minutes total -->
             <minutesSpentLimit>120</minutesSpentLimit>
             <!-- Or after 30 minutes without improvement (allows more patience to escape local optima) -->
