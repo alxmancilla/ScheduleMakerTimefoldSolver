@@ -2,6 +2,8 @@ package com.example;
 
 import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.api.solver.SolverFactory;
+import ai.timefold.solver.core.api.solver.event.BestSolutionChangedEvent;
+import ai.timefold.solver.core.api.solver.event.SolverEventListener;
 
 import com.example.data.DataLoader;
 import com.example.data.DataSaver;
@@ -15,6 +17,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Main application for block-based scheduling.
@@ -59,8 +62,33 @@ public class MainBlockSchedulingApp {
         SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory();
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
 
+        // Add event listener to track progress
+        final AtomicInteger stepCounter = new AtomicInteger(0);
+        final long startTime = System.currentTimeMillis();
+
+        solver.addEventListener(new SolverEventListener<SchoolSchedule>() {
+            @Override
+            public void bestSolutionChanged(BestSolutionChangedEvent<SchoolSchedule> event) {
+                int step = stepCounter.incrementAndGet();
+                long elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000;
+                SchoolSchedule newBestSolution = event.getNewBestSolution();
+
+                // Log every 100 steps or every 10 seconds
+                if (step % 100 == 0 || step <= 10) {
+                    System.out.println(String.format(
+                            "[Step %d] Time: %ds | Score: %s | Phase: %s",
+                            step,
+                            elapsedSeconds,
+                            newBestSolution.getScore(),
+                            event.getNewBestScore() != null ? "Active" : "Unknown"));
+                }
+            }
+        });
+
         // Solve
         System.out.println("Solving...");
+        System.out.println("NOTE: If no progress is shown after 30 seconds, the solver may be stuck.");
+        System.out.println();
         SchoolSchedule solvedSchedule = solver.solve(initialSchedule);
 
         // Print results

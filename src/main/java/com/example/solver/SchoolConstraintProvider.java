@@ -29,9 +29,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 teacherMustBeAvailable(constraintFactory), // #1: Most likely to fail (~30% rejection rate)
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
-                nonStandardRoomsShouldFinishBy2pm(constraintFactory), // #4: Non-standard rooms must finish by 2pm
-                maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // #5: Max 2 blocks per course per group per day
-                                                                        // (ALL courses)
 
                 // ========== TIER 2: High-Selectivity HARD Pair Constraints ==========
                 // These detect the most common conflicts:
@@ -54,15 +51,20 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // These optimize quality, evaluated last:
                 // - Don't affect feasibility (can be violated)
                 // - Evaluated only if all HARD constraints pass
-                // - Order by computational cost (most expensive first)
-                courseBlocksShouldBeConsecutive(constraintFactory), // SOFT: Prefer course blocks to be consecutive (ALL
-                                                                    // courses)
-                minimizeGroupIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (student schedule quality)
-                minimizeTeacherIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (teacher satisfaction)
-                teacherMaxHoursPerWeek(constraintFactory), // SOFT: groupBy aggregation (workload balance)
-                preferBlockSpecifiedRoom(constraintFactory), // SOFT: prefer block's specified room (CC distribution)
-                groupPreferredRoomConstraint(constraintFactory), // SOFT: prefer group's pre-assigned room
-                minimizeTeacherBuildingChanges(constraintFactory), // SOFT: minimize teacher travel
+                // - Order by weight (highest priority first)
+                nonStandardRoomsShouldFinishBy2pm(constraintFactory), // SOFT (weight 10): Prefer non-standard rooms to
+                                                                      // finish by 2pm
+                maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // SOFT (weight 8): Prefer max 2 blocks per
+                                                                        // course per day
+                teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
+                courseBlocksShouldBeConsecutive(constraintFactory), // SOFT (weight 3): Prefer course blocks to be
+                                                                    // consecutive
+                minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
+                preferBlockSpecifiedRoom(constraintFactory), // SOFT (weight 3): prefer block's specified room (CC
+                                                             // distribution)
+                minimizeTeacherIdleGaps(constraintFactory), // SOFT (weight 2): teacher satisfaction
+                groupPreferredRoomConstraint(constraintFactory), // SOFT (weight 2): prefer group's pre-assigned room
+                minimizeTeacherBuildingChanges(constraintFactory), // SOFT (weight 1): minimize teacher travel
 
                 // ========== COMMENTED OUT CONSTRAINTS ==========
                 // Uncomment these if needed:
@@ -229,10 +231,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint nonStandardRoomsShouldFinishBy2pm(ConstraintFactory constraintFactory) {
-        // HARD: Non-standard rooms MUST finish by 2pm (14:00)
+        // SOFT (weight 10): Non-standard rooms SHOULD finish by 2pm (14:00)
         //
-        // This hard constraint enforces that all courses using non-standard rooms
-        // (computer centers, workshops, labs) must finish by 2pm to allow for:
+        // This soft constraint strongly encourages courses using non-standard rooms
+        // (computer centers, workshops, labs) to finish by 2pm to allow for:
         // - Equipment maintenance and cleanup
         // - Facility preparation for next day
         // - Reduced operational costs (utilities, supervision)
@@ -254,6 +256,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // - Works with multi-hour blocks (1-4 hours)
         // - Example: Block starting at 13:00 with length 2 hours ends at 15:00
         // (VIOLATION)
+        //
+        // WEIGHT: 10 (Very high priority - strong preference but not absolute
+        // requirement)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(assignment -> {
@@ -282,16 +287,21 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
                     return isNonStandard; // Penalize if non-standard room after 2pm
                 })
-                .penalize(HardSoftScore.ofSoft(10)) // Changed from HARD to SOFT with high weight
+                .penalize(HardSoftScore.ofSoft(10)) // SOFT constraint (weight 10) - strong preference
                 .asConstraint("Non-standard rooms should finish by 2pm");
     }
 
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
-        // BASICAS courses: Maximum 1 block per course per group per day
-        // Non-BASICAS courses: Maximum 2 blocks per course per group per day
+        // SOFT (weight 8): Prefer maximum 1 block per day for BASICAS, 2 for
+        // non-BASICAS
         // This prevents excessive concentration of same course on one day
+        // BASICAS courses: Prefer maximum 1 block per course per group per day
+        // Non-BASICAS courses: Prefer maximum 2 blocks per course per group per day
         // OPTIMIZED: Uses Joiners to pre-filter by group, course, and day, then counts
         // blocks
+        //
+        // WEIGHT: 8 (High priority - strong preference for spreading courses across
+        // days)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
@@ -308,7 +318,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Non-BASICAS courses: max 2 blocks per day
                     return count > 2;
                 })
-                .penalize(HardSoftScore.ONE_HARD,
+                .penalize(HardSoftScore.ofSoft(8),
                         (group, course, day, count) -> {
                             // BASICAS: penalize each block beyond 1
                             if ("BASICAS".equals(course.getComponent())) {

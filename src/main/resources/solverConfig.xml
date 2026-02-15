@@ -67,8 +67,8 @@
         </unionMoveSelector>
         <acceptor>
             <!-- Late Acceptance: accepts moves based on score from N steps ago -->
-            <!-- Optimized to 5000 for better performance while maintaining exploration -->
-            <lateAcceptanceSize>5000</lateAcceptanceSize>
+            <!-- Optimized to 10000 for better performance while maintaining exploration -->
+            <lateAcceptanceSize>10000</lateAcceptanceSize>
             <!-- Tabu Search: prevents cycling back to recent solutions -->
             <entityTabuSize>7</entityTabuSize>
         </acceptor>
@@ -78,10 +78,10 @@
         <termination>
             <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
-            <!-- Or after 60 minutes total -->
-            <minutesSpentLimit>60</minutesSpentLimit>
-            <!-- Or after 10 minutes without improvement (allows more patience to escape local optima) -->
-            <unimprovedMinutesSpentLimit>10</unimprovedMinutesSpentLimit>
+            <!-- Or after 120 minutes total -->
+            <minutesSpentLimit>120</minutesSpentLimit>
+            <!-- Or after 30 minutes without improvement (allows more patience to escape local optima) -->
+            <unimprovedMinutesSpentLimit>30</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>

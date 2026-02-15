@@ -65,7 +65,9 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
+                // FIXED: Changed from && to || to match constraint provider logic
+                // Penalize if at least one assignment is unpinned
+                if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
@@ -81,7 +83,9 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
+                // FIXED: Changed from && to || to match constraint provider logic
+                // Penalize if at least one assignment is unpinned
+                if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
@@ -106,7 +110,9 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
+                // FIXED: Changed from && to || to match constraint provider logic
+                // Penalize if at least one assignment is unpinned
+                if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getGroup().equals(a2.getGroup())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
@@ -115,37 +121,6 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Group cannot have two courses at same time", groupConflict);
-
-        // Prefer non-BASICAS courses in non-standard rooms to finish by 2pm (SOFT) -
-        // COMMENTED OUT
-        // int mustFinishBy2pm = 0;
-        // for (CourseBlockAssignment a : list) {
-        // if (a.getCourse() != null && a.getTimeslot() != null && !a.isPinned()) {
-        // int endHour = a.getTimeslot().getStartHour() +
-        // a.getTimeslot().getLengthHours();
-        // if (endHour >= 14) {
-        // // Check if non-BASICAS course
-        // String component = a.getCourse().getComponent();
-        // boolean isNonBasicas = (component == null ||
-        // !component.equalsIgnoreCase("BASICAS"));
-        //
-        // // Check if non-standard room
-        // boolean isNonStandardRoom = false;
-        // if (a.getRoom() != null) {
-        // String roomType = a.getRoom().getType();
-        // isNonStandardRoom = (roomType != null &&
-        // !roomType.equalsIgnoreCase("estándar"));
-        // }
-        //
-        // // Penalize if BOTH conditions are true (AND logic)
-        // if (isNonBasicas && isNonStandardRoom) {
-        // mustFinishBy2pm++;
-        // }
-        // }
-        // }
-        // }
-        // result.put("Prefer non-BASICAS courses in non-standard rooms to finish by
-        // 2pm", mustFinishBy2pm);
 
         // COMMENTED OUT: Prefer BASICAS blocks to be consecutive on same day (SOFT)
         // int basicasNonConsecutive = 0;
@@ -199,32 +174,6 @@ public final class BlockScheduleAnalyzer {
         // result.put("Prefer BASICAS blocks to be consecutive on same day",
         // basicasNonConsecutive);
 
-        // Maximum 2 blocks per course per group per day (ALL courses)
-        int maxTwoBlocksPerCoursePerDay = 0;
-        Map<String, Map<String, Map<DayOfWeek, Integer>>> groupCourseDayCount = new HashMap<>();
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
-                String groupId = a.getGroup().getId();
-                String courseId = a.getCourse().getId();
-                DayOfWeek day = a.getTimeslot().getDayOfWeek();
-                groupCourseDayCount
-                        .computeIfAbsent(groupId, k -> new HashMap<>())
-                        .computeIfAbsent(courseId, k -> new HashMap<>())
-                        .merge(day, 1, Integer::sum);
-            }
-        }
-        for (Map<String, Map<DayOfWeek, Integer>> courseDayCounts : groupCourseDayCount.values()) {
-            for (Map<DayOfWeek, Integer> dayCounts : courseDayCounts.values()) {
-                for (int count : dayCounts.values()) {
-                    if (count > 2) {
-                        maxTwoBlocksPerCoursePerDay += (count - 2);
-                    }
-                }
-            }
-        }
-        result.put("Maximum 2 blocks per course per group per day",
-                maxTwoBlocksPerCoursePerDay);
-
         return result;
     }
 
@@ -277,7 +226,9 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
+                // FIXED: Changed from && to || to match constraint provider logic
+                // Penalize if at least one assignment is unpinned
+                if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
@@ -293,7 +244,9 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
+                // FIXED: Changed from && to || to match constraint provider logic
+                // Penalize if at least one assignment is unpinned
+                if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
@@ -321,7 +274,9 @@ public final class BlockScheduleAnalyzer {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
                 CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
+                // FIXED: Changed from && to || to match constraint provider logic
+                // Penalize if at least one assignment is unpinned
+                if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getGroup().equals(a2.getGroup())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
@@ -330,6 +285,79 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Group cannot have two courses at same time", groupConflict);
+
+        return details;
+    }
+
+    /**
+     * Analyze soft constraint violations with detailed descriptions.
+     * Returns a map of constraint name to list of violation descriptions.
+     */
+    public static Map<String, List<String>> analyzeSoftConstraintViolationsDetailed(SchoolSchedule schedule) {
+        Map<String, List<String>> details = new LinkedHashMap<>();
+
+        if (schedule.getCourseBlockAssignments() == null) {
+            return details;
+        }
+
+        List<CourseBlockAssignment> list = schedule.getCourseBlockAssignments();
+
+        // Non-standard rooms should finish by 2pm (SOFT, weight 10) - Detailed
+        List<String> nonStandardAfter2pmDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour > 14) {
+                    String roomType = a.getRoom().getType();
+                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
+                        String reason = String.format("(room=%s, type=%s, ends at %d:00)",
+                                a.getRoom().getName(), roomType, endHour);
+                        nonStandardAfter2pmDetails.add(blockAssignmentToString(a) + " " + reason);
+                    }
+                }
+            }
+        }
+        details.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pmDetails);
+
+        // Maximum 2 blocks per course per group per day (SOFT, weight 8) - Detailed
+        List<String> maxTwoBlocksDetails = new ArrayList<>();
+        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
+                String groupId = a.getGroup().getId();
+                String courseId = a.getCourse().getId();
+                DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                groupCourseDayAssignments
+                        .computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(courseId, k -> new HashMap<>())
+                        .computeIfAbsent(day, k -> new ArrayList<>())
+                        .add(a);
+            }
+        }
+        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayCounts : groupCourseDayAssignments
+                .values()) {
+            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayCounts : courseDayCounts.values()) {
+                for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : dayCounts.entrySet()) {
+                    List<CourseBlockAssignment> assignments = dayEntry.getValue();
+                    int count = assignments.size();
+                    if (count > 0) {
+                        String component = assignments.get(0).getCourse().getComponent();
+                        boolean isBasicas = "BASICAS".equals(component);
+                        String courseName = assignments.get(0).getCourse().getName();
+                        String groupName = assignments.get(0).getGroup().getName();
+                        String dayName = formatDay(dayEntry.getKey());
+
+                        if ((isBasicas && count > 1) || (!isBasicas && count > 2)) {
+                            int limit = isBasicas ? 1 : 2;
+                            String reason = String.format("(%s has %d blocks on %s, limit=%d for %s)",
+                                    groupName, count, dayName, limit, component);
+                            maxTwoBlocksDetails.add(courseName + " " + reason);
+                        }
+                    }
+                }
+            }
+        }
+        details.put("Maximum 2 blocks per course per group per day", maxTwoBlocksDetails);
 
         // Teacher max hours per week
         List<String> teacherMaxExcess = new ArrayList<>();
@@ -491,49 +519,6 @@ public final class BlockScheduleAnalyzer {
         // details.put("Prefer BASICAS blocks to be consecutive on same day",
         // basicasNonConsecutiveDetails);
 
-        // Maximum 2 blocks per course per group per day (ALL courses)
-        List<String> maxTwoBlocksPerCoursePerDay = new ArrayList<>();
-        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
-        for (CourseBlockAssignment a : list) {
-            if (a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
-                String groupId = a.getGroup().getId();
-                String courseId = a.getCourse().getId();
-                DayOfWeek day = a.getTimeslot().getDayOfWeek();
-                groupCourseDayAssignments
-                        .computeIfAbsent(groupId, k -> new HashMap<>())
-                        .computeIfAbsent(courseId, k -> new HashMap<>())
-                        .computeIfAbsent(day, k -> new ArrayList<>())
-                        .add(a);
-            }
-        }
-        for (Map.Entry<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupEntry : groupCourseDayAssignments
-                .entrySet()) {
-            String groupId = groupEntry.getKey();
-            for (Map.Entry<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseEntry : groupEntry.getValue()
-                    .entrySet()) {
-                String courseId = courseEntry.getKey();
-                for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : courseEntry.getValue().entrySet()) {
-                    DayOfWeek day = dayEntry.getKey();
-                    List<CourseBlockAssignment> assignments = dayEntry.getValue();
-                    if (assignments.size() > 2) {
-                        StringBuilder sb = new StringBuilder();
-                        String courseName = assignments.get(0).getCourse().getName();
-                        sb.append(String.format("Group %s, Course [%s] on %s has %d blocks: ",
-                                groupId, courseName, day, assignments.size()));
-                        for (int i = 0; i < assignments.size(); i++) {
-                            if (i > 0)
-                                sb.append(", ");
-                            CourseBlockAssignment a = assignments.get(i);
-                            sb.append(formatBlockTimeslot(a.getTimeslot()));
-                        }
-                        maxTwoBlocksPerCoursePerDay.add(sb.toString());
-                    }
-                }
-            }
-        }
-        details.put("Maximum 2 blocks per course per group per day",
-                maxTwoBlocksPerCoursePerDay);
-
         return details;
     }
 
@@ -549,6 +534,59 @@ public final class BlockScheduleAnalyzer {
         }
 
         List<CourseBlockAssignment> list = schedule.getCourseBlockAssignments();
+
+        // Non-standard rooms should finish by 2pm (SOFT, weight 10)
+        int nonStandardAfter2pm = 0;
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour > 14) {
+                    String roomType = a.getRoom().getType();
+                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
+                        nonStandardAfter2pm++;
+                    }
+                }
+            }
+        }
+        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
+
+        // Maximum 2 blocks per course per group per day (SOFT, weight 8)
+        // BASICAS: max 1, non-BASICAS: max 2
+        int maxTwoBlocksPerCoursePerDay = 0;
+        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
+                String groupId = a.getGroup().getId();
+                String courseId = a.getCourse().getId();
+                DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                groupCourseDayAssignments
+                        .computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(courseId, k -> new HashMap<>())
+                        .computeIfAbsent(day, k -> new ArrayList<>())
+                        .add(a);
+            }
+        }
+        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayCounts : groupCourseDayAssignments
+                .values()) {
+            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayCounts : courseDayCounts.values()) {
+                for (List<CourseBlockAssignment> assignments : dayCounts.values()) {
+                    int count = assignments.size();
+                    if (count > 0) {
+                        String component = assignments.get(0).getCourse().getComponent();
+                        boolean isBasicas = "BASICAS".equals(component);
+
+                        if (isBasicas && count > 1) {
+                            // BASICAS courses: max 1 block per day
+                            maxTwoBlocksPerCoursePerDay += (count - 1);
+                        } else if (!isBasicas && count > 2) {
+                            // Non-BASICAS courses: max 2 blocks per day
+                            maxTwoBlocksPerCoursePerDay += (count - 2);
+                        }
+                    }
+                }
+            }
+        }
+        result.put("Maximum 2 blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
 
         // Prefer course blocks to be consecutive on same day (SOFT, weight 3) - ALL
         // courses
@@ -730,21 +768,6 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Prefer block's specified room", blockSpecifiedRoomViolations);
 
-        // Non-standard rooms should finish by 2pm (SOFT, weight 10)
-        int nonStandardAfter2pm = 0;
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
-                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                if (endHour > 14) {
-                    String roomType = a.getRoom().getType();
-                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
-                        nonStandardAfter2pm++;
-                    }
-                }
-            }
-        }
-        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
-
         return result;
     }
 
@@ -794,5 +817,20 @@ public final class BlockScheduleAnalyzer {
         };
         int endHour = bt.getStartHour() + bt.getLengthHours();
         return String.format("%s %d-%d", day, bt.getStartHour(), endHour);
+    }
+
+    /**
+     * Helper method to format a day of week as a string.
+     */
+    private static String formatDay(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> "Lun";
+            case TUESDAY -> "Mar";
+            case WEDNESDAY -> "Mie";
+            case THURSDAY -> "Jue";
+            case FRIDAY -> "Vie";
+            case SATURDAY -> "Sáb";
+            case SUNDAY -> "Dom";
+        };
     }
 }

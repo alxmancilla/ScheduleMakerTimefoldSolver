@@ -16,6 +16,9 @@ release.properties
 .DS_Store
 *.class
 
+# web ui    
+web-ui/node_modules/
+
 # Datasets
 database/datasets/
 database/migrations/
