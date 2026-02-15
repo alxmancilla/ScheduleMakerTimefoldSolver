@@ -91,11 +91,11 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("No room double-booking", roomDouble);
 
-        // Room type must satisfy course requirement
+        // Room type must satisfy course requirement (uses dual room requirements)
         int roomTypeMismatch = 0;
         for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getRoom() != null
-                    && !a.getRoom().satisfiesRequirement(a.getCourse().getRoomRequirement()))
+            if (!a.isPinned() && a.getRoom() != null && a.getSatisfiesRoomType() != null
+                    && !a.getRoom().satisfiesRequirement(a.getSatisfiesRoomType()))
                 roomTypeMismatch++;
         }
         result.put("Room type must satisfy course requirement", roomTypeMismatch);
@@ -116,29 +116,20 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Group cannot have two courses at same time", groupConflict);
 
-        // Teacher max hours per week (SOFT constraint for block scheduling)
-        // IMPORTANT: Includes BOTH pinned and unpinned assignments because pinned
-        // assignments
-        // represent real teaching hours that count toward the teacher's workload limit.
-        int teacherMaxViolations = 0;
-        Map<String, Integer> teacherHours = new HashMap<>();
-        Map<String, Teacher> teacherMap = new HashMap<>();
+        // Non-standard rooms should finish by 2pm (HARD)
+        int nonStandardAfter2pm = 0;
         for (CourseBlockAssignment a : list) {
-            if (a.getTeacher() != null && a.getTimeslot() != null) { // Include ALL assignments
-                String teacherId = a.getTeacher().getId();
-                teacherHours.put(teacherId, teacherHours.getOrDefault(teacherId, 0) + a.getBlockLength());
-                teacherMap.put(teacherId, a.getTeacher());
+            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour > 14) {
+                    String roomType = a.getRoom().getType();
+                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
+                        nonStandardAfter2pm++;
+                    }
+                }
             }
         }
-        for (Map.Entry<String, Integer> entry : teacherHours.entrySet()) {
-            String teacherId = entry.getKey();
-            int totalHours = entry.getValue();
-            Teacher teacher = teacherMap.get(teacherId);
-            if (teacher != null && totalHours > teacher.getMaxHoursPerWeek()) {
-                teacherMaxViolations++;
-            }
-        }
-        result.put("Teacher exceeds max hours per week", teacherMaxViolations);
+        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
 
         // Prefer non-BASICAS courses in non-standard rooms to finish by 2pm (SOFT) -
         // COMMENTED OUT
@@ -249,66 +240,6 @@ public final class BlockScheduleAnalyzer {
         result.put("Maximum 2 blocks per course per group per day",
                 maxTwoBlocksPerCoursePerDay);
 
-        // Prefer course blocks to be consecutive on same day (SOFT) - ALL courses
-        int courseBlocksNonConsecutive = 0;
-        for (int i = 0; i < list.size(); i++) {
-            for (int j = i + 1; j < list.size(); j++) {
-                CourseBlockAssignment a1 = list.get(i);
-                CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
-                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
-                        a1.getCourse() != null && a1.getCourse().equals(a2.getCourse()) &&
-                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
-                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                    // Apply to ALL courses (removed BASICAS-only filter)
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-                    boolean areConsecutive = (end1 == start2 || end2 == start1);
-                    if (!areConsecutive) {
-                        courseBlocksNonConsecutive++;
-                    }
-                }
-            }
-        }
-        result.put("Prefer course blocks to be consecutive on same day", courseBlocksNonConsecutive);
-
-        // Prefer group's preferred room (SOFT)
-        int preferredRoomViolations = 0;
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null && a.getCourse() != null) {
-                var preferredRoom = a.getGroup().getPreferredRoom();
-                if (preferredRoom != null &&
-                        !"laboratorio".equalsIgnoreCase(a.getCourse().getRoomRequirement()) &&
-                        !preferredRoom.equals(a.getRoom())) {
-                    preferredRoomViolations++;
-                }
-            }
-        }
-        result.put("Prefer group's preferred room", preferredRoomViolations);
-
-        // Minimize teacher building changes (SOFT)
-        int buildingChanges = 0;
-        for (int i = 0; i < list.size(); i++) {
-            for (int j = i + 1; j < list.size(); j++) {
-                CourseBlockAssignment a1 = list.get(i);
-                CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
-                        && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher()) &&
-                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
-                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek()) &&
-                        a1.getRoom() != null && a2.getRoom() != null) {
-                    String building1 = a1.getRoom().getBuilding();
-                    String building2 = a2.getRoom().getBuilding();
-                    if (building1 != null && building2 != null && !building1.equals(building2)) {
-                        buildingChanges++;
-                    }
-                }
-            }
-        }
-        result.put("Minimize teacher building changes", buildingChanges);
-
         return result;
     }
 
@@ -385,12 +316,14 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("No room double-booking", roomDouble);
 
-        // Room type must satisfy course requirement
+        // Room type must satisfy course requirement (uses dual room requirements)
         List<String> roomTypeMismatch = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
-            if (a.getRoom() != null && !a.getRoom().satisfiesRequirement(a.getCourse().getRoomRequirement())) {
+            if (!a.isPinned() && a.getRoom() != null && a.getSatisfiesRoomType() != null
+                    && !a.getRoom().satisfiesRequirement(a.getSatisfiesRoomType())) {
                 roomTypeMismatch.add(
-                        blockAssignmentToString(a) + " (roomRequirement=" + a.getCourse().getRoomRequirement() + ")");
+                        blockAssignmentToString(a) + " (satisfiesRoomType=" + a.getSatisfiesRoomType()
+                                + ", assignedRoomType=" + a.getRoom().getType() + ")");
             }
         }
         details.put("Room type must satisfy course requirement", roomTypeMismatch);
@@ -409,6 +342,23 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Group cannot have two courses at same time", groupConflict);
+
+        // Non-standard rooms should finish by 2pm (HARD) - Detailed
+        List<String> nonStandardAfter2pmDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getTimeslot() != null && a.getRoom() != null) {
+                int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                if (endHour > 14) {
+                    String roomType = a.getRoom().getType();
+                    if (roomType != null && !roomType.equalsIgnoreCase("estándar")) {
+                        String reason = String.format("(room_type=%s, ends at %d:00)",
+                                roomType, endHour);
+                        nonStandardAfter2pmDetails.add(blockAssignmentToString(a) + " " + reason);
+                    }
+                }
+            }
+        }
+        details.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pmDetails);
 
         // Teacher max hours per week
         List<String> teacherMaxExcess = new ArrayList<>();
@@ -432,6 +382,54 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Teacher exceeds max hours per week", teacherMaxExcess);
+
+        // Minimize group idle gaps (SOFT) - Detailed
+        List<String> groupIdleGapsDetails = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                CourseBlockAssignment a1 = list.get(i);
+                CourseBlockAssignment a2 = list.get(j);
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
+                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
+                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+
+                    int gapSize = 0;
+                    if (end1 < start2) {
+                        gapSize = start2 - end1;
+                    } else if (end2 < start1) {
+                        gapSize = start1 - end2;
+                    }
+
+                    if (gapSize > 0) {
+                        String reason = String.format("(gap=%d hours)", gapSize);
+                        groupIdleGapsDetails.add(blockAssignmentToString(a1) + "  <->  " +
+                                blockAssignmentToString(a2) + " " + reason);
+                    }
+                }
+            }
+        }
+        details.put("Minimize group idle gaps", groupIdleGapsDetails);
+
+        // Prefer block's specified room (SOFT) - Detailed
+        List<String> blockSpecifiedRoomDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getRoom() != null) {
+                String preferredRoomName = a.getPreferredRoomName();
+                if (preferredRoomName != null && !preferredRoomName.isEmpty()) {
+                    if (!preferredRoomName.equals(a.getRoom().getName())) {
+                        String reason = String.format("(preferred=%s, assigned=%s)",
+                                preferredRoomName, a.getRoom().getName());
+                        blockSpecifiedRoomDetails.add(blockAssignmentToString(a) + " " + reason);
+                    }
+                }
+            }
+        }
+        details.put("Prefer block's specified room", blockSpecifiedRoomDetails);
 
         // Prefer non-BASICAS courses in non-standard rooms to finish by 2pm (SOFT) -
         // COMMENTED OUT
@@ -581,7 +579,93 @@ public final class BlockScheduleAnalyzer {
 
         List<CourseBlockAssignment> list = schedule.getCourseBlockAssignments();
 
-        // Minimize teacher idle gaps (soft, weight 1, availability-aware)
+        // Prefer course blocks to be consecutive on same day (SOFT, weight 3) - ALL
+        // courses
+        int courseBlocksNonConsecutive = 0;
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                CourseBlockAssignment a1 = list.get(i);
+                CourseBlockAssignment a2 = list.get(j);
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
+                        a1.getCourse() != null && a1.getCourse().equals(a2.getCourse()) &&
+                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
+                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+                    // Apply to ALL courses (removed BASICAS-only filter)
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+                    boolean areConsecutive = (end1 == start2 || end2 == start1);
+                    if (!areConsecutive) {
+                        courseBlocksNonConsecutive++;
+                    }
+                }
+            }
+        }
+        result.put("Prefer course blocks to be consecutive on same day", courseBlocksNonConsecutive);
+
+        // Prefer group's preferred room (SOFT, weight 2) - uses dual room requirements
+        int preferredRoomViolations = 0;
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
+                var preferredRoom = a.getGroup().getPreferredRoom();
+                if (preferredRoom != null &&
+                        !(a.getSatisfiesRoomType() != null && "laboratorio".equalsIgnoreCase(a.getSatisfiesRoomType()))
+                        &&
+                        !preferredRoom.equals(a.getRoom())) {
+                    preferredRoomViolations++;
+                }
+            }
+        }
+        result.put("Prefer group's preferred room", preferredRoomViolations);
+
+        // Minimize teacher building changes (SOFT, weight 1)
+        int buildingChanges = 0;
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                CourseBlockAssignment a1 = list.get(i);
+                CourseBlockAssignment a2 = list.get(j);
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher()) &&
+                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
+                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek()) &&
+                        a1.getRoom() != null && a2.getRoom() != null) {
+                    String building1 = a1.getRoom().getBuilding();
+                    String building2 = a2.getRoom().getBuilding();
+                    if (building1 != null && building2 != null && !building1.equals(building2)) {
+                        buildingChanges++;
+                    }
+                }
+            }
+        }
+        result.put("Minimize teacher building changes", buildingChanges);
+
+        // Teacher max hours per week (SOFT, weight 5)
+        // IMPORTANT: Includes BOTH pinned and unpinned assignments because pinned
+        // assignments represent real teaching hours that count toward the teacher's
+        // workload limit.
+        int teacherMaxViolations = 0;
+        Map<String, Integer> teacherHours = new HashMap<>();
+        Map<String, Teacher> teacherMap = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getTeacher() != null && a.getTimeslot() != null) { // Include ALL assignments
+                String teacherId = a.getTeacher().getId();
+                teacherHours.put(teacherId, teacherHours.getOrDefault(teacherId, 0) + a.getBlockLength());
+                teacherMap.put(teacherId, a.getTeacher());
+            }
+        }
+        for (Map.Entry<String, Integer> entry : teacherHours.entrySet()) {
+            String teacherId = entry.getKey();
+            int totalHours = entry.getValue();
+            Teacher teacher = teacherMap.get(teacherId);
+            if (teacher != null && totalHours > teacher.getMaxHoursPerWeek()) {
+                teacherMaxViolations++;
+            }
+        }
+        result.put("Teacher exceeds max hours per week", teacherMaxViolations);
+
+        // Minimize teacher idle gaps (SOFT, weight 2, availability-aware)
         int idleGaps = 0;
         Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> teacherDayAssignments = new HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -630,6 +714,50 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Minimize teacher idle gaps (availability-aware)", idleGaps);
+
+        // Minimize group idle gaps (SOFT, weight 3)
+        int groupIdleGaps = 0;
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                CourseBlockAssignment a1 = list.get(i);
+                CourseBlockAssignment a2 = list.get(j);
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
+                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
+                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+
+                    int gapSize = 0;
+                    if (end1 < start2) {
+                        gapSize = start2 - end1;
+                    } else if (end2 < start1) {
+                        gapSize = start1 - end2;
+                    }
+
+                    if (gapSize > 0) {
+                        groupIdleGaps += gapSize;
+                    }
+                }
+            }
+        }
+        result.put("Minimize group idle gaps", groupIdleGaps);
+
+        // Prefer block's specified room (SOFT, weight 3)
+        int blockSpecifiedRoomViolations = 0;
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getRoom() != null) {
+                String preferredRoomName = a.getPreferredRoomName();
+                if (preferredRoomName != null && !preferredRoomName.isEmpty()) {
+                    if (!preferredRoomName.equals(a.getRoom().getName())) {
+                        blockSpecifiedRoomViolations++;
+                    }
+                }
+            }
+        }
+        result.put("Prefer block's specified room", blockSpecifiedRoomViolations);
 
         return result;
     }

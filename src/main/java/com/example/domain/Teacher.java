@@ -137,6 +137,31 @@ public class Teacher {
     }
 
     /**
+     * Get the total number of available hours across all days.
+     * This is used by the difficulty comparator to prioritize teachers with low
+     * availability.
+     *
+     * @return total number of available hours (sum of all hours across all days)
+     */
+    public int getTotalAvailableHours() {
+        int total = 0;
+        for (java.util.Set<Integer> hours : availabilityPerDay.values()) {
+            total += hours.size();
+        }
+        return total;
+    }
+
+    /**
+     * Get the availability map for this teacher.
+     * This is used by the difficulty comparator to count available hours.
+     *
+     * @return map from DayOfWeek to set of available hours
+     */
+    public java.util.Map<DayOfWeek, java.util.Set<Integer>> getAvailabilityPerDay() {
+        return availabilityPerDay;
+    }
+
+    /**
      * Derived: return the earliest hour the teacher is available across all days,
      * or 0 if none.
      */

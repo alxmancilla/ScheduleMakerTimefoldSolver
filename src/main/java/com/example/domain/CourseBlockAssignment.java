@@ -27,6 +27,10 @@ public class CourseBlockAssignment {
     // @PlanningVariable(valueRangeProviderRefs = { "roomRange" })
     private Room room;
 
+    // NEW: Support for dual room requirements and custom block decomposition
+    private String satisfiesRoomType; // Which room requirement this block satisfies
+    private String preferredRoomName; // Preferred room for soft constraint optimization
+
     public CourseBlockAssignment() {
         // No-arg constructor required by Timefold
     }
@@ -100,6 +104,24 @@ public class CourseBlockAssignment {
 
     public void setPinned(boolean pinned) {
         this.pinned = pinned;
+    }
+
+    // NEW: Getters and setters for room requirement fields
+
+    public String getSatisfiesRoomType() {
+        return satisfiesRoomType;
+    }
+
+    public void setSatisfiesRoomType(String satisfiesRoomType) {
+        this.satisfiesRoomType = satisfiesRoomType;
+    }
+
+    public String getPreferredRoomName() {
+        return preferredRoomName;
+    }
+
+    public void setPreferredRoomName(String preferredRoomName) {
+        this.preferredRoomName = preferredRoomName;
     }
 
     @Override

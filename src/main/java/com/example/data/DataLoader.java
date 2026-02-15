@@ -276,6 +276,79 @@ public class DataLoader {
     // ============================================================================
 
     /**
+     * Load room requirements from the database and populate them in courses.
+     */
+    private void loadRoomRequirements(Connection conn, List<com.example.domain.Course> courses) throws SQLException {
+        String sql = "SELECT course_id, room_type, hours_required, priority, default_preferred_room FROM course_room_requirement ORDER BY course_id, priority";
+
+        Map<String, List<com.example.domain.RoomRequirement>> requirementsByCourse = new HashMap<>();
+
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                String courseId = rs.getString("course_id");
+                String roomType = rs.getString("room_type");
+                int hoursRequired = rs.getInt("hours_required");
+                int priority = rs.getInt("priority");
+                String defaultPreferredRoom = rs.getString("default_preferred_room");
+
+                com.example.domain.RoomRequirement req = new com.example.domain.RoomRequirement(
+                        null, courseId, roomType, hoursRequired, priority, defaultPreferredRoom);
+
+                requirementsByCourse.computeIfAbsent(courseId, k -> new ArrayList<>()).add(req);
+            }
+        }
+
+        // Populate room requirements in courses
+        for (com.example.domain.Course course : courses) {
+            List<com.example.domain.RoomRequirement> reqs = requirementsByCourse.get(course.getId());
+            if (reqs != null) {
+                course.setRoomRequirements(reqs);
+            }
+        }
+    }
+
+    /**
+     * Load block templates from the database and populate them in courses.
+     */
+    private void loadBlockTemplates(Connection conn, List<com.example.domain.Course> courses) throws SQLException {
+        String sql = "SELECT course_id, group_id, block_index, block_length, room_type, preferred_room_name, preferred_day, pin_assignment, preferred_timeslot_id FROM course_block_template ORDER BY course_id, group_id, block_index";
+
+        Map<String, List<com.example.domain.BlockTemplate>> templatesByCourse = new HashMap<>();
+
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                String courseId = rs.getString("course_id");
+                String groupId = rs.getString("group_id");
+                int blockIndex = rs.getInt("block_index");
+                int blockLength = rs.getInt("block_length");
+                String roomType = rs.getString("room_type");
+                String preferredRoomName = rs.getString("preferred_room_name");
+                Integer preferredDay = (Integer) rs.getObject("preferred_day");
+                boolean pinAssignment = rs.getBoolean("pin_assignment");
+                String preferredTimeslotId = rs.getString("preferred_timeslot_id");
+
+                com.example.domain.BlockTemplate template = new com.example.domain.BlockTemplate(
+                        null, courseId, groupId, blockIndex, blockLength, roomType,
+                        preferredRoomName, preferredDay, pinAssignment, preferredTimeslotId);
+
+                templatesByCourse.computeIfAbsent(courseId, k -> new ArrayList<>()).add(template);
+            }
+        }
+
+        // Populate block templates in courses
+        for (com.example.domain.Course course : courses) {
+            List<com.example.domain.BlockTemplate> templates = templatesByCourse.get(course.getId());
+            if (templates != null) {
+                course.setBlockTemplates(templates);
+            }
+        }
+    }
+
+    /**
      * Load the complete dataset for block-based scheduling from the database.
      *
      * @return SchoolSchedule with block timeslots and course block assignments
@@ -285,6 +358,11 @@ public class DataLoader {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             List<Teacher> teachers = loadTeachers(conn);
             List<Course> courses = loadCourses(conn);
+
+            // NEW: Load room requirements and block templates
+            loadRoomRequirements(conn, courses);
+            loadBlockTemplates(conn, courses);
+
             List<Room> rooms = loadRooms(conn);
             List<BlockTimeslot> blockTimeslots = loadBlockTimeslots(conn);
             List<Group> groups = loadGroups(conn, rooms);
@@ -337,7 +415,7 @@ public class DataLoader {
             throws SQLException {
         List<CourseBlockAssignment> assignments = new ArrayList<>();
 
-        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned FROM course_block_assignment ORDER BY id";
+        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_name FROM course_block_assignment ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -399,6 +477,17 @@ public class DataLoader {
 
                 boolean pinned = rs.getBoolean("pinned");
                 assignment.setPinned(pinned);
+
+                // NEW: Load room requirement fields
+                String satisfiesRoomType = rs.getString("satisfies_room_type");
+                if (satisfiesRoomType != null && !satisfiesRoomType.isEmpty()) {
+                    assignment.setSatisfiesRoomType(satisfiesRoomType);
+                }
+
+                String preferredRoomName = rs.getString("preferred_room_name");
+                if (preferredRoomName != null && !preferredRoomName.isEmpty()) {
+                    assignment.setPreferredRoomName(preferredRoomName);
+                }
 
                 if (assignment.isPinned()) {
                     System.out.println("Loaded pinned block assignment: " + assignment);

@@ -29,6 +29,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 teacherMustBeAvailable(constraintFactory), // #1: Most likely to fail (~30% rejection rate)
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
+                nonStandardRoomsShouldFinishBy2pm(constraintFactory), // #4: Non-standard rooms must finish by 2pm
                 maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // #5: Max 2 blocks per course per group per day
                                                                         // (ALL courses)
 
@@ -56,8 +57,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // - Order by computational cost (most expensive first)
                 courseBlocksShouldBeConsecutive(constraintFactory), // SOFT: Prefer course blocks to be consecutive (ALL
                                                                     // courses)
-                minimizeTeacherIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (most expensive SOFT)
+                minimizeGroupIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (student schedule quality)
+                minimizeTeacherIdleGaps(constraintFactory), // SOFT: ~1,000 pairs (teacher satisfaction)
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT: groupBy aggregation (workload balance)
+                preferBlockSpecifiedRoom(constraintFactory), // SOFT: prefer block's specified room (CC distribution)
                 groupPreferredRoomConstraint(constraintFactory), // SOFT: prefer group's pre-assigned room
                 minimizeTeacherBuildingChanges(constraintFactory), // SOFT: minimize teacher travel
 
@@ -186,33 +189,28 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint roomTypeMustSatisfyRequirement(ConstraintFactory constraintFactory) {
+        // HARD: Room type must match the block's satisfiesRoomType field
+        // This supports dual room requirements where different blocks of the same
+        // course
+        // can require different room types (e.g., 4h in CC + 1h in estándar)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
-                .filter(assignment -> !assignment.isPinned() // Exclude pinned assignments
-                        && !isRoomTypeException(assignment) // Exclude specific exceptions
-                        && assignment.getRoom() != null
-                        && !assignment.getRoom().satisfiesRequirement(assignment.getCourse().getRoomRequirement()))
+                .filter(assignment -> {
+                    // Exclude pinned assignments (they are fixed from database)
+                    if (assignment.isPinned()) {
+                        return false;
+                    }
+                    // Skip if no room assigned or no room type requirement
+                    if (assignment.getRoom() == null || assignment.getSatisfiesRoomType() == null) {
+                        return false;
+                    }
+                    // Check if assigned room satisfies the block's required room type
+                    // Uses satisfiesRoomType field (from course_block_assignment table)
+                    // instead of course.room_requirement (old single-requirement system)
+                    return !assignment.getRoom().satisfiesRequirement(assignment.getSatisfiesRoomType());
+                })
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Room type must satisfy course requirement");
-    }
-
-    /**
-     * Identifies assignments that are exceptions to the room type requirement.
-     * These are specific blocks that need to use a different room type than
-     * what the course normally requires (e.g., 1 hour in a standard room for
-     * a course that normally uses a computer center).
-     */
-    private boolean isRoomTypeException(CourseBlockAssignment assignment) {
-        String id = assignment.getId();
-        // Exception: 6A PRO courses 60 and 61 have 1 hour in standard room AULA 23
-        if (id.equals("6APRO_60_2") || id.equals("6APRO_61_3")) {
-            return true;
-        }
-        // Exception: 4A PRO course 40 has hours in standard room AULA 15
-        if (id.equals("4APRO_40_3")) {
-            return true;
-        }
-        return false;
     }
 
     private Constraint groupCannotHaveTwoCoursesAtSameTime(ConstraintFactory constraintFactory) {
@@ -230,58 +228,62 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Group cannot have two courses at same time");
     }
 
-    private Constraint mustFinishBy2pm(ConstraintFactory constraintFactory) {
-        // SOFT: Prefer non-BASICAS courses AND non-standard rooms to finish by 2pm
-        // (14:00)
+    private Constraint nonStandardRoomsShouldFinishBy2pm(ConstraintFactory constraintFactory) {
+        // HARD: Non-standard rooms MUST finish by 2pm (14:00)
         //
-        // This soft constraint encourages (but doesn't require):
-        // - Non-BASICAS courses (TADHR, TEM, TPIAL, etc.) using non-standard rooms to
-        // finish by 2pm
-        // - Ensures specialized/technical courses in specialized facilities finish
-        // earlier
-        // - Allows flexibility when needed (can be violated if necessary for
-        // feasibility)
+        // This hard constraint enforces that all courses using non-standard rooms
+        // (computer centers, workshops, labs) must finish by 2pm to allow for:
+        // - Equipment maintenance and cleanup
+        // - Facility preparation for next day
+        // - Reduced operational costs (utilities, supervision)
         //
-        // Benefits:
-        // - Specialized facilities available for maintenance and cleanup
-        // - Technical courses don't run into late afternoon hours
+        // Non-standard room types:
+        // - centro de cómputo (Computer Centers: CC 1, CC 2, CC 3)
+        // - taller electromecánica (Electromechanical Workshops: TEM 1, TEM 2, TEM 3)
+        // - taller electrónica (Electronics Workshop: TE 1)
+        // - taller (General Workshop: AULA 4)
+        // - laboratorio (Labs: LQ 1, LMICRO)
+        //
+        // Standard rooms (estándar) can run until 3pm (15:00) for flexibility.
         //
         // Exemptions:
-        // - BASICAS courses in standard rooms can run until 3pm (15:00) for flexibility
         // - Pinned assignments are exempt (they are fixed from the database)
+        //
+        // Block-based logic:
+        // - Uses BlockTimeslot.startHour + BlockTimeslot.lengthHours for end time
+        // - Works with multi-hour blocks (1-4 hours)
+        // - Example: Block starting at 13:00 with length 2 hours ends at 15:00
+        // (VIOLATION)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(assignment -> {
-                    // Basic validation
-                    if (assignment.getCourse() == null || assignment.getTimeslot() == null)
+                    // Skip if no timeslot or room assigned
+                    if (assignment.getTimeslot() == null || assignment.getRoom() == null)
                         return false;
 
-                    // Exempt pinned assignments (they are fixed from database)
+                    // Skip pinned assignments (fixed from database)
                     if (assignment.isPinned())
                         return false;
 
-                    // Check if block ends before 2pm (14:00)
+                    // Calculate block end hour (BLOCK-BASED APPROACH)
+                    int endHour = assignment.getTimeslot().getStartHour()
+                            + assignment.getTimeslot().getLengthHours();
+
+                    // Check if ends after 2pm (14:00)
                     // "Finish by 2pm" means the last hour should be 13:00 (1pm-2pm)
-                    int endHour = assignment.getTimeslot().getStartHour() + assignment.getTimeslot().getLengthHours();
-                    if (endHour < 14)
-                        return false; // Ends before 2pm, no violation
+                    // So endHour > 14 is a violation (e.g., 15:00 is after 2pm)
+                    if (endHour <= 14)
+                        return false; // Ends by 2pm, no violation
 
-                    // Check if this is a non-BASICAS course
-                    String component = assignment.getCourse().getComponent();
-                    boolean isNonBasicas = (component == null || !component.equalsIgnoreCase("BASICAS"));
+                    // Check if room is non-standard
+                    String roomType = assignment.getRoom().getType();
+                    boolean isNonStandard = (roomType != null
+                            && !roomType.equalsIgnoreCase("estándar"));
 
-                    // Check if this uses a non-standard room
-                    boolean isNonStandardRoom = false;
-                    if (assignment.getRoom() != null) {
-                        String roomType = assignment.getRoom().getType();
-                        isNonStandardRoom = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
-                    }
-
-                    // Penalize if BOTH conditions are true (non-BASICAS AND non-standard room)
-                    return isNonBasicas && isNonStandardRoom;
+                    return isNonStandard; // Penalize if non-standard room after 2pm
                 })
-                .penalize(HardSoftScore.ONE_SOFT)
-                .asConstraint("Prefer non-BASICAS courses in non-standard rooms to finish by 2pm");
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Non-standard rooms should finish by 2pm");
     }
 
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
@@ -404,9 +406,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (assignment.getGroup() == null || assignment.getRoom() == null) {
                         return false;
                     }
-                    // Only apply to non-lab courses (labs must use lab rooms)
-                    if (assignment.getCourse() != null &&
-                            "laboratorio".equalsIgnoreCase(assignment.getCourse().getRoomRequirement())) {
+                    // Only apply to non-lab blocks (labs must use lab rooms)
+                    // Uses satisfiesRoomType field to support dual room requirements
+                    if (assignment.getSatisfiesRoomType() != null &&
+                            "laboratorio".equalsIgnoreCase(assignment.getSatisfiesRoomType())) {
                         return false;
                     }
                     // Check if group has a preferred room
@@ -556,6 +559,99 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     return gapSize * 2;
                 })
                 .asConstraint("Minimize teacher idle gaps (availability-aware)");
+    }
+
+    private Constraint minimizeGroupIdleGaps(ConstraintFactory constraintFactory) {
+        // SOFT: Minimizes student group idle gaps between blocks on the same day
+        // This improves student experience by reducing waiting time between classes
+        // WEIGHT: 3 (High priority - student schedule quality, higher than teacher
+        // gaps)
+        return constraintFactory
+                .forEachUniquePair(CourseBlockAssignment.class,
+                        // Performance optimization: pre-filter pairs with Joiners
+                        Joiners.equal(CourseBlockAssignment::getGroup),
+                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                .filter((a1, a2) -> {
+                    // Exclude pinned assignments
+                    if (a1.isPinned() || a2.isPinned())
+                        return false;
+                    // Additional filters after Joiners
+                    if (a1.getGroup() == null || a1.getTimeslot() == null || a2.getTimeslot() == null)
+                        return false;
+
+                    // Calculate block end times
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+
+                    // Determine if there's a gap between blocks
+                    int gapStart, gapEnd;
+                    if (end1 <= start2) {
+                        // Block 1 ends before block 2 starts
+                        gapStart = end1;
+                        gapEnd = start2;
+                    } else if (end2 <= start1) {
+                        // Block 2 ends before block 1 starts
+                        gapStart = end2;
+                        gapEnd = start1;
+                    } else {
+                        // Blocks overlap or are consecutive - no gap
+                        return false;
+                    }
+
+                    int gapSize = gapEnd - gapStart;
+                    if (gapSize <= 0)
+                        return false; // No gap or consecutive blocks
+
+                    // Penalize all gaps for student groups (no availability check needed)
+                    return true;
+                })
+                .penalize(HardSoftScore.ONE_SOFT, (a1, a2) -> {
+                    // Calculate gap size
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+
+                    int gapSize;
+                    if (end1 <= start2) {
+                        gapSize = start2 - end1;
+                    } else {
+                        gapSize = start1 - end2;
+                    }
+
+                    // Weighted penalty: 3x per gap hour (high priority - student experience)
+                    return gapSize * 3;
+                })
+                .asConstraint("Minimize group idle gaps");
+    }
+
+    private Constraint preferBlockSpecifiedRoom(ConstraintFactory constraintFactory) {
+        // SOFT: Prefer using the block's specified preferred room
+        // This supports Computer Center distribution strategy and custom room
+        // assignments
+        // WEIGHT: 3 (High priority - operational strategy for specialized rooms)
+        return constraintFactory
+                .forEach(CourseBlockAssignment.class)
+                .filter(assignment -> {
+                    // Exclude pinned assignments (they already have fixed rooms)
+                    if (assignment.isPinned()) {
+                        return false;
+                    }
+                    if (assignment.getRoom() == null) {
+                        return false;
+                    }
+                    // Check if block has a preferred room specified
+                    String preferredRoomName = assignment.getPreferredRoomName();
+                    if (preferredRoomName == null || preferredRoomName.isEmpty()) {
+                        return false; // No preference specified
+                    }
+                    // Penalize if NOT using the preferred room
+                    return !preferredRoomName.equals(assignment.getRoom().getName());
+                })
+                .penalize(HardSoftScore.ofSoft(3))
+                .asConstraint("Prefer block's specified room");
     }
 
 }

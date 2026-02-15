@@ -1,5 +1,6 @@
 package com.example.domain;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -10,8 +11,12 @@ public class Course {
     private final String semester; // 'I', 'II', 'III', 'IV', 'V', 'VI'
     private final String component; // 'BASICAS', 'TADHR','TEM'
     private final int requiredHoursPerWeek;
-    private final String roomRequirement; // 'standard', 'science_lab'
+    private final String roomRequirement; // 'standard', 'science_lab' (legacy - use roomRequirements instead)
     private final Boolean active;
+
+    // NEW: Support for dual room requirements and custom block decomposition
+    private List<RoomRequirement> roomRequirements;
+    private List<BlockTemplate> blockTemplates;
 
     public Course(String id, String name, String abbreviation, String semester, String component,
             String roomRequirement, int requiredHoursPerWeek, Boolean active) {
@@ -67,6 +72,52 @@ public class Course {
 
     public Boolean getActive() {
         return active;
+    }
+
+    // NEW: Getters and setters for room requirements and block templates
+
+    public List<RoomRequirement> getRoomRequirements() {
+        return roomRequirements;
+    }
+
+    public void setRoomRequirements(List<RoomRequirement> roomRequirements) {
+        this.roomRequirements = roomRequirements;
+    }
+
+    public List<BlockTemplate> getBlockTemplates() {
+        return blockTemplates;
+    }
+
+    public void setBlockTemplates(List<BlockTemplate> blockTemplates) {
+        this.blockTemplates = blockTemplates;
+    }
+
+    // NEW: Helper methods
+
+    /**
+     * Check if this course has custom block decomposition defined.
+     * 
+     * @return true if custom templates exist, false otherwise
+     */
+    public boolean hasCustomDecomposition() {
+        return blockTemplates != null && !blockTemplates.isEmpty();
+    }
+
+    /**
+     * Get the preferred room for a specific room type.
+     * 
+     * @param roomType the room type to search for
+     * @return the preferred room name, or null if not found
+     */
+    public String getPreferredRoomForType(String roomType) {
+        if (roomRequirements == null) {
+            return null;
+        }
+        return roomRequirements.stream()
+                .filter(r -> r.getRoomType().equals(roomType))
+                .findFirst()
+                .map(RoomRequirement::getDefaultPreferredRoom)
+                .orElse(null);
     }
 
     @Override

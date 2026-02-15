@@ -13,6 +13,9 @@
          from creating invalid assignments. -->
     <customPhase>
         <customPhaseCommandClass>com.example.solver.MatchingLengthTimeslotAssigner</customPhaseCommandClass>
+        <termination>
+            <stepCountLimit>10000</stepCountLimit>
+        </termination>
     </customPhase>
 
     <!-- Phase 2: Construction Heuristic - ENABLED -->
@@ -38,6 +41,9 @@
          4. Assigns the larger block to the cleared contiguous slot -->
     <customPhase>
         <customPhaseCommandClass>com.example.solver.BlockDefragmenter</customPhaseCommandClass>
+        <termination>
+            <stepCountLimit>5000</stepCountLimit>
+        </termination>
     </customPhase>
 
     <!-- Phase 4: Local Search (Improvement) -->
@@ -61,7 +67,8 @@
         </unionMoveSelector>
         <acceptor>
             <!-- Late Acceptance: accepts moves based on score from N steps ago -->
-            <lateAcceptanceSize>500</lateAcceptanceSize>
+            <!-- Optimized to 5000 for better performance while maintaining exploration -->
+            <lateAcceptanceSize>5000</lateAcceptanceSize>
             <!-- Tabu Search: prevents cycling back to recent solutions -->
             <entityTabuSize>7</entityTabuSize>
         </acceptor>
@@ -71,10 +78,10 @@
         <termination>
             <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/*soft</bestScoreLimit>
-            <!-- Or after 30 minutes total -->
-            <minutesSpentLimit>10</minutesSpentLimit>
-            <!-- Or after 10 minutes without improvement -->
-            <unimprovedMinutesSpentLimit>2</unimprovedMinutesSpentLimit>
+            <!-- Or after 15 minutes total -->
+            <minutesSpentLimit>30</minutesSpentLimit>
+            <!-- Or after 8 minutes without improvement (optimized for better exploration) -->
+            <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>
