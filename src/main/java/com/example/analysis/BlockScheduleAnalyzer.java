@@ -122,6 +122,40 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Group cannot have two courses at same time", groupConflict);
 
+        // Maximum 2 blocks per course per group per day (HARD) - Count
+        int maxTwoBlocksPerCoursePerDay = 0;
+        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
+                String groupId = a.getGroup().getId();
+                String courseId = a.getCourse().getId();
+                DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                groupCourseDayAssignments
+                        .computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(courseId, k -> new HashMap<>())
+                        .computeIfAbsent(day, k -> new ArrayList<>())
+                        .add(a);
+            }
+        }
+        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayCounts : groupCourseDayAssignments
+                .values()) {
+            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayCounts : courseDayCounts.values()) {
+                for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : dayCounts.entrySet()) {
+                    List<CourseBlockAssignment> assignments = dayEntry.getValue();
+                    int count = assignments.size();
+                    if (count > 0) {
+                        String component = assignments.get(0).getCourse().getComponent();
+                        boolean isBasicas = "BASICAS".equals(component);
+                        if ((isBasicas && count > 1) || (!isBasicas && count > 2)) {
+                            int limit = isBasicas ? 1 : 2;
+                            maxTwoBlocksPerCoursePerDay += (count - limit);
+                        }
+                    }
+                }
+            }
+        }
+        result.put("Maximum 2 blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
+
         // COMMENTED OUT: Prefer BASICAS blocks to be consecutive on same day (SOFT)
         // int basicasNonConsecutive = 0;
         // Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>>
@@ -286,6 +320,46 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Group cannot have two courses at same time", groupConflict);
 
+        // Maximum 2 blocks per course per group per day (HARD) - Detailed
+        List<String> maxTwoBlocksDetails = new ArrayList<>();
+        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments2 = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
+                String groupId = a.getGroup().getId();
+                String courseId = a.getCourse().getId();
+                DayOfWeek day = a.getTimeslot().getDayOfWeek();
+                groupCourseDayAssignments2
+                        .computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(courseId, k -> new HashMap<>())
+                        .computeIfAbsent(day, k -> new ArrayList<>())
+                        .add(a);
+            }
+        }
+        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayCounts : groupCourseDayAssignments2
+                .values()) {
+            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayCounts : courseDayCounts.values()) {
+                for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : dayCounts.entrySet()) {
+                    List<CourseBlockAssignment> assignments = dayEntry.getValue();
+                    int count = assignments.size();
+                    if (count > 0) {
+                        String component = assignments.get(0).getCourse().getComponent();
+                        boolean isBasicas = "BASICAS".equals(component);
+                        String courseName = assignments.get(0).getCourse().getName();
+                        String groupName = assignments.get(0).getGroup().getName();
+                        String dayName = formatDay(dayEntry.getKey());
+
+                        if ((isBasicas && count > 1) || (!isBasicas && count > 2)) {
+                            int limit = isBasicas ? 1 : 2;
+                            String reason = String.format("(%s has %d blocks on %s, limit=%d for %s)",
+                                    groupName, count, dayName, limit, component);
+                            maxTwoBlocksDetails.add(courseName + " " + reason);
+                        }
+                    }
+                }
+            }
+        }
+        details.put("Maximum 2 blocks per course per group per day", maxTwoBlocksDetails);
+
         return details;
     }
 
@@ -318,46 +392,6 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pmDetails);
-
-        // Maximum 2 blocks per course per group per day (SOFT, weight 8) - Detailed
-        List<String> maxTwoBlocksDetails = new ArrayList<>();
-        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
-                String groupId = a.getGroup().getId();
-                String courseId = a.getCourse().getId();
-                DayOfWeek day = a.getTimeslot().getDayOfWeek();
-                groupCourseDayAssignments
-                        .computeIfAbsent(groupId, k -> new HashMap<>())
-                        .computeIfAbsent(courseId, k -> new HashMap<>())
-                        .computeIfAbsent(day, k -> new ArrayList<>())
-                        .add(a);
-            }
-        }
-        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayCounts : groupCourseDayAssignments
-                .values()) {
-            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayCounts : courseDayCounts.values()) {
-                for (Map.Entry<DayOfWeek, List<CourseBlockAssignment>> dayEntry : dayCounts.entrySet()) {
-                    List<CourseBlockAssignment> assignments = dayEntry.getValue();
-                    int count = assignments.size();
-                    if (count > 0) {
-                        String component = assignments.get(0).getCourse().getComponent();
-                        boolean isBasicas = "BASICAS".equals(component);
-                        String courseName = assignments.get(0).getCourse().getName();
-                        String groupName = assignments.get(0).getGroup().getName();
-                        String dayName = formatDay(dayEntry.getKey());
-
-                        if ((isBasicas && count > 1) || (!isBasicas && count > 2)) {
-                            int limit = isBasicas ? 1 : 2;
-                            String reason = String.format("(%s has %d blocks on %s, limit=%d for %s)",
-                                    groupName, count, dayName, limit, component);
-                            maxTwoBlocksDetails.add(courseName + " " + reason);
-                        }
-                    }
-                }
-            }
-        }
-        details.put("Maximum 2 blocks per course per group per day", maxTwoBlocksDetails);
 
         // Teacher max hours per week
         List<String> teacherMaxExcess = new ArrayList<>();
@@ -549,44 +583,6 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
-
-        // Maximum 2 blocks per course per group per day (SOFT, weight 8)
-        // BASICAS: max 1, non-BASICAS: max 2
-        int maxTwoBlocksPerCoursePerDay = 0;
-        Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
-        for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
-                String groupId = a.getGroup().getId();
-                String courseId = a.getCourse().getId();
-                DayOfWeek day = a.getTimeslot().getDayOfWeek();
-                groupCourseDayAssignments
-                        .computeIfAbsent(groupId, k -> new HashMap<>())
-                        .computeIfAbsent(courseId, k -> new HashMap<>())
-                        .computeIfAbsent(day, k -> new ArrayList<>())
-                        .add(a);
-            }
-        }
-        for (Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> courseDayCounts : groupCourseDayAssignments
-                .values()) {
-            for (Map<DayOfWeek, List<CourseBlockAssignment>> dayCounts : courseDayCounts.values()) {
-                for (List<CourseBlockAssignment> assignments : dayCounts.values()) {
-                    int count = assignments.size();
-                    if (count > 0) {
-                        String component = assignments.get(0).getCourse().getComponent();
-                        boolean isBasicas = "BASICAS".equals(component);
-
-                        if (isBasicas && count > 1) {
-                            // BASICAS courses: max 1 block per day
-                            maxTwoBlocksPerCoursePerDay += (count - 1);
-                        } else if (!isBasicas && count > 2) {
-                            // Non-BASICAS courses: max 2 blocks per day
-                            maxTwoBlocksPerCoursePerDay += (count - 2);
-                        }
-                    }
-                }
-            }
-        }
-        result.put("Maximum 2 blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
 
         // Prefer course blocks to be consecutive on same day (SOFT, weight 3) - ALL
         // courses

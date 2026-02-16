@@ -39,13 +39,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 noRoomDoubleBooking(constraintFactory), // #6: ~45 pairs, very high selectivity
 
                 // ========== TIER 3: Medium-Selectivity HARD Pair Constraints ==========
-                // REMOVED FOR BLOCK-BASED SCHEDULING:
-                // - groupCourseMustBeConsecutiveOnSameDay: OBSOLETE (blocks are inherently
-                // consecutive)
-                // - sameTeacherForAllCourseHours: OBSOLETE (only one block per course per
-                // group)
-                // - basicasBlocksShouldBeConsecutive: MOVED TO SOFT (now a preference, not
-                // requirement)
+                maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max 2 blocks per course per group per
+                                                                        // day
 
                 // ========== TIER 4: SOFT Constraints - Quality Optimization ==========
                 // These optimize quality, evaluated last:
@@ -54,8 +49,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // - Order by weight (highest priority first)
                 nonStandardRoomsShouldFinishBy2pm(constraintFactory), // SOFT (weight 10): Prefer non-standard rooms to
                                                                       // finish by 2pm
-                maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // SOFT (weight 8): Prefer max 2 blocks per
-                                                                        // course per day
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
                 courseBlocksShouldBeConsecutive(constraintFactory), // SOFT (weight 3): Prefer course blocks to be
                                                                     // consecutive
@@ -292,16 +285,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
-        // SOFT (weight 8): Prefer maximum 1 block per day for BASICAS, 2 for
-        // non-BASICAS
+        // HARD: Maximum 1 block per day for BASICAS courses, 2 for non-BASICAS
         // This prevents excessive concentration of same course on one day
-        // BASICAS courses: Prefer maximum 1 block per course per group per day
-        // Non-BASICAS courses: Prefer maximum 2 blocks per course per group per day
-        // OPTIMIZED: Uses Joiners to pre-filter by group, course, and day, then counts
-        // blocks
-        //
-        // WEIGHT: 8 (High priority - strong preference for spreading courses across
-        // days)
+        // BASICAS courses: Maximum 1 block per course per group per day
+        // Non-BASICAS courses: Maximum 2 blocks per course per group per day
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
@@ -318,7 +305,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Non-BASICAS courses: max 2 blocks per day
                     return count > 2;
                 })
-                .penalize(HardSoftScore.ofSoft(8),
+                .penalize(HardSoftScore.ONE_HARD,
                         (group, course, day, count) -> {
                             // BASICAS: penalize each block beyond 1
                             if ("BASICAS".equals(course.getComponent())) {
