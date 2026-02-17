@@ -109,6 +109,18 @@ web-ui/
 
 ## Troubleshooting
 
+### Port 8000 Already in Use
+
+If port 8000 is already in use, kill the process:
+
+```bash
+kill -9 $(lsof -t -i:8080)
+```
+or
+```bash
+lsof -ti:8080 | xargs kill -9
+```
+
 ### Port 3000 Already in Use
 
 If port 3000 is already in use, kill the process:

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getScheduleView } from '../api';
+import { getScheduleView, getGroups } from '../api';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
@@ -9,10 +9,30 @@ function Schedule() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [groups, setGroups] = useState([]);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
 
   useEffect(() => {
+    loadGroups();
     loadSchedule();
   }, []);
+
+  useEffect(() => {
+    // Auto-select first group when groups are loaded
+    if (groups.length > 0 && !selectedGroupId) {
+      setSelectedGroupId(groups[0].id);
+    }
+  }, [groups]);
+
+  const loadGroups = async () => {
+    try {
+      const response = await getGroups();
+      setGroups(response.data);
+    } catch (err) {
+      console.error('Failed to load groups:', err);
+    }
+  };
 
   const loadSchedule = async () => {
     try {
@@ -27,9 +47,57 @@ function Schedule() {
     }
   };
 
-  const getEntriesForDayAndHour = (dayOfWeek, hour) => {
+  // Get unique teachers for the selected group
+  const getTeachersForGroup = () => {
+    if (!schedule || !selectedGroupId) return [];
+    const teacherMap = new Map();
+    schedule.entries
+      .filter(entry => entry.groupId === selectedGroupId && entry.teacherId)
+      .forEach(entry => {
+        if (!teacherMap.has(entry.teacherId)) {
+          teacherMap.set(entry.teacherId, entry.teacherName);
+        }
+      });
+    return Array.from(teacherMap.entries()).map(([id, name]) => ({ id, name }));
+  };
+
+  // Filter entries based on selected group and teacher
+  const getFilteredEntries = () => {
     if (!schedule) return [];
-    return schedule.entries.filter(entry => {
+    let filtered = schedule.entries;
+
+    // Debug logging
+    if (selectedGroupId || selectedTeacherId) {
+      console.log('Filtering with:', { selectedGroupId, selectedTeacherId });
+      console.log('Sample entry:', filtered[0]);
+      console.log('Total entries before filter:', filtered.length);
+    }
+
+    if (selectedGroupId) {
+      filtered = filtered.filter(entry => {
+        const matches = entry.groupId === selectedGroupId;
+        if (!matches && filtered.indexOf(entry) < 3) {
+          console.log('Entry groupId:', entry.groupId, 'vs selected:', selectedGroupId, 'matches:', matches);
+        }
+        return matches;
+      });
+      console.log('After group filter:', filtered.length);
+    }
+
+    if (selectedTeacherId) {
+      filtered = filtered.filter(entry => {
+        const matches = entry.teacherId === selectedTeacherId;
+        return matches;
+      });
+      console.log('After teacher filter:', filtered.length);
+    }
+
+    return filtered;
+  };
+
+  const getEntriesForDayAndHour = (dayOfWeek, hour) => {
+    const filteredEntries = getFilteredEntries();
+    return filteredEntries.filter(entry => {
       const entryDay = entry.dayOfWeek;
       const entryStart = entry.startHour;
       const entryEnd = entryStart + entry.lengthHours;
@@ -37,9 +105,21 @@ function Schedule() {
     });
   };
 
+  const handleGroupChange = (e) => {
+    setSelectedGroupId(e.target.value);
+    setSelectedTeacherId(''); // Reset teacher filter when group changes
+  };
+
+  const handleTeacherChange = (e) => {
+    setSelectedTeacherId(e.target.value);
+  };
+
   if (loading) return <div className="loading">Loading schedule...</div>;
   if (error) return <div className="error">{error}</div>;
   if (!schedule) return <div className="loading">No schedule data</div>;
+
+  const filteredEntries = getFilteredEntries();
+  const teachersForGroup = getTeachersForGroup();
 
   return (
     <div>
@@ -47,14 +127,14 @@ function Schedule() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Schedule View</h2>
           <div>
-            <button 
+            <button
               className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setViewMode('grid')}
               style={{ marginRight: '10px' }}
             >
               Grid View
             </button>
-            <button 
+            <button
               className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setViewMode('list')}
             >
@@ -62,8 +142,54 @@ function Schedule() {
             </button>
           </div>
         </div>
-        <p style={{ marginTop: '10px', color: '#7f8c8d' }}>
-          Total: {schedule.totalAssignments} | Assigned: {schedule.assignedCount} | Unassigned: {schedule.unassignedCount}
+
+        {/* Filters */}
+        <div style={{ marginTop: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="groupFilter" style={{ fontWeight: 'bold' }}>Group:</label>
+            <select
+              id="groupFilter"
+              value={selectedGroupId}
+              onChange={handleGroupChange}
+              style={{ padding: '8px', minWidth: '150px' }}
+            >
+              {groups.map(group => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="teacherFilter" style={{ fontWeight: 'bold' }}>Teacher:</label>
+            <select
+              id="teacherFilter"
+              value={selectedTeacherId}
+              onChange={handleTeacherChange}
+              style={{ padding: '8px', minWidth: '200px' }}
+              disabled={!selectedGroupId}
+            >
+              <option value="">All Teachers</option>
+              {teachersForGroup.map(teacher => (
+                <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedTeacherId && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setSelectedTeacherId('')}
+              style={{ padding: '8px 16px' }}
+            >
+              Clear Teacher Filter
+            </button>
+          )}
+        </div>
+
+        <p style={{ marginTop: '15px', color: '#7f8c8d' }}>
+          Showing {filteredEntries.length} of {schedule.entries.length} assignments
+          {selectedGroupId && ` | Group: ${groups.find(g => g.id === selectedGroupId)?.name || selectedGroupId}`}
+          {selectedTeacherId && ` | Teacher: ${teachersForGroup.find(t => t.id === selectedTeacherId)?.name || selectedTeacherId}`}
         </p>
       </div>
 
@@ -128,17 +254,25 @@ function Schedule() {
               </tr>
             </thead>
             <tbody>
-              {schedule.entries.map((entry, idx) => (
-                <tr key={idx}>
-                  <td>{DAYS[entry.dayOfWeek - 1]}</td>
-                  <td>{entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)</td>
-                  <td>{entry.courseName}</td>
-                  <td>{entry.groupName}</td>
-                  <td>{entry.teacherName}</td>
-                  <td>{entry.roomName}</td>
-                  <td>{entry.pinned ? '📌' : ''}</td>
+              {filteredEntries.length > 0 ? (
+                filteredEntries.map((entry, idx) => (
+                  <tr key={idx}>
+                    <td>{DAYS[entry.dayOfWeek - 1]}</td>
+                    <td>{entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)</td>
+                    <td>{entry.courseName}</td>
+                    <td>{entry.groupName}</td>
+                    <td>{entry.teacherName}</td>
+                    <td>{entry.roomName}</td>
+                    <td>{entry.pinned ? '📌' : ''}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#7f8c8d' }}>
+                    No assignments found for the selected filters
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

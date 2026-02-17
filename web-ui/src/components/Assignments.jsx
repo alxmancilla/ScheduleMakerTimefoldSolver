@@ -172,7 +172,7 @@ function Assignments() {
               <th>Course</th>
               <th>Block Length</th>
               <th>Teacher</th>
-              <th>Timeslot</th>
+              <th>Block Timeslot</th>
               <th>Room</th>
               <th>Pinned</th>
               <th>Actions</th>
@@ -186,9 +186,9 @@ function Assignments() {
                 <td>{assignment.courseId}</td>
                 <td>{assignment.blockLength}h</td>
                 <td>{assignment.teacherId || '-'}</td>
-                <td>{assignment.timeslotId || '-'}</td>
+                <td>{assignment.blockTimeslotId || '-'}</td>
                 <td>{assignment.roomName || '-'}</td>
-                <td>{assignment.pinAssignment ? '📌' : ''}</td>
+                <td>{assignment.pinned ? '📌' : ''}</td>
                 <td>
                   <button className="btn btn-primary" onClick={() => handleEdit(assignment)} style={{ marginRight: '5px' }}>
                     Edit

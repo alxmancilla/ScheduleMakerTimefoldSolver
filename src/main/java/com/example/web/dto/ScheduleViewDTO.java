@@ -15,8 +15,10 @@ public class ScheduleViewDTO {
         private Integer lengthHours;
         private String courseName;
         private String teacherName;
+        private String teacherId;
         private String roomName;
         private String groupName;
+        private String groupId;
         private Boolean pinned;
 
         // Getters and Setters
@@ -69,6 +71,14 @@ public class ScheduleViewDTO {
             this.teacherName = teacherName;
         }
 
+        public String getTeacherId() {
+            return teacherId;
+        }
+
+        public void setTeacherId(String teacherId) {
+            this.teacherId = teacherId;
+        }
+
         public String getRoomName() {
             return roomName;
         }
@@ -83,6 +93,14 @@ public class ScheduleViewDTO {
 
         public void setGroupName(String groupName) {
             this.groupName = groupName;
+        }
+
+        public String getGroupId() {
+            return groupId;
+        }
+
+        public void setGroupId(String groupId) {
+            this.groupId = groupId;
         }
 
         public Boolean getPinned() {

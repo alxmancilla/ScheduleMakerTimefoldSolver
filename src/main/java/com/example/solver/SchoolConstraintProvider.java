@@ -41,6 +41,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // ========== TIER 3: Medium-Selectivity HARD Pair Constraints ==========
                 maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max 2 blocks per course per group per
                                                                         // day
+                courseBlocksMustBeConsecutive(constraintFactory), // HARD: ALL course blocks MUST be consecutive
 
                 // ========== TIER 4: SOFT Constraints - Quality Optimization ==========
                 // These optimize quality, evaluated last:
@@ -50,8 +51,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 nonStandardRoomsShouldFinishBy2pm(constraintFactory), // SOFT (weight 10): Prefer non-standard rooms to
                                                                       // finish by 2pm
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
-                courseBlocksShouldBeConsecutive(constraintFactory), // SOFT (weight 3): Prefer course blocks to be
-                                                                    // consecutive
                 minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
                 preferBlockSpecifiedRoom(constraintFactory), // SOFT (weight 3): prefer block's specified room (CC
                                                              // distribution)
@@ -285,10 +284,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
-        // HARD: Maximum 1 block per day for BASICAS courses, 2 for non-BASICAS
+        // HARD: Maximum 1 block per day for BASICAS courses
+        // For non-BASICAS: Maximum 2 blocks per day ONLY if total length > 4 hours
         // This prevents excessive concentration of same course on one day
         // BASICAS courses: Maximum 1 block per course per group per day
-        // Non-BASICAS courses: Maximum 2 blocks per course per group per day
+        // Non-BASICAS courses: Maximum 2 blocks per course per group per day if total >
+        // 4 hours
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
@@ -296,35 +297,46 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         CourseBlockAssignment::getGroup,
                         CourseBlockAssignment::getCourse,
                         a -> a.getTimeslot().getDayOfWeek(),
-                        ConstraintCollectors.count())
-                .filter((group, course, day, count) -> {
+                        ConstraintCollectors.toList())
+                .filter((group, course, day, assignments) -> {
+                    int count = assignments.size();
+
                     // BASICAS courses: max 1 block per day
                     if ("BASICAS".equals(course.getComponent())) {
                         return count > 1;
                     }
-                    // Non-BASICAS courses: max 2 blocks per day
+
+                    // Non-BASICAS courses: calculate total hours
+                    int totalHours = assignments.stream()
+                            .mapToInt(a -> a.getTimeslot().getLengthHours())
+                            .sum();
+
+                    // If total <= 4 hours, allow any number of blocks
+                    if (totalHours <= 4) {
+                        return false; // No violation if total is 4 hours or less
+                    }
+
+                    // If total > 4 hours, max 2 blocks per day
                     return count > 2;
                 })
                 .penalize(HardSoftScore.ONE_HARD,
-                        (group, course, day, count) -> {
+                        (group, course, day, assignments) -> {
+                            int count = assignments.size();
+
                             // BASICAS: penalize each block beyond 1
                             if ("BASICAS".equals(course.getComponent())) {
                                 return count - 1;
                             }
-                            // Non-BASICAS: penalize each block beyond 2
+                            // Non-BASICAS: penalize each block beyond 2 (only if total > 4 hours)
                             return count - 2;
                         })
-                .asConstraint("Maximum blocks per course per group per day (1 for BASICAS, 2 for non-BASICAS)");
+                .asConstraint("Maximum blocks per course per group per day (1 for BASICAS, 2 for non-BASICAS if >4h)");
     }
 
-    private Constraint courseBlocksShouldBeConsecutive(ConstraintFactory constraintFactory) {
-        // SOFT: When ANY course has multiple blocks on the same day for the same group,
-        // prefer them to be consecutive to minimize fragmentation and improve student
-        // experience
-        // This applies to ALL courses (BASICAS and non-BASICAS)
-        // This is a SOFT constraint - it encourages but doesn't require consecutive
-        // blocks
-        // WEIGHT: 3 (High priority - student experience and schedule quality)
+    private Constraint courseBlocksMustBeConsecutive(ConstraintFactory constraintFactory) {
+        // HARD: When ANY course has multiple blocks on the same day for the same group,
+        // they MUST be consecutive
+        // This is critical for maintaining course continuity and student focus
         return constraintFactory
                 .forEachUniquePair(CourseBlockAssignment.class,
                         Joiners.equal(CourseBlockAssignment::getGroup),
@@ -335,8 +347,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (a1.isPinned() || a2.isPinned()) {
                         return false;
                     }
-                    // Apply to ALL courses (removed BASICAS-only filter)
-                    // Note: Joiners already filter out null groups and courses
 
                     // Check if blocks are NOT consecutive
                     int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
@@ -350,8 +360,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Penalize if NOT consecutive
                     return !areConsecutive;
                 })
-                .penalize(HardSoftScore.ofSoft(3))
-                .asConstraint("Prefer course blocks to be consecutive on same day");
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Course blocks must be consecutive");
     }
 
     // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================

@@ -63,8 +63,10 @@ public class ScheduleController {
                                 entry.setCourseName(course.getName());
                                 entry.setTeacherName(teacher != null ? teacher.getName() + " " + teacher.getLastName()
                                                 : null);
+                                entry.setTeacherId(teacher != null ? teacher.getId() : null);
                                 entry.setRoomName(room != null ? room.getName() : null);
                                 entry.setGroupName(group != null ? group.getName() : null);
+                                entry.setGroupId(group != null ? group.getId() : null);
                                 entry.setPinned(assignment.getPinned());
 
                                 entries.add(entry);
@@ -140,8 +142,10 @@ public class ScheduleController {
                                 entry.setCourseName(course.getName());
                                 entry.setTeacherName(teacher != null ? teacher.getName() + " " + teacher.getLastName()
                                                 : null);
+                                entry.setTeacherId(teacher != null ? teacher.getId() : null);
                                 entry.setRoomName(room != null ? room.getName() : null);
                                 entry.setGroupName(group != null ? group.getName() : null);
+                                entry.setGroupId(group != null ? group.getId() : null);
                                 entry.setPinned(assignment.getPinned());
 
                                 entries.add(entry);

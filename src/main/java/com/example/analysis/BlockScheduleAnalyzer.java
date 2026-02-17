@@ -123,6 +123,8 @@ public final class BlockScheduleAnalyzer {
         result.put("Group cannot have two courses at same time", groupConflict);
 
         // Maximum 2 blocks per course per group per day (HARD) - Count
+        // BASICAS: max 1 block per day
+        // Non-BASICAS: max 2 blocks per day ONLY if total > 4 hours
         int maxTwoBlocksPerCoursePerDay = 0;
         Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -146,15 +148,54 @@ public final class BlockScheduleAnalyzer {
                     if (count > 0) {
                         String component = assignments.get(0).getCourse().getComponent();
                         boolean isBasicas = "BASICAS".equals(component);
-                        if ((isBasicas && count > 1) || (!isBasicas && count > 2)) {
-                            int limit = isBasicas ? 1 : 2;
-                            maxTwoBlocksPerCoursePerDay += (count - limit);
+
+                        if (isBasicas && count > 1) {
+                            // BASICAS: max 1 block per day
+                            maxTwoBlocksPerCoursePerDay += (count - 1);
+                        } else if (!isBasicas) {
+                            // Non-BASICAS: calculate total hours
+                            int totalHours = assignments.stream()
+                                    .mapToInt(a -> a.getTimeslot().getLengthHours())
+                                    .sum();
+
+                            // Only violation if total > 4 hours AND count > 2
+                            if (totalHours > 4 && count > 2) {
+                                maxTwoBlocksPerCoursePerDay += (count - 2);
+                            }
                         }
                     }
                 }
             }
         }
         result.put("Maximum 2 blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
+
+        // Course blocks must be consecutive (HARD) - Count
+        int courseBlocksNonConsecutive = 0;
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                CourseBlockAssignment a1 = list.get(i);
+                CourseBlockAssignment a2 = list.get(j);
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup())
+                        && a1.getCourse() != null && a1.getCourse().equals(a2.getCourse())
+                        && a1.getTimeslot() != null && a2.getTimeslot() != null
+                        && a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+
+                    // Apply to ALL courses
+                    // Check if blocks are NOT consecutive
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+
+                    boolean areConsecutive = (end1 == start2 || end2 == start1);
+                    if (!areConsecutive) {
+                        courseBlocksNonConsecutive++;
+                    }
+                }
+            }
+        }
+        result.put("Course blocks must be consecutive", courseBlocksNonConsecutive);
 
         // COMMENTED OUT: Prefer BASICAS blocks to be consecutive on same day (SOFT)
         // int basicasNonConsecutive = 0;
@@ -321,6 +362,8 @@ public final class BlockScheduleAnalyzer {
         details.put("Group cannot have two courses at same time", groupConflict);
 
         // Maximum 2 blocks per course per group per day (HARD) - Detailed
+        // BASICAS: max 1 block per day
+        // Non-BASICAS: max 2 blocks per day ONLY if total > 4 hours
         List<String> maxTwoBlocksDetails = new ArrayList<>();
         Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments2 = new HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -348,17 +391,59 @@ public final class BlockScheduleAnalyzer {
                         String groupName = assignments.get(0).getGroup().getName();
                         String dayName = formatDay(dayEntry.getKey());
 
-                        if ((isBasicas && count > 1) || (!isBasicas && count > 2)) {
-                            int limit = isBasicas ? 1 : 2;
-                            String reason = String.format("(%s has %d blocks on %s, limit=%d for %s)",
-                                    groupName, count, dayName, limit, component);
+                        if (isBasicas && count > 1) {
+                            // BASICAS: max 1 block per day
+                            String reason = String.format("(%s has %d blocks on %s, limit=1 for BASICAS)",
+                                    groupName, count, dayName);
                             maxTwoBlocksDetails.add(courseName + " " + reason);
+                        } else if (!isBasicas) {
+                            // Non-BASICAS: calculate total hours
+                            int totalHours = assignments.stream()
+                                    .mapToInt(a -> a.getTimeslot().getLengthHours())
+                                    .sum();
+
+                            // Only violation if total > 4 hours AND count > 2
+                            if (totalHours > 4 && count > 2) {
+                                String reason = String.format(
+                                        "(%s has %d blocks on %s totaling %dh, limit=2 blocks when >4h)",
+                                        groupName, count, dayName, totalHours);
+                                maxTwoBlocksDetails.add(courseName + " " + reason);
+                            }
                         }
                     }
                 }
             }
         }
         details.put("Maximum 2 blocks per course per group per day", maxTwoBlocksDetails);
+
+        // Course blocks must be consecutive (HARD) - Detailed
+        List<String> courseBlocksNonConsecutiveDetails = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = i + 1; j < list.size(); j++) {
+                CourseBlockAssignment a1 = list.get(i);
+                CourseBlockAssignment a2 = list.get(j);
+                if (!a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup())
+                        && a1.getCourse() != null && a1.getCourse().equals(a2.getCourse())
+                        && a1.getTimeslot() != null && a2.getTimeslot() != null
+                        && a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
+
+                    // Apply to ALL courses
+                    // Check if blocks are NOT consecutive
+                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
+                    int start2 = a2.getTimeslot().getStartHour();
+                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
+                    int start1 = a1.getTimeslot().getStartHour();
+
+                    boolean areConsecutive = (end1 == start2 || end2 == start1);
+                    if (!areConsecutive) {
+                        courseBlocksNonConsecutiveDetails.add(
+                                blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
+                    }
+                }
+            }
+        }
+        details.put("Course blocks must be consecutive", courseBlocksNonConsecutiveDetails);
 
         return details;
     }
@@ -583,32 +668,6 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
-
-        // Prefer course blocks to be consecutive on same day (SOFT, weight 3) - ALL
-        // courses
-        int courseBlocksNonConsecutive = 0;
-        for (int i = 0; i < list.size(); i++) {
-            for (int j = i + 1; j < list.size(); j++) {
-                CourseBlockAssignment a1 = list.get(i);
-                CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
-                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
-                        a1.getCourse() != null && a1.getCourse().equals(a2.getCourse()) &&
-                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
-                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                    // Apply to ALL courses (removed BASICAS-only filter)
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-                    boolean areConsecutive = (end1 == start2 || end2 == start1);
-                    if (!areConsecutive) {
-                        courseBlocksNonConsecutive++;
-                    }
-                }
-            }
-        }
-        result.put("Prefer course blocks to be consecutive on same day", courseBlocksNonConsecutive);
 
         // Prefer group's preferred room (SOFT, weight 2) - uses dual room requirements
         int preferredRoomViolations = 0;
