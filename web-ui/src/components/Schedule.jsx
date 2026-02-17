@@ -66,30 +66,12 @@ function Schedule() {
     if (!schedule) return [];
     let filtered = schedule.entries;
 
-    // Debug logging
-    if (selectedGroupId || selectedTeacherId) {
-      console.log('Filtering with:', { selectedGroupId, selectedTeacherId });
-      console.log('Sample entry:', filtered[0]);
-      console.log('Total entries before filter:', filtered.length);
-    }
-
     if (selectedGroupId) {
-      filtered = filtered.filter(entry => {
-        const matches = entry.groupId === selectedGroupId;
-        if (!matches && filtered.indexOf(entry) < 3) {
-          console.log('Entry groupId:', entry.groupId, 'vs selected:', selectedGroupId, 'matches:', matches);
-        }
-        return matches;
-      });
-      console.log('After group filter:', filtered.length);
+      filtered = filtered.filter(entry => entry.groupId === selectedGroupId);
     }
 
     if (selectedTeacherId) {
-      filtered = filtered.filter(entry => {
-        const matches = entry.teacherId === selectedTeacherId;
-        return matches;
-      });
-      console.log('After teacher filter:', filtered.length);
+      filtered = filtered.filter(entry => entry.teacherId === selectedTeacherId);
     }
 
     return filtered;
@@ -102,6 +84,19 @@ function Schedule() {
       const entryStart = entry.startHour;
       const entryEnd = entryStart + entry.lengthHours;
       return entryDay === dayOfWeek && hour >= entryStart && hour < entryEnd;
+    });
+  };
+
+  // Check if this is the starting hour for a block (for rowspan rendering)
+  const isBlockStart = (entry, hour) => {
+    return entry.startHour === hour;
+  };
+
+  // Get entries that START at this specific day and hour (for merged cell rendering)
+  const getEntriesStartingAt = (dayOfWeek, hour) => {
+    const filteredEntries = getFilteredEntries();
+    return filteredEntries.filter(entry => {
+      return entry.dayOfWeek === dayOfWeek && entry.startHour === hour;
     });
   };
 
@@ -195,40 +190,68 @@ function Schedule() {
 
       {viewMode === 'grid' ? (
         <div className="card" style={{ overflowX: 'auto' }}>
-          <table style={{ minWidth: '1000px' }}>
+          <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ width: '80px' }}>Hour</th>
+                <th style={{ width: '80px', border: '1px solid #ddd', padding: '8px' }}>Hour</th>
                 {DAYS.map((day, idx) => (
-                  <th key={idx}>{day}</th>
+                  <th key={idx} style={{ border: '1px solid #ddd', padding: '8px' }}>{day}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {HOURS.map(hour => (
                 <tr key={hour}>
-                  <td style={{ fontWeight: 'bold' }}>{hour}:00</td>
+                  <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{hour}:00</td>
                   {DAYS.map((day, dayIdx) => {
-                    const entries = getEntriesForDayAndHour(dayIdx + 1, hour);
+                    const dayOfWeek = dayIdx + 1;
+                    const entriesStartingHere = getEntriesStartingAt(dayOfWeek, hour);
+
+                    // Check if this cell is covered by a block starting in a previous hour
+                    const allEntries = getEntriesForDayAndHour(dayOfWeek, hour);
+                    const isCoveredByPreviousBlock = allEntries.some(entry => entry.startHour < hour);
+
+                    // Skip rendering this cell if it's covered by a rowspan from above
+                    if (isCoveredByPreviousBlock && entriesStartingHere.length === 0) {
+                      return null;
+                    }
+
                     return (
-                      <td key={dayIdx} style={{ verticalAlign: 'top', padding: '8px' }}>
-                        {entries.map((entry, idx) => (
-                          <div 
+                      <td
+                        key={dayIdx}
+                        rowSpan={entriesStartingHere.length > 0 && entriesStartingHere[0].lengthHours > 1 ? entriesStartingHere[0].lengthHours : 1}
+                        style={{
+                          verticalAlign: 'top',
+                          padding: '0',
+                          border: '1px solid #ddd',
+                          height: '60px'
+                        }}
+                      >
+                        {entriesStartingHere.map((entry, idx) => (
+                          <div
                             key={idx}
                             style={{
                               backgroundColor: entry.pinned ? '#ffe6e6' : '#e8f4f8',
-                              border: '1px solid ' + (entry.pinned ? '#ffcccc' : '#b3d9e6'),
+                              border: '2px solid ' + (entry.pinned ? '#ffcccc' : '#b3d9e6'),
                               borderRadius: '4px',
-                              padding: '6px',
-                              marginBottom: '4px',
-                              fontSize: '12px'
+                              padding: '8px',
+                              margin: '4px',
+                              fontSize: '12px',
+                              height: 'calc(100% - 8px)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              boxSizing: 'border-box'
                             }}
                           >
-                            <div style={{ fontWeight: 'bold' }}>{entry.courseName}</div>
-                            <div>{entry.groupName}</div>
-                            <div>{entry.teacherName}</div>
-                            <div>{entry.roomName}</div>
-                            {entry.pinned && <div style={{ color: '#c00', fontSize: '10px' }}>📌 PINNED</div>}
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{entry.courseName}</div>
+                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.groupName}</div>
+                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.teacherName}</div>
+                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.roomName}</div>
+                            <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+                              {entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)
+                            </div>
+                            {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 PINNED</div>}
                           </div>
                         ))}
                       </td>
