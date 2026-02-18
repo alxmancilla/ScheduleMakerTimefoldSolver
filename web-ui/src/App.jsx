@@ -13,7 +13,7 @@ function App() {
       <div className="app">
         <header className="header">
           <div className="container">
-            <h1>Schedule Maker - Timefold Solver</h1>
+            <h1>Schedule Maker</h1>
             <nav className="nav">
               <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>
                 Schedule
