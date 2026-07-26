@@ -37,15 +37,10 @@ public class MainBlockSchedulingApp {
         // Option 1: Generate demo data (no database required)
         // SchoolSchedule initialSchedule = DemoDataGenerator.generateBlockDemoData();
 
-        // Option 2: Load from database (uncomment to use)
-        // String jdbcUrl = "jdbc:postgresql://localhost:5432/school_schedule";
-        // String username = "mancilla";
-        // String password = "";
-        // DataLoader dataLoader = new DataLoader(jdbcUrl, username, password);
-        // SchoolSchedule initialSchedule = dataLoader.loadDataForBlockScheduling();
-        String jdbcUrl = "jdbc:postgresql://localhost:5432/school_schedule";
-        String username = "mancilla";
-        String password = "";
+        // Option 2: Load from database (overridable via DB_URL / DB_USER / DB_PASSWORD)
+        String jdbcUrl = System.getenv().getOrDefault("DB_URL", "jdbc:postgresql://localhost:5432/school_schedule");
+        String username = System.getenv().getOrDefault("DB_USER", "mancilla");
+        String password = System.getenv().getOrDefault("DB_PASSWORD", "");
         DataLoader dataLoader = new DataLoader(jdbcUrl, username, password);
         SchoolSchedule initialSchedule = dataLoader.loadDataForBlockScheduling();
 

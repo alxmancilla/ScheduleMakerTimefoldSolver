@@ -6,9 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a school scheduling constraint optimization system built with **Timefold Solver 1.x** and **Java 17**. The solver automatically generates weekly timetables by assigning teachers, courses, timeslots, and rooms while satisfying hard constraints and optimizing soft preferences.
 
-The system supports **two scheduling modes**:
-1. **Hour-based scheduling** - Traditional approach with individual hour assignments
-2. **Block-based scheduling** - Modern approach with multi-hour block assignments (NEW)
+**Current Status**: This project uses **block-based scheduling only**. Hour-based scheduling has been deprecated and removed.
+
+### Block-Based Scheduling
+The system assigns multi-hour blocks (1-4 hours) to courses, allowing for more realistic scheduling patterns. Blocks represent consecutive teaching periods and are the only supported scheduling mode.
 
 ## Essential Commands
 
@@ -17,11 +18,11 @@ The system supports **two scheduling modes**:
 # Compile the project
 mvn clean compile
 
-# Run the hour-based solver
-mvn exec:java -Dexec.mainClass="com.example.MainApp"
-
-# Run the block-based solver (NEW)
+# Run the block-based solver
 mvn exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
+
+# Run the Spring Boot web application
+mvn spring-boot:run -Dspring-boot.run.mainClass=com.example.web.ScheduleWebApplication
 
 # Run tests
 mvn test
@@ -31,11 +32,6 @@ mvn -X clean compile
 ```
 
 ### Output Files
-
-**Hour-based scheduling** generates three PDF reports:
-- `calendario-incumplimientos.pdf` - Constraint violation analysis
-- `calendario-por-maestro.pdf` - Schedule grouped by teacher
-- `calendario-por-grupo.pdf` - Schedule grouped by student group
 
 **Block-based scheduling** generates three PDF reports:
 - `calendario-bloques-incumplimientos.pdf` - Constraint violation analysis
@@ -51,14 +47,7 @@ mvn -X clean compile
 - Contains value range providers for teachers, timeslots, and rooms
 - Holds the `HardSoftScore` calculated by the constraint provider
 
-**Planning Entity**:
-
-*Hour-based* (`CourseAssignment`):
-- The `@PlanningEntity` with three `@PlanningVariable` fields: `teacher`, `timeslot`, `room`
-- Represents one hour of a course for a specific group
-- Each assignment has a `sequenceIndex` to track which hour of the multi-hour course it represents
-
-*Block-based* (`CourseBlockAssignment`) - **NEW**:
+**Planning Entity** (`CourseBlockAssignment`):
 - The `@PlanningEntity` with one `@PlanningVariable` field: `timeslot` (teacher and room pre-assigned from database)
 - Represents a block of consecutive hours for a course
 - Has `blockLength` field indicating the number of consecutive hours
@@ -70,14 +59,13 @@ mvn -X clean compile
 - `Course` - Has `id`, name, `roomRequirement` (legacy single requirement), `roomRequirements` (List for dual requirements), `blockTemplates` (List for custom block decomposition), and `requiredHoursPerWeek`
 - `Group` - Student group with assigned courses and optional `preferredRoom`
 - `Room` - Classroom with `type` (estándar, laboratorio, taller, taller electromecánica, taller electrónica, centro de cómputo) and `building` designation
-- `Timeslot` - Specific day (`DayOfWeek`) and hour (int, 7-15) - used for hour-based scheduling
-- `BlockTimeslot` - Specific day (`DayOfWeek`), start hour (int, 7-14), and length in hours (int, 1-4) - used for block-based scheduling
-- `RoomRequirement` - **NEW**: Dual room requirements with `courseId`, `roomType`, `hoursRequired`, `priority`, `defaultPreferredRoom`
-- `BlockTemplate` - **NEW**: Custom block decomposition with `courseId`, `groupId`, `blockIndex`, `blockLength`, `roomType`, `preferredRoomName`, `preferredDay`, `pinAssignment`, `preferredTimeslotId`
+- `BlockTimeslot` - Specific day (`DayOfWeek`), start hour (int, 7-14), and length in hours (int, 1-4)
+- `RoomRequirement` - Dual room requirements with `courseId`, `roomType`, `hoursRequired`, `priority`, `defaultPreferredRoom`
+- `BlockTemplate` - Custom block decomposition with `courseId`, `groupId`, `blockIndex`, `blockLength`, `roomType`, `preferredRoomName`, `preferredDay`, `pinAssignment`, `preferredTimeslotId`
 
 ### Constraint System (Block-Based Scheduling)
 
-**Hard Constraints** (9 total in `SchoolConstraintProvider`):
+**Hard Constraints** (10 total in `SchoolConstraintProvider`):
 1. `blockLengthMustMatchTimeslotLength` - Block length must match timeslot length
 2. `teacherMustBeQualified` - Teacher must have qualification matching course name
 3. `teacherMustBeAvailable` - Teacher must be available for entire block duration (checks per-day availability map)
@@ -85,17 +73,18 @@ mvn -X clean compile
 5. `noRoomDoubleBooking` - Room cannot host two blocks that overlap in time
 6. `roomTypeMustSatisfyRequirement` - **CRITICAL**: Uses `assignment.getSatisfiesRoomType()` (NOT `course.getRoomRequirement()`) to support dual room requirements
 7. `groupCannotHaveTwoCoursesAtSameTime` - Student group cannot have overlapping blocks
-8. `nonStandardRoomsShouldFinishBy2pm` - Non-standard rooms (CC, TEM, TE, AULA 4, LQ, LMICRO) MUST finish by 14:00
-9. `maxTwoBlocksPerCoursePerGroupPerDay` - Maximum 2 blocks per course per group per day
+8. `maxTwoBlocksPerCoursePerGroupPerDay` - Maximum 2 blocks per course per group per day
+9. `courseBlocksMustBeConsecutive` - All course blocks on same day must be consecutive
+10. `nonStandardRoomsShouldFinishBy2pm` - Non-standard rooms (CC, TEM, TE, AULA 4, LQ, LMICRO) should finish by 14:00 (SOFT in constraint provider with weight 10, but tracked as HARD in analyzer for historical reasons)
 
 **Soft Constraints** (7 total, quality optimization):
 1. `teacherMaxHoursPerWeek` (weight 5) - Minimize teacher workload violations
-2. `courseBlocksShouldBeConsecutive` (weight 3) - Prefer consecutive blocks for same course on same day
-3. `minimizeGroupIdleGaps` (weight 3) - Minimize idle time between blocks for student groups
-4. `preferBlockSpecifiedRoom` (weight 3) - Prefer room specified in `assignment.getPreferredRoomName()` field
-5. `groupPreferredRoomConstraint` (weight 2) - Groups prefer their pre-assigned room (excludes lab blocks using `getSatisfiesRoomType()`)
-6. `minimizeTeacherIdleGaps` (weight 2) - Reduce gaps between blocks for same teacher on same day
-7. `minimizeTeacherBuildingChanges` (weight 1) - Reduce building switches for teachers on same day
+2. `minimizeGroupIdleGaps` (weight 3) - Minimize idle time between blocks for student groups
+3. `preferBlockSpecifiedRoom` (weight 3) - Prefer room specified in `assignment.getPreferredRoomName()` field
+4. `groupPreferredRoomConstraint` (weight 2) - Groups prefer their pre-assigned room (excludes lab blocks using `getSatisfiesRoomType()`)
+5. `minimizeTeacherIdleGaps` (weight 2) - Reduce gaps between blocks for same teacher on same day
+6. `minimizeTeacherBuildingChanges` (weight 1) - Reduce building switches for teachers on same day
+7. `preferCourseBlocksToBeConsecutiveOnSameDay` (weight 3) - Placeholder constraint expected by tests but not yet implemented in constraint provider
 
 ### Solver Configuration
 
