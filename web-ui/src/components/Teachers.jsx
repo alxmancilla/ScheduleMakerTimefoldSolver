@@ -1,12 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher } from '../api';
 
+const DAY_LABELS = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+];
+const AVAILABILITY_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
+const EMPTY_FORM = { id: '', name: '', lastName: '', maxHoursPerWeek: 40 };
+
 function Teachers() {
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [editingTeacher, setEditingTeacher] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [qualifications, setQualifications] = useState([]);
+  const [qualInput, setQualInput] = useState('');
+  const [availability, setAvailability] = useState(new Set());
 
   useEffect(() => {
     loadTeachers();
@@ -25,14 +40,58 @@ function Teachers() {
     }
   };
 
+  const handleField = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const availabilityKey = (day, hour) => `${day}-${hour}`;
+
+  const addQualification = () => {
+    const value = qualInput.trim();
+    if (value && !qualifications.includes(value)) {
+      setQualifications([...qualifications, value]);
+    }
+    setQualInput('');
+  };
+
+  const removeQualification = (value) => {
+    setQualifications(qualifications.filter((q) => q !== value));
+  };
+
+  const toggleAvailability = (day, hour) => {
+    const key = availabilityKey(day, hour);
+    const next = new Set(availability);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    setAvailability(next);
+  };
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setQualifications([]);
+    setQualInput('');
+    setAvailability(new Set());
+    setFieldErrors({});
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    setFieldErrors({});
+    setError(null);
+
     const teacher = {
-      id: formData.get('id'),
-      name: formData.get('name'),
-      lastName: formData.get('lastName'),
-      maxHoursPerWeek: parseInt(formData.get('maxHoursPerWeek')),
+      id: form.id,
+      name: form.name,
+      lastName: form.lastName,
+      maxHoursPerWeek: parseInt(form.maxHoursPerWeek, 10),
+      qualifications,
+      availability: Array.from(availability).map((key) => {
+        const [dayOfWeek, hour] = key.split('-').map(Number);
+        return { dayOfWeek, hour };
+      }),
     };
 
     try {
@@ -41,16 +100,39 @@ function Teachers() {
       } else {
         await createTeacher(teacher);
       }
-      setShowForm(false);
-      setEditingTeacher(null);
+      handleCancel();
       loadTeachers();
     } catch (err) {
-      setError('Failed to save teacher: ' + err.message);
+      const data = err.response?.data;
+      if (data?.errors) {
+        setFieldErrors(data.errors);
+      }
+      setError(data?.message || 'Failed to save teacher: ' + err.message);
     }
+  };
+
+  const handleAdd = () => {
+    setEditingTeacher(null);
+    resetForm();
+    setError(null);
+    setShowForm(true);
   };
 
   const handleEdit = (teacher) => {
     setEditingTeacher(teacher);
+    setForm({
+      id: teacher.id,
+      name: teacher.name || '',
+      lastName: teacher.lastName || '',
+      maxHoursPerWeek: teacher.maxHoursPerWeek ?? 40,
+    });
+    setQualifications((teacher.qualifications || []).map((q) => q.qualification));
+    setQualInput('');
+    setAvailability(new Set(
+      (teacher.availability || []).map((slot) => availabilityKey(slot.dayOfWeek, slot.hour))
+    ));
+    setFieldErrors({});
+    setError(null);
     setShowForm(true);
   };
 
@@ -67,6 +149,7 @@ function Teachers() {
   const handleCancel = () => {
     setShowForm(false);
     setEditingTeacher(null);
+    resetForm();
   };
 
   if (loading) return <div className="loading">Loading teachers...</div>;
@@ -76,7 +159,7 @@ function Teachers() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Teachers</h2>
-          <button className="btn btn-success" onClick={() => setShowForm(true)}>
+          <button className="btn btn-success" onClick={handleAdd}>
             + Add Teacher
           </button>
         </div>
@@ -90,31 +173,136 @@ function Teachers() {
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>ID:</label>
-              <input 
-                type="text" 
-                name="id" 
-                defaultValue={editingTeacher?.id || ''} 
-                required 
+              <input
+                type="text"
+                name="id"
+                value={form.id}
+                onChange={handleField}
+                required
                 disabled={!!editingTeacher}
               />
+              {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
             </div>
             <div className="form-group">
               <label>Name:</label>
-              <input type="text" name="name" defaultValue={editingTeacher?.name || ''} required />
+              <input type="text" name="name" value={form.name} onChange={handleField} required />
+              {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
             </div>
             <div className="form-group">
               <label>Last Name:</label>
-              <input type="text" name="lastName" defaultValue={editingTeacher?.lastName || ''} required />
+              <input type="text" name="lastName" value={form.lastName} onChange={handleField} required />
+              {fieldErrors.lastName && <div className="error">{fieldErrors.lastName}</div>}
             </div>
             <div className="form-group">
               <label>Max Hours Per Week:</label>
-              <input 
-                type="number" 
-                name="maxHoursPerWeek" 
-                defaultValue={editingTeacher?.maxHoursPerWeek || 40} 
-                required 
+              <input
+                type="number"
+                name="maxHoursPerWeek"
+                value={form.maxHoursPerWeek}
+                onChange={handleField}
+                required
               />
+              {fieldErrors.maxHoursPerWeek && <div className="error">{fieldErrors.maxHoursPerWeek}</div>}
             </div>
+
+            <div className="form-group">
+              <label>Qualifications:</label>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  value={qualInput}
+                  onChange={(e) => setQualInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addQualification();
+                    }
+                  }}
+                  placeholder="Add a qualification and press Enter"
+                />
+                <button type="button" className="btn btn-secondary" onClick={addQualification}>
+                  Add
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {qualifications.map((q) => (
+                  <span
+                    key={q}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: '#e8f4f8',
+                      border: '1px solid #b3d9e6',
+                      borderRadius: '12px',
+                      padding: '2px 10px',
+                      fontSize: '13px',
+                    }}
+                  >
+                    {q}
+                    <button
+                      type="button"
+                      onClick={() => removeQualification(q)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                {qualifications.length === 0 && (
+                  <span style={{ color: '#7f8c8d', fontSize: '13px' }}>No qualifications added</span>
+                )}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Availability:</label>
+              <table style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '4px 8px' }}></th>
+                    {DAY_LABELS.map((day) => (
+                      <th key={day.value} style={{ padding: '4px 8px', textAlign: 'center' }}>{day.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {AVAILABILITY_HOURS.map((hour) => (
+                    <tr key={hour}>
+                      <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{hour}:00</td>
+                      {DAY_LABELS.map((day) => {
+                        const active = availability.has(availabilityKey(day.value, hour));
+                        return (
+                          <td key={day.value} style={{ padding: '2px', textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => toggleAvailability(day.value, hour)}
+                              style={{
+                                width: '32px',
+                                height: '28px',
+                                border: '1px solid ' + (active ? '#2e7d32' : '#ccc'),
+                                background: active ? '#a5d6a7' : '#fff',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                              }}
+                              aria-label={`${day.label} ${hour}:00 ${active ? 'available' : 'unavailable'}`}
+                            >
+                              {active ? '✓' : ''}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary">Save</button>
               <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
@@ -131,6 +319,7 @@ function Teachers() {
               <th>Name</th>
               <th>Last Name</th>
               <th>Max Hours/Week</th>
+              <th>Qualifications</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -141,6 +330,7 @@ function Teachers() {
                 <td>{teacher.name}</td>
                 <td>{teacher.lastName}</td>
                 <td>{teacher.maxHoursPerWeek}</td>
+                <td>{(teacher.qualifications || []).map((q) => q.qualification).join(', ')}</td>
                 <td>
                   <button className="btn btn-primary" onClick={() => handleEdit(teacher)} style={{ marginRight: '5px' }}>
                     Edit
