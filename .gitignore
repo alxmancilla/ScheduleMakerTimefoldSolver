@@ -16,8 +16,9 @@ release.properties
 .DS_Store
 *.class
 
-# web ui    
+# web ui
 web-ui/node_modules/
+web-ui/dist/
 
 # Datasets
 database/datasets/
