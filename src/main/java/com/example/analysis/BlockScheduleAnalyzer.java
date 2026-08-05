@@ -205,10 +205,10 @@ public final class BlockScheduleAnalyzer {
         int nonStandardAfter2pm = 0;
         for (CourseBlockAssignment a : list) {
             if (a.getRoom() != null && a.getTimeslot() != null) {
-                String roomName = a.getRoom().getName();
-                // Non-standard rooms that must finish by 2pm
-                if ((roomName.equals("CC") || roomName.equals("TEM") || roomName.equals("TE") ||
-                        roomName.equals("AULA 4") || roomName.equals("LQ") || roomName.equals("LMICRO"))) {
+                // Match the solver: non-standard = any room whose type is not "estándar"
+                String roomType = a.getRoom().getType();
+                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                if (isNonStandard) {
                     int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
                     if (endHour > 14) {
                         nonStandardAfter2pm++;
@@ -421,10 +421,10 @@ public final class BlockScheduleAnalyzer {
         List<String> nonStandardAfter2pmDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (a.getRoom() != null && a.getTimeslot() != null) {
-                String roomName = a.getRoom().getName();
-                // Non-standard rooms that must finish by 2pm
-                if ((roomName.equals("CC") || roomName.equals("TEM") || roomName.equals("TE") ||
-                        roomName.equals("AULA 4") || roomName.equals("LQ") || roomName.equals("LMICRO"))) {
+                // Match the solver: non-standard = any room whose type is not "estándar"
+                String roomType = a.getRoom().getType();
+                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                if (isNonStandard) {
                     int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
                     if (endHour > 14) {
                         nonStandardAfter2pmDetails.add(blockAssignmentToString(a) +

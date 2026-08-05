@@ -98,24 +98,16 @@ public class DataSaver {
      * schedule.
      * Useful for starting a fresh solve.
      *
+     * @deprecated The system is block-based only; this delegates to
+     *             {@link #clearBlockSchedule()} which operates on
+     *             {@code course_block_assignment}. Prefer calling that method
+     *             directly. Retained for backwards compatibility with older
+     *             call sites.
      * @throws SQLException if database access fails
      */
+    @Deprecated
     public void clearSchedule() throws SQLException {
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
-            conn.setAutoCommit(false);
-            try {
-                String sql = "UPDATE course_assignment SET teacher_id = NULL, timeslot_id = NULL, room_name = NULL, updated_at = CURRENT_TIMESTAMP";
-                try (Statement stmt = conn.createStatement()) {
-                    int count = stmt.executeUpdate(sql);
-                    conn.commit();
-                    System.out.println("✓ Cleared " + count + " course assignments");
-                }
-            } catch (SQLException e) {
-                conn.rollback();
-                System.err.println("✗ Failed to clear schedule. Changes rolled back.");
-                throw e;
-            }
-        }
+        clearBlockSchedule();
     }
 
     /**
