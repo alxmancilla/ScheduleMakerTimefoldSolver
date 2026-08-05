@@ -1,9 +1,14 @@
 package com.example.web.controller;
 
+import com.example.web.dto.CourseDTO;
 import com.example.web.entity.CourseEntity;
+import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,61 +16,68 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/courses")
 public class CourseController {
-    
+
     @Autowired
     private CourseRepository courseRepository;
-    
+
     @GetMapping
     public List<CourseEntity> getAllCourses() {
         return courseRepository.findAll();
     }
-    
+
     @GetMapping("/{id}")
-    public ResponseEntity<CourseEntity> getCourseById(@PathVariable String id) {
+    public CourseEntity getCourseById(@PathVariable String id) {
         return courseRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
     }
-    
+
     @GetMapping("/search")
     public List<CourseEntity> searchCourses(@RequestParam String query) {
         return courseRepository.findByNameContainingIgnoreCase(query);
     }
-    
+
     @GetMapping("/active")
     public List<CourseEntity> getActiveCourses() {
         return courseRepository.findByActive(true);
     }
-    
+
     @PostMapping
-    public CourseEntity createCourse(@RequestBody CourseEntity course) {
+    public CourseEntity createCourse(
+            @Validated({ Default.class, CourseDTO.Create.class }) @RequestBody CourseDTO request) {
+        if (courseRepository.existsById(request.getId())) {
+            throw new IllegalArgumentException("Course with ID '" + request.getId() + "' already exists");
+        }
+        CourseEntity course = new CourseEntity();
+        course.setId(request.getId());
+        applyFields(course, request);
         return courseRepository.save(course);
     }
-    
+
     @PutMapping("/{id}")
-    public ResponseEntity<CourseEntity> updateCourse(@PathVariable String id, @RequestBody CourseEntity courseDetails) {
-        return courseRepository.findById(id)
-                .map(course -> {
-                    course.setName(courseDetails.getName());
-                    course.setAbbreviation(courseDetails.getAbbreviation());
-                    course.setSemester(courseDetails.getSemester());
-                    course.setComponent(courseDetails.getComponent());
-                    course.setRoomRequirement(courseDetails.getRoomRequirement());
-                    course.setRequiredHoursPerWeek(courseDetails.getRequiredHoursPerWeek());
-                    course.setActive(courseDetails.getActive());
-                    return ResponseEntity.ok(courseRepository.save(course));
-                })
-                .orElse(ResponseEntity.notFound().build());
+    public CourseEntity updateCourse(@PathVariable String id, @Valid @RequestBody CourseDTO request) {
+        CourseEntity course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
+        applyFields(course, request);
+        return courseRepository.save(course);
     }
-    
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCourse(@PathVariable String id) {
-        return courseRepository.findById(id)
-                .map(course -> {
-                    courseRepository.delete(course);
-                    return ResponseEntity.ok().<Void>build();
-                })
-                .orElse(ResponseEntity.notFound().build());
+        CourseEntity course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", id));
+        courseRepository.delete(course);
+        return ResponseEntity.noContent().build();
+    }
+
+    private void applyFields(CourseEntity course, CourseDTO request) {
+        course.setName(request.getName());
+        course.setAbbreviation(request.getAbbreviation());
+        course.setSemester(request.getSemester());
+        course.setComponent(request.getComponent());
+        course.setRoomRequirement(request.getRoomRequirement());
+        course.setRequiredHoursPerWeek(request.getRequiredHoursPerWeek());
+        if (request.getActive() != null) {
+            course.setActive(request.getActive());
+        }
     }
 }
-
