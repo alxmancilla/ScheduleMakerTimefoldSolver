@@ -31,3 +31,6 @@ md_files/
 
 # Logs
 *.log
+
+# Local secrets / config (keep only the .example templates tracked)
+database.properties

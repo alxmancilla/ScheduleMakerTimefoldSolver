@@ -89,7 +89,7 @@ mvn -X clean compile
 ### Solver Configuration
 
 Located in `SchoolSolverConfig`:
-- **Termination**: Best score limit of `0hard/*soft` OR 15 minutes OR 5 minutes without improvement
+- **Termination**: Best score limit of `0hard/-800soft` OR 120 minutes OR 15 minutes without improvement (see `solverConfig.xml`)
 - Uses **Construction Heuristic** + **Local Search** (Tabu Search, Simulated Annealing)
 - Constraint Streams API for declarative constraint modeling
 

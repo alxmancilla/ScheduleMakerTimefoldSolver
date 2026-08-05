@@ -1,10 +1,10 @@
 # School Scheduling Solution with Timefold Solver
 
-A comprehensive Java 17 application for school schedule generation using **Timefold Solver 1.13.0**. This solution implements complex constraint optimization for assigning teachers, courses, timeslots, and rooms while respecting hard constraints and optimizing soft preferences.
+A comprehensive Java 17 application for school schedule generation using **Timefold Solver 1.29.0**. This solution implements complex constraint optimization for assigning teachers, courses, timeslots, and rooms while respecting hard constraints and optimizing soft preferences.
 
 ## Current Status
 
-✅ **Build & Tests: PASSING** — Compiles successfully with Timefold 1.13.0
+✅ **Build & Tests: PASSING** — Compiles successfully with Timefold 1.29.0
 ✅ **Block-Based Scheduling:** Migrated from hour-based to block-based scheduling (multi-hour consecutive blocks)
 ✅ **PostgreSQL Integration:** Full database support with schema, views, and data loading
 ✅ **Production Dataset:** 399 course block assignments with 32 pinned assignments
@@ -513,8 +513,8 @@ PDF reports written to:
 
 ### January 2, 2026
 
-- **Timefold 1.13.0 Validation & Fixes**
-  - Fixed syntax errors and updated imports for Timefold 1.13.0 API
+- **Timefold 1.29.0 Validation & Fixes**
+  - Fixed syntax errors and updated imports for Timefold 1.29.0 API
   - All tests pass (`mvn test` returns BUILD SUCCESS)
 
 ### November 2025
@@ -528,7 +528,7 @@ PDF reports written to:
 
 ### Technology Stack
 - **Java 17** — Modern language features and performance
-- **Timefold Solver 1.13.0** — Constraint Streams API for declarative constraint modeling
+- **Timefold Solver 1.29.0** — Constraint Streams API for declarative constraint modeling
 - **PostgreSQL 12+** — Database for storing courses, teachers, rooms, and assignments
 - **Maven** — Build automation and dependency management
 - **Apache PDFBox** — PDF report generation
