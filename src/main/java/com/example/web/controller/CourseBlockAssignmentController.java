@@ -1,9 +1,14 @@
 package com.example.web.controller;
 
+import com.example.web.dto.CourseBlockAssignmentDTO;
 import com.example.web.entity.CourseBlockAssignmentEntity;
+import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,10 +26,9 @@ public class CourseBlockAssignmentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CourseBlockAssignmentEntity> getAssignmentById(@PathVariable String id) {
+    public CourseBlockAssignmentEntity getAssignmentById(@PathVariable String id) {
         return assignmentRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
     }
 
     @GetMapping("/group/{groupId}")
@@ -58,36 +62,46 @@ public class CourseBlockAssignmentController {
     }
 
     @PostMapping
-    public CourseBlockAssignmentEntity createAssignment(@RequestBody CourseBlockAssignmentEntity assignment) {
+    public CourseBlockAssignmentEntity createAssignment(
+            @Validated({ Default.class,
+                    CourseBlockAssignmentDTO.Create.class }) @RequestBody CourseBlockAssignmentDTO request) {
+        if (assignmentRepository.existsById(request.getId())) {
+            throw new IllegalArgumentException("Assignment with ID '" + request.getId() + "' already exists");
+        }
+        CourseBlockAssignmentEntity assignment = new CourseBlockAssignmentEntity();
+        assignment.setId(request.getId());
+        applyFields(assignment, request);
         return assignmentRepository.save(assignment);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CourseBlockAssignmentEntity> updateAssignment(@PathVariable String id,
-            @RequestBody CourseBlockAssignmentEntity assignmentDetails) {
-        return assignmentRepository.findById(id)
-                .map(assignment -> {
-                    assignment.setGroupId(assignmentDetails.getGroupId());
-                    assignment.setCourseId(assignmentDetails.getCourseId());
-                    assignment.setBlockLength(assignmentDetails.getBlockLength());
-                    assignment.setPinned(assignmentDetails.getPinned());
-                    assignment.setTeacherId(assignmentDetails.getTeacherId());
-                    assignment.setBlockTimeslotId(assignmentDetails.getBlockTimeslotId());
-                    assignment.setRoomName(assignmentDetails.getRoomName());
-                    assignment.setSatisfiesRoomType(assignmentDetails.getSatisfiesRoomType());
-                    assignment.setPreferredRoomName(assignmentDetails.getPreferredRoomName());
-                    return ResponseEntity.ok(assignmentRepository.save(assignment));
-                })
-                .orElse(ResponseEntity.notFound().build());
+    public CourseBlockAssignmentEntity updateAssignment(@PathVariable String id,
+            @Valid @RequestBody CourseBlockAssignmentDTO request) {
+        CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
+        applyFields(assignment, request);
+        return assignmentRepository.save(assignment);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAssignment(@PathVariable String id) {
-        return assignmentRepository.findById(id)
-                .map(assignment -> {
-                    assignmentRepository.delete(assignment);
-                    return ResponseEntity.ok().<Void>build();
-                })
-                .orElse(ResponseEntity.notFound().build());
+        CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
+        assignmentRepository.delete(assignment);
+        return ResponseEntity.noContent().build();
+    }
+
+    private void applyFields(CourseBlockAssignmentEntity assignment, CourseBlockAssignmentDTO request) {
+        assignment.setGroupId(request.getGroupId());
+        assignment.setCourseId(request.getCourseId());
+        assignment.setBlockLength(request.getBlockLength());
+        if (request.getPinned() != null) {
+            assignment.setPinned(request.getPinned());
+        }
+        assignment.setTeacherId(request.getTeacherId());
+        assignment.setBlockTimeslotId(request.getBlockTimeslotId());
+        assignment.setRoomName(request.getRoomName());
+        assignment.setSatisfiesRoomType(request.getSatisfiesRoomType());
+        assignment.setPreferredRoomName(request.getPreferredRoomName());
     }
 }
