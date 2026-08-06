@@ -160,6 +160,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(CourseBlockAssignment::getTeacher),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
                 .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
+                        && a1.getTeacher() != null // Guard: Joiners.equal joins null==null; two unassigned
+                                                   // blocks are not a double-booking (a2 is non-null via the join)
                         && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
@@ -175,6 +177,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(CourseBlockAssignment::getRoom),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
                 .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
+                        && a1.getRoom() != null // Guard: Joiners.equal joins null==null; two unassigned
+                                                // blocks are not a double-booking (a2 is non-null via the join)
                         && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
                         && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
