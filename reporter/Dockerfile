@@ -20,12 +20,15 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /src
 
-# Copy the reactor: parent POM + engine (the reporter's library dependency) +
-# reporter module sources. The web module is not needed to build the reporter.
+# Copy the reactor: the parent POM lists all three modules, so Maven must be able
+# to read every module POM to resolve the reactor. Bring in all module POMs, plus
+# the sources for the reporter and its library dependency (engine). The web
+# module is only read, not built, so its sources are not needed.
 COPY pom.xml ./
 COPY engine/pom.xml ./engine/pom.xml
-COPY engine/src ./engine/src
 COPY reporter/pom.xml ./reporter/pom.xml
+COPY web/pom.xml ./web/pom.xml
+COPY engine/src ./engine/src
 COPY reporter/src ./reporter/src
 
 # Build the reporter module (and everything it needs: parent + engine) into the
