@@ -19,6 +19,9 @@ release.properties
 # web ui
 web-ui/node_modules/
 web-ui/dist/
+# Local Vite env overrides (tracked templates: .env.example/.development/.production)
+web-ui/.env.local
+web-ui/.env.*.local
 
 # Datasets
 database/datasets/

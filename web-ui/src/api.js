@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = '/api';
+// Base URL for API calls. In development this defaults to '/api', which Vite
+// proxies to the backend (see vite.config.js). In production, set
+// VITE_API_BASE_URL at build time to the backend's public URL (e.g.
+// https://api.example.com/api) when the SPA is deployed on a different origin.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

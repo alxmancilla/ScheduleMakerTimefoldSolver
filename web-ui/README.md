@@ -77,13 +77,32 @@ http://localhost:3000
 
 ## API Configuration
 
-The frontend is configured to proxy API requests to the backend:
+API calls are configured through environment variables (Vite). See `.env.example`
+for the full list. Only variables prefixed with `VITE_` are exposed to the
+client bundle, and they are baked in at **build time**, not read at runtime.
 
-- **Backend URL**: `http://localhost:8080`
-- **API Base Path**: `/api`
-- **Proxy Configuration**: See `vite.config.js`
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | `/api` | Base URL the SPA uses for API calls. |
+| `VITE_DEV_PROXY_TARGET` | `http://localhost:8080` | Dev-only: backend the Vite proxy forwards `/api` to. |
 
-All API calls are automatically proxied from `/api/*` to `http://localhost:8080/api/*`.
+### Development
+
+`npm run dev` loads `.env.development`. `/api` requests are proxied to
+`VITE_DEV_PROXY_TARGET` (default `http://localhost:8080`), so no CORS setup is
+needed locally.
+
+### Production
+
+`npm run build` loads `.env.production`. Two deployment shapes are supported:
+
+- **Same origin / reverse proxy** (default): serve the built SPA behind a proxy
+  that forwards `/api` to the backend. Leave `VITE_API_BASE_URL=/api`.
+- **Separate origin**: set `VITE_API_BASE_URL` to the backend's public API URL
+  at build time, e.g. `VITE_API_BASE_URL=https://api.example.com/api`. The
+  backend must also allow the SPA's origin via CORS — set
+  `CORS_ALLOWED_ORIGINS` on the backend (e.g. `https://app.example.com`), which
+  maps to the `app.cors.allowed-origins` property in `application.properties`.
 
 ## Project Structure
 
@@ -147,8 +166,8 @@ export default defineConfig({
 **Solution**: Ensure the backend is running on port 8080:
 
 ```bash
-# From the project root directory
-mvn spring-boot:run -Dspring-boot.run.mainClass=com.example.web.ScheduleWebApplication
+# From the repository root directory
+mvn -pl web spring-boot:run
 ```
 
 Verify backend is running:
