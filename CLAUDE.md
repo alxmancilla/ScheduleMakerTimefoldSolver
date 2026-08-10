@@ -13,18 +13,20 @@ The system assigns multi-hour blocks (1-4 hours) to courses, allowing for more r
 
 ## Essential Commands
 
+The project is a Maven multi-module build: an aggregator/parent `pom.xml` with two modules — `engine` (`scheduler-engine`, Timefold + JDBC, no Spring) and `web` (`scheduler-web`, Spring Boot REST API). The two modules do not depend on each other; they integrate only through the shared PostgreSQL database. The React frontend lives in `web-ui/` (unchanged).
+
 ### Build and Run
 ```bash
-# Compile the project
+# Compile all modules (run from the repository root)
 mvn clean compile
 
-# Run the block-based solver
-mvn exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
+# Run the block-based solver (engine module)
+mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 
-# Run the Spring Boot web application
-mvn spring-boot:run -Dspring-boot.run.mainClass=com.example.web.ScheduleWebApplication
+# Run the Spring Boot web application (web module)
+mvn -pl web spring-boot:run
 
-# Run tests
+# Run all tests (both modules, from the root)
 mvn test
 
 # Debug mode
@@ -188,13 +190,13 @@ See `DUAL_ROOM_REQUIREMENT_FIX_SUMMARY.md` and `ANALYZER_DUAL_ROOM_REQUIREMENT_F
 ## Modifying the System
 
 **To change constraints**:
-Edit `src/main/java/com/example/solver/SchoolConstraintProvider.java`
+Edit `engine/src/main/java/com/example/solver/SchoolConstraintProvider.java`
 
 **To modify demo data**:
-Edit `src/main/java/com/example/data/DemoDataGenerator.java`
+Edit `engine/src/main/java/com/example/data/DemoDataGenerator.java`
 
 **To adjust solver termination**:
-Edit `src/main/java/com/example/solver/SchoolSolverConfig.java`
+Edit `engine/src/main/java/com/example/solver/SchoolSolverConfig.java`
 
 **To change domain model**:
 - Ensure no-arg constructors remain for Timefold compatibility
