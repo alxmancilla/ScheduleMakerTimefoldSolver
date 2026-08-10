@@ -13,7 +13,7 @@ The system assigns multi-hour blocks (1-4 hours) to courses, allowing for more r
 
 ## Essential Commands
 
-The project is a Maven multi-module build: an aggregator/parent `pom.xml` with two modules — `engine` (`scheduler-engine`, Timefold + JDBC, no Spring) and `web` (`scheduler-web`, Spring Boot REST API). The two modules do not depend on each other; they integrate only through the shared PostgreSQL database. The React frontend lives in `web-ui/` (unchanged).
+The project is a Maven multi-module build: an aggregator/parent `pom.xml` with three modules — `engine` (`scheduler-engine`, Timefold + JDBC, no Spring), `reporter` (`scheduler-reporter`, reads the solved schedule from the database and generates PDF reports; depends on `scheduler-engine` as a library), and `web` (`scheduler-web`, Spring Boot REST API). The `engine` and `web` modules do not depend on each other; all three integrate through the shared PostgreSQL database. The React frontend lives in `web-ui/` (unchanged).
 
 ### Build and Run
 ```bash
@@ -23,10 +23,13 @@ mvn clean compile
 # Run the block-based solver (engine module)
 mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 
+# Generate PDF reports from the solved schedule (reporter module)
+mvn -pl reporter exec:java -Dexec.mainClass="com.example.reporter.PdfReportApp"
+
 # Run the Spring Boot web application (web module)
 mvn -pl web spring-boot:run
 
-# Run all tests (both modules, from the root)
+# Run all tests (all modules, from the root)
 mvn test
 
 # Debug mode
@@ -35,7 +38,7 @@ mvn -X clean compile
 
 ### Output Files
 
-**Block-based scheduling** generates three PDF reports:
+The **reporter** module generates three PDF reports from the persisted schedule:
 - `calendario-bloques-incumplimientos.pdf` - Constraint violation analysis
 - `calendario-bloques-por-maestro.pdf` - Schedule grouped by teacher
 - `calendario-bloques-por-grupo.pdf` - Schedule grouped by student group
@@ -116,10 +119,11 @@ Located in `SchoolSolverConfig`:
 - Handles block overlap detection and availability checking for multi-hour blocks
 - Returns violation counts and detailed offender descriptions
 
-**PdfReporter** (`com.example.util.PdfReporter`):
+**PdfReporter** (`com.example.util.PdfReporter`, in the `reporter` module):
 - Generates paginated PDF reports using Apache PDFBox
-- Three reports for hour-based: violations, by-teacher schedule, by-group schedule
-- Three reports for block-based: violations, by-teacher schedule, by-group schedule (NEW)
+- Three reports for block-based: violations, by-teacher schedule, by-group schedule
+- Invoked by `com.example.reporter.PdfReportApp`, which loads the solved schedule via `DataLoader` and recomputes violations via `BlockScheduleAnalyzer`
+- **NOTE**: PDF generation (and the PDFBox dependency) lives in the `reporter` module, not the engine
 
 **ExcelTemplateGenerator** (`com.example.util.ExcelTemplateGenerator`):
 - Uses Apache POI to pre-fill Excel workbook with demo data

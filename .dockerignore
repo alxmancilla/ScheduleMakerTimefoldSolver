@@ -1,0 +1,11 @@
+# Keep the Docker build context small and reproducible.
+**/target/
+web-ui/node_modules/
+web-ui/dist/
+.git/
+*.log
+*.pdf
+*.xlsx
+database/datasets/
+md_files/
+database.properties

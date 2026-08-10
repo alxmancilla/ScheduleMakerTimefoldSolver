@@ -11,9 +11,7 @@ import com.example.data.DemoDataGenerator;
 import com.example.domain.SchoolSchedule;
 import com.example.solver.SchoolSolverConfig;
 import com.example.analysis.BlockScheduleAnalyzer;
-import com.example.util.PdfReporter;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 2. Solve the scheduling problem
  * 3. Analyze constraint violations
  * 4. Save results to database
- * 5. Generate PDF reports
+ *
+ * PDF reports are generated separately by the reporter module.
  */
 public class MainBlockSchedulingApp {
 
@@ -133,20 +132,7 @@ public class MainBlockSchedulingApp {
         }
         System.out.println();
 
-        // Generate PDF reports
-        try {
-            String base = "calendario-bloques";
-            PdfReporter.generateBlockReports(solvedSchedule, violations, softViolations, base);
-            System.out.println("PDF reports written to:");
-            System.out.println("  - " + base + "-incumplimientos.pdf");
-            System.out.println("  - " + base + "-por-maestro.pdf");
-            System.out.println("  - " + base + "-por-grupo.pdf");
-        } catch (IOException e) {
-            System.err.println("Failed to write PDF reports: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        System.out.println();
         System.out.println("=== Block-Based Scheduling Complete! ===");
+        System.out.println("Run the reporter module to generate PDF reports from the persisted schedule.");
     }
 }

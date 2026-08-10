@@ -159,17 +159,93 @@ mvn clean compile
 
 ### Run Block-Based Solver
 ```bash
-mvn exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
+mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 ```
 
 This will:
 1. Load data from PostgreSQL database
 2. Run the solver (up to 15 minutes or until optimal score reached)
-3. Generate three PDF reports:
-   - `calendario-bloques-incumplimientos.pdf` - Constraint violations
-   - `calendario-bloques-por-maestro.pdf` - Schedule by teacher
-   - `calendario-bloques-por-grupo.pdf` - Schedule by student group
+3. Save the solved assignments back to PostgreSQL
 4. Display constraint violation analysis
+
+PDF reports are produced separately by the **reporter** module (see below), which
+reads the persisted schedule from the database.
+
+### Run the Engine as a Worker
+
+The engine is a one-shot batch job (load → solve → save), not a daemon, so it
+runs well on demand or on a schedule. It writes the solved assignments back to
+PostgreSQL, and the web API serves those same rows — so a completed run surfaces
+automatically via `GET /api/schedule/view` (and related endpoints).
+
+Connection settings come from environment variables (`DB_URL`, `DB_USER`,
+`DB_PASSWORD`); the process exits non-zero on failure, so cron/orchestrators can
+detect failed runs.
+
+**1. Build the fat jar**
+```bash
+mvn -pl engine -am -DskipTests package
+# -> engine/target/scheduler-engine-1.0.0.jar (self-contained)
+```
+
+**2. Run on demand** (via the helper script)
+```bash
+DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
+DB_USER=<user> DB_PASSWORD=<pass> \
+./scripts/run-engine.sh
+```
+
+**3. Schedule with cron** (e.g. nightly at 02:00; log to a file)
+```cron
+0 2 * * *  DB_URL=jdbc:postgresql://localhost:5432/school_schedule DB_USER=mancilla DB_PASSWORD=secret /opt/schedule/scripts/run-engine.sh >> /var/log/schedule-engine.log 2>&1
+```
+
+**4. Run as a container** (see `engine/Dockerfile`)
+```bash
+docker build -f engine/Dockerfile -t scheduler-engine .
+docker run --rm \
+  -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
+  -e DB_USER=<user> -e DB_PASSWORD=<pass> \
+  scheduler-engine
+```
+The image is a batch worker (runs once and exits); schedule it with an ECS
+scheduled task, a Kubernetes CronJob, or a host cron invoking `docker run`.
+
+### Run the Reporter as a Worker
+
+The reporter is a separate one-shot batch job that generates the three PDF
+reports. It reconstructs the solved schedule from PostgreSQL (the same rows the
+engine persists), recomputes constraint violations, and writes the PDFs into
+`REPORTER_OUTPUT_DIR`. It shares only the database with the engine, so run it on
+demand or right after an engine run.
+
+**1. Build the fat jar**
+```bash
+mvn -pl reporter -am -DskipTests package
+# -> reporter/target/scheduler-reporter-1.0.0.jar (self-contained)
+```
+
+**2. Run on demand** (via the helper script; PDFs land in `REPORTER_OUTPUT_DIR`)
+```bash
+DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
+DB_USER=<user> DB_PASSWORD=<pass> \
+REPORTER_OUTPUT_DIR=./reports \
+./scripts/run-reporter.sh
+```
+This writes:
+- `calendario-bloques-incumplimientos.pdf` - Constraint violations
+- `calendario-bloques-por-maestro.pdf` - Schedule by teacher
+- `calendario-bloques-por-grupo.pdf` - Schedule by student group
+
+**3. Run as a container** (see `reporter/Dockerfile`)
+```bash
+docker build -f reporter/Dockerfile -t scheduler-reporter .
+docker run --rm \
+  -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
+  -e DB_USER=<user> -e DB_PASSWORD=<pass> \
+  -v "$PWD/reports:/work" \
+  scheduler-reporter
+```
 
 ### Run Tests
 ```bash
