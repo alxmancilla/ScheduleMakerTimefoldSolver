@@ -47,11 +47,14 @@ COPY --from=build /reporter.jar /app/reporter.jar
 RUN chown -R worker:worker /work /app
 USER worker
 
-# Default DB connection; override at run time.
+# Default DB connection; override at run time. JAVA_OPTS sets a deterministic
+# heap ceiling relative to the container memory limit (via -XX:MaxRAMPercentage),
+# so the JVM sizes itself off the container's cgroup rather than the whole host.
+# Pair with `docker run --memory=<limit>` for a deterministic heap.
 ENV DB_URL=jdbc:postgresql://localhost:5432/school_schedule \
     DB_USER=mancilla \
     DB_PASSWORD="" \
-    JAVA_OPTS=""
+    JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 
 # PDF reports are written to the working directory (/work); mount a volume there
 # to retain them.

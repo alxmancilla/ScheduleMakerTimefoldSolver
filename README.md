@@ -256,11 +256,16 @@ This writes:
 ```bash
 docker build -f reporter/Dockerfile -t scheduler-reporter .
 docker run --rm \
+  --cpus=1 --memory=1g \
   -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
   -e DB_USER=<user> -e DB_PASSWORD=<pass> \
   -v "$PWD/reports:/work" \
   scheduler-reporter
 ```
+The image defaults `JAVA_OPTS="-XX:MaxRAMPercentage=75.0"`, so the JVM heap sizes
+to a fixed fraction of the `--memory` limit (e.g. ~768 MB at `--memory=1g`)
+rather than to the whole host. Set `--cpus`/`--memory` to pin CPU and RAM, or
+override `JAVA_OPTS` to tune further.
 
 ### Run Tests
 ```bash
@@ -276,6 +281,22 @@ A React + Spring Boot web interface is available for viewing and editing the sch
 mvn spring-boot:run
 ```
 Runs on `http://localhost:8080`, using the PostgreSQL database configured in `src/main/resources/application.properties` (defaults to `school_schedule`/`mancilla`; override with `DB_URL`/`DB_USER`/`DB_PASSWORD` env vars).
+
+**Or run the backend as a container** (see `web/Dockerfile`)
+```bash
+docker build -f web/Dockerfile -t scheduler-web .
+docker run --rm \
+  --cpus=2 --memory=1g \
+  -p 8080:8080 \
+  -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
+  -e DB_USER=<user> -e DB_PASSWORD=<pass> \
+  -e CORS_ALLOWED_ORIGINS=https://app.example.com \
+  scheduler-web
+```
+Unlike the engine and reporter (one-shot batch workers), the web image is a
+long-running service on port 8080. It defaults `JAVA_OPTS="-XX:MaxRAMPercentage=75.0"`,
+so the JVM heap tracks the `--memory` limit deterministically (e.g. ~768 MB at
+`--memory=1g`). Set `--cpus`/`--memory` to pin resources.
 
 ### 2. Start the Frontend (React + Vite)
 ```bash
