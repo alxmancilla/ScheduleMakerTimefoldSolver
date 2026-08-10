@@ -79,9 +79,9 @@
             <!-- Stop when we find a feasible solution (0 hard violations) -->
             <bestScoreLimit>0hard/0soft</bestScoreLimit>
             <!-- Or after 100 minutes total -->
-            <minutesSpentLimit>10</minutesSpentLimit>
+            <minutesSpentLimit>5</minutesSpentLimit>
             <!-- Or after 15 minutes without improvement (allows more patience to escape local optima) -->
-            <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
+            <unimprovedMinutesSpentLimit>2</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>
