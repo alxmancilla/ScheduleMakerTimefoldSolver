@@ -34,3 +34,11 @@ md_files/
 
 # Local secrets / config (keep only the .example templates tracked)
 database.properties
+
+# Generated PDF reports
+calendario-bloques-incumplimientos.pdf
+calendario-bloques-por-grupo.pdf
+calendario-bloques-por-maestro.pdf
+calendario-incumplimientos.pdf
+calendario-por-grupo.pdf
+calendario-por-maestro.pdf

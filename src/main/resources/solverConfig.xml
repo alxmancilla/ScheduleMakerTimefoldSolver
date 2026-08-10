@@ -77,11 +77,11 @@
         </forager>
         <termination>
             <!-- Stop when we find a feasible solution (0 hard violations) -->
-            <bestScoreLimit>0hard/-800soft</bestScoreLimit>
+            <bestScoreLimit>0hard/0soft</bestScoreLimit>
             <!-- Or after 100 minutes total -->
-            <minutesSpentLimit>120</minutesSpentLimit>
+            <minutesSpentLimit>10</minutesSpentLimit>
             <!-- Or after 15 minutes without improvement (allows more patience to escape local optima) -->
-            <unimprovedMinutesSpentLimit>15</unimprovedMinutesSpentLimit>
+            <unimprovedMinutesSpentLimit>5</unimprovedMinutesSpentLimit>
         </termination>
     </localSearch>
 </solver>
