@@ -238,13 +238,17 @@ The project includes a `DataLoader` class (`com.example.data.DataLoader`) that l
 
 **1. Configure database connection**
 
-Create a `database.properties` file (copy from `database.properties.example`):
+Database connection settings come from environment variables (with sensible
+local defaults):
 
-```properties
-db.url=jdbc:postgresql://localhost:5432/school_schedule
-db.username=postgres
-db.password=your_password_here
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/school_schedule
+export DB_USER=postgres
+export DB_PASSWORD=your_password_here
 ```
+
+All entry points (engine, reporter, and `DataLoader.main`) read `DB_URL`,
+`DB_USER`, and `DB_PASSWORD` from the environment.
 
 **2. Load data from database**
 
