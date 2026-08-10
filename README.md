@@ -219,10 +219,19 @@ DB_USER=<user> DB_PASSWORD=<pass> \
 ```bash
 docker build -f engine/Dockerfile -t scheduler-engine .
 docker run --rm \
+  --cpus=6 --memory=12g --memory-reservation=8g \
   -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
   -e DB_USER=<user> -e DB_PASSWORD=<pass> \
   scheduler-engine
 ```
+The solver is the most resource-hungry component: give it **at least 4 CPUs /
+8 GB and at most 6 CPUs / 12 GB**. In plain `docker run`, `--cpus`/`--memory` set
+the ceiling and `--memory-reservation` the memory floor (a CPU floor needs an
+orchestrator — e.g. Kubernetes `requests: {cpu: "4", memory: 8Gi}` /
+`limits: {cpu: "6", memory: 12Gi}`). The image defaults
+`JAVA_OPTS="-XX:MaxRAMPercentage=75.0"`, so the heap tracks `--memory`
+deterministically (~6 GB at `--memory=8g`, ~9 GB at `--memory=12g`).
+
 The image is a batch worker (runs once and exits); schedule it with an ECS
 scheduled task, a Kubernetes CronJob, or a host cron invoking `docker run`.
 

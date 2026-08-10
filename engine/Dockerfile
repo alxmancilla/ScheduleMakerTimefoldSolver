@@ -9,11 +9,19 @@
 # Build (from the repository root, so the parent POM is in context):
 #   docker build -f engine/Dockerfile -t scheduler-engine .
 #
-# Run once against your database:
+# Run once against your database. The solver is CPU- and memory-hungry, so give
+# it more than the other images: at least 4 CPUs / 8 GB, at most 6 CPUs / 12 GB.
+# In plain `docker run`, --cpus/--memory set the ceiling and --memory-reservation
+# sets the memory floor (a CPU floor needs an orchestrator: K8s requests, Compose
+# reservations):
 #   docker run --rm \
+#     --cpus=6 --memory=12g --memory-reservation=8g \
 #     -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
 #     -e DB_USER=<user> -e DB_PASSWORD=<pass> \
 #     scheduler-engine
+#
+# JAVA_OPTS (below) sizes the heap to 75% of the container memory limit, so the
+# heap tracks --memory deterministically (~6 GB at 8g, ~9 GB at 12g).
 
 # ---- Build stage ----
 FROM maven:3.9-eclipse-temurin-17 AS build
@@ -44,11 +52,14 @@ COPY --from=build /engine.jar /app/engine.jar
 RUN chown -R worker:worker /work /app
 USER worker
 
-# Default DB connection; override at run time.
+# Default DB connection; override at run time. JAVA_OPTS sets a deterministic
+# heap ceiling relative to the container memory limit (via -XX:MaxRAMPercentage),
+# so the solver's heap tracks the container's cgroup rather than the whole host.
+# Pair with `docker run --memory=<limit>` (see the recommended range above).
 ENV DB_URL=jdbc:postgresql://localhost:5432/school_schedule \
     DB_USER=mancilla \
     DB_PASSWORD="" \
-    JAVA_OPTS=""
+    JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 
 # The solved schedule is written to the database (the primary, durable output);
 # generate PDFs afterwards with the reporter image.
