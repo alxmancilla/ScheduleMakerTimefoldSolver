@@ -50,7 +50,7 @@ If the database is not set up, load it:
 
 ```bash
 psql -U mancilla -d school_schedule -f database/schema_block_scheduling.sql
-psql -U mancilla -d school_schedule -f database/load_final_dataset_blocks.sql
+psql -U mancilla -d school_schedule -f database/datasets/load_final_dataset_blocks.sql
 ```
 
 ### 2. Backend Setup

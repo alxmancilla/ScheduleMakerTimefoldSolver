@@ -176,6 +176,59 @@ This will:
 mvn test
 ```
 
+## Web UI
+
+A React + Spring Boot web interface is available for viewing and editing the schedule (teachers, courses, rooms, groups, and course block assignments) without touching the database directly.
+
+### 1. Start the Backend (Spring Boot REST API)
+```bash
+mvn spring-boot:run
+```
+Runs on `http://localhost:8080`, using the PostgreSQL database configured in `src/main/resources/application.properties` (defaults to `school_schedule`/`mancilla`; override with `DB_URL`/`DB_USER`/`DB_PASSWORD` env vars).
+
+### 2. Start the Frontend (React + Vite)
+```bash
+cd web-ui
+npm install   # first time only
+npm run dev
+```
+Runs on `http://localhost:3000` and proxies all `/api/*` requests to the backend on port 8080 (see `web-ui/vite.config.js`).
+
+Both must be running at the same time — start the backend first, then the frontend, and open `http://localhost:3000` in a browser.
+
+See [`web-ui/README.md`](web-ui/README.md) and [`WEB_UI_SETUP.md`](WEB_UI_SETUP.md) for the full feature list, REST API endpoint reference, and troubleshooting.
+
+### 3. Expose It on the Internet (temporary sharing)
+
+⚠️ **The app has no authentication** — every REST endpoint (create/edit/delete included) is open. Only use this to share with people you trust, and tear it down when done.
+
+**One-time setup:**
+```bash
+brew install cloudflared
+```
+
+**Each time you want a public link:**
+```bash
+# Terminal 1 — backend
+mvn spring-boot:run
+
+# Terminal 2 — frontend
+cd web-ui && npm run dev
+
+# Terminal 3 — tunnel
+cloudflared tunnel --url http://localhost:3000
+```
+`cloudflared` prints a random `https://*.trycloudflare.com` URL — that's your public link. It proxies straight through Vite's `/api` proxy to the backend, so no extra tunnel is needed for port 8080.
+
+`web-ui/vite.config.js` has `allowedHosts: true` so Vite accepts the tunnel's hostname (Vite otherwise rejects requests with an unrecognized `Host` header).
+
+**To shut everything down:**
+```bash
+pkill -f "cloudflared tunnel"
+pkill -f "spring-boot:run"
+pkill -f "vite"
+```
+
 ## Edge Cases and Special Scenarios
 
 ### 1. **Computer Center Capacity Overload**
@@ -579,7 +632,7 @@ PDF reports written to:
 - [ ] Rest period constraints (minimum gap between blocks for teachers)
 - [ ] Multi-week scheduling patterns
 - [ ] Integration with calendar systems (iCal/Google Calendar export)
-- [ ] Web UI for viewing and editing schedules
+- [x] Web UI for viewing and editing schedules (see [Web UI](#web-ui) section)
 - [ ] Real-time constraint violation feedback during manual edits
 
 ## Testing & Validation
