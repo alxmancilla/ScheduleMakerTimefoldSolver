@@ -1,0 +1,90 @@
+# Declarative resource limits/reservations for the three services.
+#
+# All three share an external PostgreSQL database (not managed here); point them
+# at it with DB_URL / DB_USER / DB_PASSWORD (defaults target the host Postgres via
+# host.docker.internal). The heap of every image auto-sizes to 75% of its memory
+# limit (JAVA_OPTS="-XX:MaxRAMPercentage=75.0"), so the `memory` limits below give
+# a deterministic heap.
+#
+# Usage:
+#   docker compose up -d web                 # long-running REST API on :8080
+#   docker compose run --rm engine           # one-shot solve (batch profile)
+#   docker compose run --rm reporter          # one-shot PDF generation (batch)
+#
+# Note on enforcement: `docker compose up/run` (Compose V2) applies
+# deploy.resources.limits for cpus and memory. reservations (the floors) and the
+# CPU floor are fully guaranteed only under an orchestrator (Swarm / Kubernetes);
+# on a single host they are best-effort scheduling hints.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: scheduler-web
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: ${DB_URL:-jdbc:postgresql://host.docker.internal:5432/school_schedule}
+      DB_USER: ${DB_USER:-mancilla}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1g
+        reservations:
+          cpus: "1"
+          memory: 512m
+
+  # One-shot solver. CPU/memory-hungry: at least 4 CPUs / 8 GB, at most 6 / 12 GB.
+  engine:
+    build:
+      context: .
+      dockerfile: engine/Dockerfile
+    image: scheduler-engine
+    profiles: ["batch"]
+    environment:
+      DB_URL: ${DB_URL:-jdbc:postgresql://host.docker.internal:5432/school_schedule}
+      DB_USER: ${DB_USER:-mancilla}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "6"
+          memory: 12g
+        reservations:
+          cpus: "4"
+          memory: 8g
+
+  # One-shot PDF reporter. Writes the three PDFs into ./reports on the host.
+  reporter:
+    build:
+      context: .
+      dockerfile: reporter/Dockerfile
+    image: scheduler-reporter
+    profiles: ["batch"]
+    environment:
+      DB_URL: ${DB_URL:-jdbc:postgresql://host.docker.internal:5432/school_schedule}
+      DB_USER: ${DB_USER:-mancilla}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+    volumes:
+      - ./reports:/work
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1g
+        reservations:
+          cpus: "1"
+          memory: 512m

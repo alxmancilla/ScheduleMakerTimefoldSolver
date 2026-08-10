@@ -276,6 +276,28 @@ to a fixed fraction of the `--memory` limit (e.g. ~768 MB at `--memory=1g`)
 rather than to the whole host. Set `--cpus`/`--memory` to pin CPU and RAM, or
 override `JAVA_OPTS` to tune further.
 
+### Run All Services with Docker Compose
+
+`docker-compose.yml` wires up all three images with declarative CPU/memory
+limits and reservations (engine 4–6 CPU / 8–12 GB, web 1–2 CPU / 0.5–1 GB,
+reporter 1 CPU / 0.5–1 GB). The engine and reporter are one-shot batch jobs
+(under the `batch` profile); web is a long-running service.
+
+```bash
+# Long-running REST API on :8080
+docker compose up -d web
+
+# One-shot solve (writes the schedule to the database)
+docker compose run --rm engine
+
+# One-shot PDF generation (PDFs land in ./reports)
+docker compose run --rm reporter
+```
+Point the services at your database with `DB_URL`/`DB_USER`/`DB_PASSWORD` (they
+default to the host Postgres via `host.docker.internal`). Compose V2 applies the
+`limits`; the `reservations` (floors, including the CPU floor) are fully enforced
+only under an orchestrator (Swarm / Kubernetes).
+
 ### Run Tests
 ```bash
 mvn test
