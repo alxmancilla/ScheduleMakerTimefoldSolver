@@ -152,6 +152,21 @@ psql -U mancilla -d school_schedule -f database/datasets/load_final_dataset_bloc
 psql -U mancilla -d school_schedule -f database/views/create_views.sql
 ```
 
+### Configure Database Connection
+
+All modules (engine, reporter, and web) read the database connection from
+environment variables. Set them once in your shell (or export them in your
+deploy environment):
+
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/school_schedule
+export DB_USER=mancilla
+export DB_PASSWORD=your_password_here
+```
+
+If unset, they default to `jdbc:postgresql://localhost:5432/school_schedule`,
+user `mancilla`, and an empty password.
+
 ### Compile
 ```bash
 mvn clean compile
