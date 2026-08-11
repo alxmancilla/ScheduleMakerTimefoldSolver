@@ -85,12 +85,27 @@ public class WebSecurityAuthorizationTest {
 
     @Test
     @WithMockUser(roles = "WRITER")
+    public void writer_canRead() throws Exception {
+        when(teacherRepository.findAll()).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/teachers"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "WRITER")
     public void writer_canWrite() throws Exception {
         when(teacherRepository.existsById("T1")).thenReturn(false);
         when(teacherRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(validTeacherJson()))
                 .andExpect(status().isOk());
         verify(teacherRepository).save(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "WRITER")
+    public void writer_cannotAccessAdminRoutes() throws Exception {
+        mockMvc.perform(get("/api/admin/users"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
