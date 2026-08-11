@@ -170,53 +170,38 @@ public final class BlockScheduleAnalyzer {
         result.put("Maximum 2 blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
 
         // Course blocks must be consecutive (HARD) - Count
+        // Mirror the solver: group unpinned blocks by (group, course, day), sort by
+        // start hour, and count the breaks (gaps or overlaps between adjacent blocks)
+        // in each chain. This avoids the pairwise over-counting where a valid
+        // 7-8 / 8-9 / 9-10 sequence would flag the 7-8 <-> 9-10 pair.
+        Map<java.util.List<Object>, java.util.List<CourseBlockAssignment>> blocksByCourseDay = new java.util.HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getGroup() == null || a.getCourse() == null || a.getTimeslot() == null) {
+                continue;
+            }
+            java.util.List<Object> key = java.util.Arrays.asList(
+                    a.getGroup(), a.getCourse(), a.getTimeslot().getDayOfWeek());
+            blocksByCourseDay.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
+        }
         int courseBlocksNonConsecutive = 0;
-        for (int i = 0; i < list.size(); i++) {
-            for (int j = i + 1; j < list.size(); j++) {
-                CourseBlockAssignment a1 = list.get(i);
-                CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
-                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup())
-                        && a1.getCourse() != null && a1.getCourse().equals(a2.getCourse())
-                        && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-
-                    // Apply to ALL courses
-                    // Check if blocks are NOT consecutive
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    boolean areConsecutive = (end1 == start2 || end2 == start1);
-                    if (!areConsecutive) {
-                        courseBlocksNonConsecutive++;
-                    }
+        for (java.util.List<CourseBlockAssignment> blocks : blocksByCourseDay.values()) {
+            if (blocks.size() < 2) {
+                continue;
+            }
+            blocks.sort(java.util.Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+            for (int i = 1; i < blocks.size(); i++) {
+                int prevEnd = blocks.get(i - 1).getTimeslot().getStartHour()
+                        + blocks.get(i - 1).getTimeslot().getLengthHours();
+                if (prevEnd != blocks.get(i).getTimeslot().getStartHour()) {
+                    courseBlocksNonConsecutive++;
                 }
             }
         }
         result.put("Course blocks must be consecutive", courseBlocksNonConsecutive);
 
-        // Non-standard rooms should finish by 2pm (SOFT in constraint provider, weight
-        // 10)
-        // Note: This is actually SOFT in SchoolConstraintProvider but test expects it
-        // as HARD
-        // Keeping it here in HARD section for test compatibility
-        int nonStandardAfter2pm = 0;
-        for (CourseBlockAssignment a : list) {
-            if (a.getRoom() != null && a.getTimeslot() != null) {
-                // Match the solver: non-standard = any room whose type is not "estándar"
-                String roomType = a.getRoom().getType();
-                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
-                if (isNonStandard) {
-                    int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                    if (endHour > 14) {
-                        nonStandardAfter2pm++;
-                    }
-                }
-            }
-        }
-        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
+        // NOTE: "Non-standard rooms should finish by 2pm" is a SOFT constraint in
+        // SchoolConstraintProvider (weight 10), so it is reported by
+        // analyzeSoftConstraintViolations, not here.
 
         return result;
     }
@@ -414,26 +399,9 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Course blocks must be consecutive", courseBlocksNonConsecutiveDetails);
 
-        // Non-standard rooms should finish by 2pm (SOFT in constraint provider, weight
-        // 10) - Detailed
-        // Note: This is actually SOFT in SchoolConstraintProvider but test expects it
-        // as HARD
-        List<String> nonStandardAfter2pmDetails = new ArrayList<>();
-        for (CourseBlockAssignment a : list) {
-            if (a.getRoom() != null && a.getTimeslot() != null) {
-                // Match the solver: non-standard = any room whose type is not "estándar"
-                String roomType = a.getRoom().getType();
-                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
-                if (isNonStandard) {
-                    int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
-                    if (endHour > 14) {
-                        nonStandardAfter2pmDetails.add(blockAssignmentToString(a) +
-                                String.format(" (ends at %d:00, must end by 14:00)", endHour));
-                    }
-                }
-            }
-        }
-        details.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pmDetails);
+        // NOTE: "Non-standard rooms should finish by 2pm" is a SOFT constraint in
+        // SchoolConstraintProvider (weight 10), so its details are reported by
+        // analyzeSoftConstraintViolationsDetailed, not here.
 
         return details;
     }
@@ -475,31 +443,32 @@ public final class BlockScheduleAnalyzer {
         details.put("Teacher exceeds max hours per week", teacherMaxExcess);
 
         // Minimize group idle gaps (SOFT) - Detailed
+        // Mirror the solver/count: group unpinned blocks by (group, day), sort by
+        // start hour, and report only the gaps between ADJACENT blocks so the listed
+        // offenders match the summed count (no pairwise over-counting).
         List<String> groupIdleGapsDetails = new ArrayList<>();
-        for (int i = 0; i < list.size(); i++) {
-            for (int j = i + 1; j < list.size(); j++) {
-                CourseBlockAssignment a1 = list.get(i);
-                CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
-                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
-                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
-                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    int gapSize = 0;
-                    if (end1 < start2) {
-                        gapSize = start2 - end1;
-                    } else if (end2 < start1) {
-                        gapSize = start1 - end2;
-                    }
-
-                    if (gapSize > 0) {
-                        String reason = String.format("(gap=%d hours)", gapSize);
-                        groupIdleGapsDetails.add(blockAssignmentToString(a1) + "  <->  " +
-                                blockAssignmentToString(a2) + " " + reason);
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayForDetails = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
+                continue;
+            String groupKey = a.getGroup().getId();
+            DayOfWeek day = a.getTimeslot().getDayOfWeek();
+            groupDayForDetails.computeIfAbsent(groupKey, k -> new HashMap<>())
+                    .computeIfAbsent(day, k -> new ArrayList<>())
+                    .add(a);
+        }
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayForDetails.values()) {
+            for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
+                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+                for (int i = 1; i < assigns.size(); i++) {
+                    CourseBlockAssignment prev = assigns.get(i - 1);
+                    CourseBlockAssignment curr = assigns.get(i);
+                    int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
+                    int gap = curr.getTimeslot().getStartHour() - prevEnd;
+                    if (gap > 0) {
+                        String reason = String.format("(gap=%d hours)", gap);
+                        groupIdleGapsDetails.add(blockAssignmentToString(prev) + "  <->  " +
+                                blockAssignmentToString(curr) + " " + reason);
                     }
                 }
             }
@@ -521,6 +490,24 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Prefer block's specified room", blockSpecifiedRoomDetails);
+
+        // Non-standard rooms should finish by 2pm (SOFT, weight 10) - Detailed
+        // Mirrors the solver: excludes pinned assignments (fixed from database).
+        List<String> nonStandardAfter2pmDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getRoom() != null && a.getTimeslot() != null) {
+                String roomType = a.getRoom().getType();
+                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                if (isNonStandard) {
+                    int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                    if (endHour > 14) {
+                        nonStandardAfter2pmDetails.add(blockAssignmentToString(a) +
+                                String.format(" (ends at %d:00, should end by 14:00)", endHour));
+                    }
+                }
+            }
+        }
+        details.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pmDetails);
 
         return details;
     }
@@ -649,29 +636,30 @@ public final class BlockScheduleAnalyzer {
         result.put("Minimize teacher idle gaps (availability-aware)", idleGaps);
 
         // Minimize group idle gaps (SOFT, weight 3)
+        // Mirror the solver: group unpinned blocks by (group, day), sort by start
+        // hour, and sum only the gaps between ADJACENT blocks. This avoids the
+        // pairwise over-counting where a non-adjacent pair (blocks 1 and 3) would
+        // re-count idle hours already covered by the adjacent pairs.
         int groupIdleGaps = 0;
-        for (int i = 0; i < list.size(); i++) {
-            for (int j = i + 1; j < list.size(); j++) {
-                CourseBlockAssignment a1 = list.get(i);
-                CourseBlockAssignment a2 = list.get(j);
-                if (!a1.isPinned() && !a2.isPinned()
-                        && a1.getGroup() != null && a1.getGroup().equals(a2.getGroup()) &&
-                        a1.getTimeslot() != null && a2.getTimeslot() != null &&
-                        a1.getTimeslot().getDayOfWeek().equals(a2.getTimeslot().getDayOfWeek())) {
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    int gapSize = 0;
-                    if (end1 < start2) {
-                        gapSize = start2 - end1;
-                    } else if (end2 < start1) {
-                        gapSize = start1 - end2;
-                    }
-
-                    if (gapSize > 0) {
-                        groupIdleGaps += gapSize;
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayAssignments = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
+                continue;
+            String groupKey = a.getGroup().getId();
+            DayOfWeek day = a.getTimeslot().getDayOfWeek();
+            groupDayAssignments.computeIfAbsent(groupKey, k -> new HashMap<>())
+                    .computeIfAbsent(day, k -> new ArrayList<>())
+                    .add(a);
+        }
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayAssignments.values()) {
+            for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
+                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+                for (int i = 1; i < assigns.size(); i++) {
+                    int prevEnd = assigns.get(i - 1).getTimeslot().getStartHour()
+                            + assigns.get(i - 1).getTimeslot().getLengthHours();
+                    int gap = assigns.get(i).getTimeslot().getStartHour() - prevEnd;
+                    if (gap > 0) {
+                        groupIdleGaps += gap;
                     }
                 }
             }
@@ -691,6 +679,23 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Prefer block's specified room", blockSpecifiedRoomViolations);
+
+        // Non-standard rooms should finish by 2pm (SOFT, weight 10)
+        // Mirrors the solver: excludes pinned assignments (fixed from database).
+        int nonStandardAfter2pm = 0;
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getRoom() != null && a.getTimeslot() != null) {
+                String roomType = a.getRoom().getType();
+                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                if (isNonStandard) {
+                    int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+                    if (endHour > 14) {
+                        nonStandardAfter2pm++;
+                    }
+                }
+            }
+        }
+        result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
 
         return result;
     }

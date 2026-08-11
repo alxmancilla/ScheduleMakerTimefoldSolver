@@ -34,9 +34,9 @@ function Assignments() {
       groupId: formData.get('groupId'),
       courseId: formData.get('courseId'),
       blockLength: parseInt(formData.get('blockLength')),
-      pinAssignment: formData.get('pinAssignment') === 'true',
+      pinned: formData.get('pinned') === 'true',
       teacherId: formData.get('teacherId') || null,
-      timeslotId: formData.get('timeslotId') ? parseInt(formData.get('timeslotId')) : null,
+      blockTimeslotId: formData.get('blockTimeslotId') || null,
       roomName: formData.get('roomName') || null,
       satisfiesRoomType: formData.get('satisfiesRoomType') || null,
       preferredRoomName: formData.get('preferredRoomName') || null,
@@ -44,8 +44,11 @@ function Assignments() {
 
     try {
       if (editingAssignment) {
+        // On update the ID comes from the path; the backend ignores it in the body.
         await updateAssignment(editingAssignment.id, assignment);
       } else {
+        // On create the client supplies the ID (validated against ^[A-Za-z0-9_-]+$).
+        assignment.id = formData.get('id');
         await createAssignment(assignment);
       }
       setShowForm(false);
@@ -77,9 +80,9 @@ function Assignments() {
   };
 
   const filteredAssignments = assignments.filter(a => {
-    if (filter === 'assigned') return a.timeslotId !== null;
-    if (filter === 'unassigned') return a.timeslotId === null;
-    if (filter === 'pinned') return a.pinAssignment === true;
+    if (filter === 'assigned') return a.blockTimeslotId != null;
+    if (filter === 'unassigned') return a.blockTimeslotId == null;
+    if (filter === 'pinned') return a.pinned === true;
     return true;
   });
 
@@ -119,6 +122,13 @@ function Assignments() {
         <div className="card">
           <h3>{editingAssignment ? 'Edit Assignment' : 'New Assignment'}</h3>
           <form onSubmit={handleSubmit}>
+            {!editingAssignment && (
+              <div className="form-group">
+                <label>Assignment ID:</label>
+                <input type="text" name="id" pattern="[A-Za-z0-9_-]+"
+                  title="Only letters, numbers, hyphens, and underscores" required />
+              </div>
+            )}
             <div className="form-group">
               <label>Group ID:</label>
               <input type="text" name="groupId" defaultValue={editingAssignment?.groupId || ''} required />
@@ -136,8 +146,8 @@ function Assignments() {
               <input type="text" name="teacherId" defaultValue={editingAssignment?.teacherId || ''} />
             </div>
             <div className="form-group">
-              <label>Timeslot ID (optional):</label>
-              <input type="number" name="timeslotId" defaultValue={editingAssignment?.timeslotId || ''} />
+              <label>Block Timeslot ID (optional):</label>
+              <input type="text" name="blockTimeslotId" defaultValue={editingAssignment?.blockTimeslotId || ''} />
             </div>
             <div className="form-group">
               <label>Room Name (optional):</label>
@@ -153,7 +163,7 @@ function Assignments() {
             </div>
             <div className="form-group">
               <label>Pin Assignment:</label>
-              <select name="pinAssignment" defaultValue={editingAssignment?.pinAssignment?.toString() || 'false'}>
+              <select name="pinned" defaultValue={editingAssignment?.pinned?.toString() || 'false'}>
                 <option value="false">No</option>
                 <option value="true">Yes</option>
               </select>

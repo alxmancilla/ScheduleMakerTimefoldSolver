@@ -1,6 +1,8 @@
-# School Scheduling Solution with Timefold Solver
+# School Timeslot Optimizer with Timefold Solver
 
-A comprehensive Java 17 application for school schedule generation using **Timefold Solver 1.29.0**. This solution implements complex constraint optimization for assigning teachers, courses, timeslots, and rooms while respecting hard constraints and optimizing soft preferences.
+A Java 17 application that places pre-assigned teacher/room/course blocks into weekly timeslots using **Timefold Solver 1.29.0**. Each `CourseBlockAssignment` arrives with its teacher, room, and course already assigned; the solver's single planning variable is the block's `timeslot`. It optimizes timeslot placement while respecting hard constraints and soft preferences.
+
+> **Scope note:** Teacher and room are **not** planning variables — they are fixed inputs pre-assigned from the database (the `teacher`/`room` `@PlanningVariable` annotations are intentionally commented out, and `DataSaver` persists only `block_timeslot_id`). This is a **timeslot optimizer** over pre-assigned teacher/room blocks, not a full teacher/room scheduler.
 
 ## Current Status
 
@@ -12,16 +14,15 @@ A comprehensive Java 17 application for school schedule generation using **Timef
 ✅ **Custom Block Templates:** Explicit block decomposition patterns via `course_block_template` table
 ✅ **Computer Center Distribution:** Greenfield strategy for optimal CC 1/CC 2/CC 3 utilization (107h in 105h capacity)
 ⚠️ **Current Score:** -11hard/-1230soft (11 actual violations, 2pm constraint relaxed to SOFT)
-⏱️ **Solver Config:** 30 min time limit, 8 min unimproved limit, lateAcceptanceSize: 3000, best score: `0hard/*soft`
+⏱️ **Solver Config:** 5 min time limit, 2 min unimproved limit, lateAcceptanceSize: 10000, entityTabuSize: 7, best score: `0hard/0soft` (see `solverConfig.xml`)
 
 ## Project Overview
 
 ### Problem Definition
-Generate a weekly school timetable using **block-based scheduling** that assigns:
-- **Teachers** to course blocks (with qualifications and per-day availability)
-- **Course Blocks** to student groups (multi-hour consecutive blocks, 1-4 hours)
-- **Block Timeslots** (Monday–Friday, 7:00–15:00, with variable block lengths)
-- **Rooms** (standard classrooms and specialized labs)
+Place pre-assigned course blocks into a weekly timetable using **block-based scheduling**. Each block already carries its **teacher** (with qualifications and per-day availability), **room** (standard classroom or specialized lab), and **course**; the solver assigns only the block's **timeslot**:
+- **Block Timeslots** (Monday–Friday, 7:00–15:00, with variable block lengths) — the single planning variable
+- **Course Blocks** belong to student groups (multi-hour consecutive blocks, 1-4 hours)
+- Teacher, room, and course are fixed inputs (not planning variables) and are validated against the chosen timeslot by the constraints
 
 ### Scheduling Modes
 
@@ -96,8 +97,8 @@ src/
 │   │   ├── CourseBlockAssignment.java  # @PlanningEntity: block assignment with pinning support
 │   │   └── SchoolSchedule.java         # @PlanningSolution: problem and solution holder
 │   ├── solver/
-│   │   ├── BlockConstraintProvider.java # All constraint definitions (hard & soft)
-│   │   └── BlockSolverConfig.java      # Solver configuration (termination, time limits)
+│   │   ├── SchoolConstraintProvider.java # All constraint definitions (hard & soft)
+│   │   └── SchoolSolverConfig.java      # Loads solver configuration from solverConfig.xml
 │   ├── analysis/
 │   │   └── BlockScheduleAnalyzer.java  # Analyzes constraint violations for blocks
 │   ├── util/
@@ -179,7 +180,7 @@ mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 
 This will:
 1. Load data from PostgreSQL database
-2. Run the solver (up to 15 minutes or until optimal score reached)
+2. Run the solver (up to 5 minutes, or 2 minutes without improvement, or until a feasible `0hard/0soft` score is reached)
 3. Save the solved assignments back to PostgreSQL
 4. Display constraint violation analysis
 
@@ -797,10 +798,10 @@ PDF reports written to:
 ### Solver Configuration
 - **Construction Heuristic** — Greedy initialization phase
 - **Local Search** — Iterative improvement (Tabu Search, Simulated Annealing)
-- **Termination Conditions:**
-  - Best score limit: `0hard/*soft` (stop if all hard constraints satisfied)
-  - Time limit: 15 minutes
-  - Unimproved limit: 5 minutes without improvement
+- **Termination Conditions** (local-search phase, see `solverConfig.xml`):
+  - Best score limit: `0hard/0soft`
+  - Time limit: 5 minutes (`minutesSpentLimit`)
+  - Unimproved limit: 2 minutes without improvement (`unimprovedMinutesSpentLimit`)
 
 ## Known Limitations
 

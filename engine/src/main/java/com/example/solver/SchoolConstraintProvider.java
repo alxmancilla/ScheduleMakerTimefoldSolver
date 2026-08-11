@@ -339,33 +339,47 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
     private Constraint courseBlocksMustBeConsecutive(ConstraintFactory constraintFactory) {
         // HARD: When ANY course has multiple blocks on the same day for the same group,
-        // they MUST be consecutive
-        // This is critical for maintaining course continuity and student focus
+        // they MUST form a single contiguous chain (no gaps between blocks).
+        // This is critical for maintaining course continuity and student focus.
+        //
+        // The blocks for a (group, course, day) are grouped together and sorted by
+        // start hour; the number of breaks in the chain (gaps or overlaps between
+        // adjacent blocks) is the penalty. Grouping avoids the false positives of a
+        // pairwise check, where a valid 7-8 / 8-9 / 9-10 sequence would still yield a
+        // non-consecutive pair between 7-8 and 9-10.
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
-                        Joiners.equal(CourseBlockAssignment::getGroup),
-                        Joiners.equal(CourseBlockAssignment::getCourse),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> {
-                    // Exclude pinned assignments
-                    if (a1.isPinned() || a2.isPinned()) {
-                        return false;
-                    }
-
-                    // Check if blocks are NOT consecutive
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    // They are consecutive if end1 == start2 OR end2 == start1
-                    boolean areConsecutive = (end1 == start2 || end2 == start1);
-
-                    // Penalize if NOT consecutive
-                    return !areConsecutive;
-                })
-                .penalize(HardSoftScore.ONE_HARD)
+                .forEach(CourseBlockAssignment.class)
+                .filter(a -> !a.isPinned() && a.getTimeslot() != null)
+                .groupBy(
+                        CourseBlockAssignment::getGroup,
+                        CourseBlockAssignment::getCourse,
+                        a -> a.getTimeslot().getDayOfWeek(),
+                        ConstraintCollectors.toList())
+                .filter((group, course, day, blocks) -> blocks.size() > 1)
+                .penalize(HardSoftScore.ONE_HARD,
+                        (group, course, day, blocks) -> countChainBreaks(blocks))
                 .asConstraint("Course blocks must be consecutive");
+    }
+
+    /**
+     * Count the number of breaks (gaps or overlaps between adjacent blocks) in a
+     * set
+     * of blocks once sorted by start hour. Zero means the blocks form a single
+     * contiguous chain; each break contributes one hard penalty.
+     */
+    private static int countChainBreaks(java.util.List<CourseBlockAssignment> blocks) {
+        java.util.List<CourseBlockAssignment> sorted = new java.util.ArrayList<>(blocks);
+        sorted.sort(java.util.Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+        int breaks = 0;
+        for (int i = 1; i < sorted.size(); i++) {
+            BlockTimeslot prev = sorted.get(i - 1).getTimeslot();
+            BlockTimeslot curr = sorted.get(i).getTimeslot();
+            int prevEnd = prev.getStartHour() + prev.getLengthHours();
+            if (prevEnd != curr.getStartHour()) {
+                breaks++;
+            }
+        }
+        return breaks;
     }
 
     // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================
@@ -496,146 +510,132 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint minimizeTeacherIdleGaps(ConstraintFactory constraintFactory) {
-        // UPDATED: Minimizes teacher idle gaps between blocks on the same day
-        // SMART LOGIC:
-        // 1. Only penalizes gaps when teacher IS available during gap hours
-        // 2. No penalty if teacher is unavailable (gap is unavoidable)
-        // 3. Uses Joiners for better performance (pre-filters pairs)
-        // 4. Works with block end times and start times
+        // SOFT: Minimizes teacher idle gaps between blocks on the same day.
+        // Only ADJACENT block pairs are penalized: a pair (a1, a2) with a1 ending
+        // before a2 starts is counted only when no third block of the same teacher
+        // sits (fully or partly) between them (ifNotExists). This avoids the pairwise
+        // over-penalization where a non-adjacent pair (blocks 1 and 3) would re-count
+        // idle hours already accounted for by the adjacent pairs (1-2 and 2-3).
+        // Availability-aware: an idle hour is only penalized if the teacher is
+        // actually available during it (otherwise the gap is unavoidable).
         // WEIGHT: 2 (Medium priority - teacher satisfaction)
         return constraintFactory
                 .forEachUniquePair(CourseBlockAssignment.class,
-                        // Performance optimization: pre-filter pairs with Joiners
                         Joiners.equal(CourseBlockAssignment::getTeacher),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> {
-                    // Exclude pinned assignments
-                    if (a1.isPinned() || a2.isPinned())
-                        return false;
-                    // Additional filters after Joiners
-                    if (a1.getTeacher() == null || a1.getTimeslot() == null || a2.getTimeslot() == null)
-                        return false;
-
-                    // Calculate block end times
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    // Determine if there's a gap between blocks
-                    int gapStart, gapEnd;
-                    if (end1 <= start2) {
-                        // Block 1 ends before block 2 starts
-                        gapStart = end1;
-                        gapEnd = start2;
-                    } else if (end2 <= start1) {
-                        // Block 2 ends before block 1 starts
-                        gapStart = end2;
-                        gapEnd = start1;
-                    } else {
-                        // Blocks overlap or are consecutive - no gap
-                        return false;
-                    }
-
-                    int gapSize = gapEnd - gapStart;
-                    if (gapSize <= 0)
-                        return false; // No gap or consecutive blocks
-
-                    // Check if teacher is available during ALL gap hours
-                    DayOfWeek day = a1.getTimeslot().getDayOfWeek();
-                    for (int gapHour = gapStart; gapHour < gapEnd; gapHour++) {
-                        if (!a1.getTeacher().isAvailableAt(day, gapHour)) {
-                            return false; // Teacher unavailable during gap - no penalty
-                        }
-                    }
-
-                    // Teacher IS available for all gap hours - this gap is avoidable, penalize it
-                    return true;
-                })
-                .penalize(HardSoftScore.ONE_SOFT, (a1, a2) -> {
-                    // Calculate gap size
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    int gapSize;
-                    if (end1 <= start2) {
-                        gapSize = start2 - end1;
-                    } else {
-                        gapSize = start1 - end2;
-                    }
-
-                    // Weighted penalty: 2x per gap hour (medium priority)
-                    return gapSize * 2;
-                })
+                .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
+                        && a1.getTeacher() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
+                        && availableGapHours(a1, a2) > 0)
+                // Keep only adjacent pairs: no third block of the same teacher lies in
+                // the [earlierEnd, laterStart] span between a1 and a2.
+                .ifNotExists(CourseBlockAssignment.class,
+                        Joiners.equal((a1, a2) -> a1.getTeacher(), CourseBlockAssignment::getTeacher),
+                        Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
+                                && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
+                .penalize(HardSoftScore.ofSoft(2), (a1, a2) -> availableGapHours(a1, a2))
                 .asConstraint("Minimize teacher idle gaps (availability-aware)");
     }
 
     private Constraint minimizeGroupIdleGaps(ConstraintFactory constraintFactory) {
-        // SOFT: Minimizes student group idle gaps between blocks on the same day
-        // This improves student experience by reducing waiting time between classes
+        // SOFT: Minimizes student group idle gaps between blocks on the same day.
+        // Only ADJACENT block pairs are penalized: a pair (a1, a2) with a gap between
+        // them is counted only when no third block of the same group sits between them
+        // (ifNotExists). This avoids the pairwise over-penalization where a
+        // non-adjacent pair (blocks 1 and 3) would re-count idle hours already
+        // accounted for by the adjacent pairs (1-2 and 2-3).
         // WEIGHT: 3 (High priority - student schedule quality, higher than teacher
         // gaps)
         return constraintFactory
                 .forEachUniquePair(CourseBlockAssignment.class,
-                        // Performance optimization: pre-filter pairs with Joiners
                         Joiners.equal(CourseBlockAssignment::getGroup),
                         Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
-                .filter((a1, a2) -> {
-                    // Exclude pinned assignments
-                    if (a1.isPinned() || a2.isPinned())
-                        return false;
-                    // Additional filters after Joiners
-                    if (a1.getGroup() == null || a1.getTimeslot() == null || a2.getTimeslot() == null)
-                        return false;
-
-                    // Calculate block end times
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    // Determine if there's a gap between blocks
-                    int gapStart, gapEnd;
-                    if (end1 <= start2) {
-                        // Block 1 ends before block 2 starts
-                        gapStart = end1;
-                        gapEnd = start2;
-                    } else if (end2 <= start1) {
-                        // Block 2 ends before block 1 starts
-                        gapStart = end2;
-                        gapEnd = start1;
-                    } else {
-                        // Blocks overlap or are consecutive - no gap
-                        return false;
-                    }
-
-                    int gapSize = gapEnd - gapStart;
-                    if (gapSize <= 0)
-                        return false; // No gap or consecutive blocks
-
-                    // Penalize all gaps for student groups (no availability check needed)
-                    return true;
-                })
-                .penalize(HardSoftScore.ONE_SOFT, (a1, a2) -> {
-                    // Calculate gap size
-                    int end1 = a1.getTimeslot().getStartHour() + a1.getTimeslot().getLengthHours();
-                    int start2 = a2.getTimeslot().getStartHour();
-                    int end2 = a2.getTimeslot().getStartHour() + a2.getTimeslot().getLengthHours();
-                    int start1 = a1.getTimeslot().getStartHour();
-
-                    int gapSize;
-                    if (end1 <= start2) {
-                        gapSize = start2 - end1;
-                    } else {
-                        gapSize = start1 - end2;
-                    }
-
-                    // Weighted penalty: 3x per gap hour (high priority - student experience)
-                    return gapSize * 3;
-                })
+                .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
+                        && gapHours(a1, a2) > 0)
+                // Keep only adjacent pairs: no third block of the same group lies in
+                // the [earlierEnd, laterStart] span between a1 and a2.
+                .ifNotExists(CourseBlockAssignment.class,
+                        Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
+                        Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
+                                && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
+                .penalize(HardSoftScore.ofSoft(3), (a1, a2) -> gapHours(a1, a2))
                 .asConstraint("Minimize group idle gaps");
+    }
+
+    /**
+     * The idle-hour count in the gap between two same-day blocks (0 if they overlap
+     * or are consecutive).
+     */
+    private static int gapHours(CourseBlockAssignment a1, CourseBlockAssignment a2) {
+        int start1 = a1.getTimeslot().getStartHour();
+        int end1 = start1 + a1.getTimeslot().getLengthHours();
+        int start2 = a2.getTimeslot().getStartHour();
+        int end2 = start2 + a2.getTimeslot().getLengthHours();
+        if (end1 <= start2) {
+            return start2 - end1;
+        } else if (end2 <= start1) {
+            return start1 - end2;
+        }
+        return 0;
+    }
+
+    /**
+     * The idle-hour count in the gap between two same-day teacher blocks, counting
+     * only hours during which the teacher is actually available (unavailable gap
+     * hours are unavoidable and therefore not penalized).
+     */
+    private static int availableGapHours(CourseBlockAssignment a1, CourseBlockAssignment a2) {
+        int start1 = a1.getTimeslot().getStartHour();
+        int end1 = start1 + a1.getTimeslot().getLengthHours();
+        int start2 = a2.getTimeslot().getStartHour();
+        int end2 = start2 + a2.getTimeslot().getLengthHours();
+        int gapStart, gapEnd;
+        if (end1 <= start2) {
+            gapStart = end1;
+            gapEnd = start2;
+        } else if (end2 <= start1) {
+            gapStart = end2;
+            gapEnd = start1;
+        } else {
+            return 0;
+        }
+        DayOfWeek day = a1.getTimeslot().getDayOfWeek();
+        Teacher teacher = a1.getTeacher();
+        int available = 0;
+        for (int gapHour = gapStart; gapHour < gapEnd; gapHour++) {
+            if (teacher.isAvailableAt(day, gapHour)) {
+                available++;
+            }
+        }
+        return available;
+    }
+
+    /**
+     * True if {@code mid} starts within the open span between the earlier block's
+     * end
+     * and the later block's start of the {@code (a1, a2)} pair. Used to detect that
+     * the pair is NOT adjacent (a third block lies between them), so its gap must
+     * not
+     * be penalized directly.
+     */
+    private static boolean liesBetween(CourseBlockAssignment a1, CourseBlockAssignment a2,
+            CourseBlockAssignment mid) {
+        int start1 = a1.getTimeslot().getStartHour();
+        int end1 = start1 + a1.getTimeslot().getLengthHours();
+        int start2 = a2.getTimeslot().getStartHour();
+        int end2 = start2 + a2.getTimeslot().getLengthHours();
+        int spanStart, spanEnd;
+        if (end1 <= start2) {
+            spanStart = end1;
+            spanEnd = start2;
+        } else if (end2 <= start1) {
+            spanStart = end2;
+            spanEnd = start1;
+        } else {
+            return false;
+        }
+        int midStart = mid.getTimeslot().getStartHour();
+        return midStart >= spanStart && midStart < spanEnd;
     }
 
     private Constraint preferBlockSpecifiedRoom(ConstraintFactory constraintFactory) {

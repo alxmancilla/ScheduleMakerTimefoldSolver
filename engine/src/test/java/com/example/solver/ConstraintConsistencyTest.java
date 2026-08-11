@@ -36,10 +36,11 @@ public class ConstraintConsistencyTest {
 
                 // Expected HARD constraint names from SchoolConstraintProvider
                 // These should match the constraint names in the provider exactly
-                // Updated 2026-07-26: 10 HARD constraints
-                // Note: "Non-standard rooms should finish by 2pm" is SOFT in constraint
-                // provider but HARD in analyzer for compatibility
-                // "Course blocks must be consecutive" is HARD in both
+                // Updated 2026-08-11: 9 HARD constraints
+                // Note: "Non-standard rooms should finish by 2pm" is SOFT in the
+                // constraint provider and is now reported as SOFT by the analyzer too
+                // (see testSoftConstraintNamesMatch).
+                // "Course blocks must be consecutive" is HARD in both.
                 Set<String> expectedHardConstraints = new HashSet<>(Arrays.asList(
                                 "Block length must match timeslot length",
                                 "Teacher must be qualified",
@@ -49,8 +50,7 @@ public class ConstraintConsistencyTest {
                                 "Room type must satisfy course requirement",
                                 "Group cannot have two courses at same time",
                                 "Maximum 2 blocks per course per group per day",
-                                "Course blocks must be consecutive",
-                                "Non-standard rooms should finish by 2pm"));
+                                "Course blocks must be consecutive"));
 
                 // Assert they match
                 assertEquals("Analyzer reports different HARD constraints than expected",
@@ -70,16 +70,19 @@ public class ConstraintConsistencyTest {
                 Set<String> analyzerNames = analyzerSoftConstraints.keySet();
 
                 // Expected SOFT constraint names from SchoolConstraintProvider
-                // Updated 2026-07-26: 6 SOFT constraints
+                // Updated 2026-08-11: 7 SOFT constraints
                 // Note: "Prefer course blocks to be consecutive on same day" removed -
-                // implemented as HARD constraint instead
+                // implemented as HARD constraint instead.
+                // "Non-standard rooms should finish by 2pm" is SOFT (weight 10) and is
+                // now reported here rather than in the HARD map.
                 Set<String> expectedSoftConstraints = new HashSet<>(Arrays.asList(
                                 "Prefer group's preferred room",
                                 "Minimize teacher building changes",
                                 "Teacher exceeds max hours per week",
                                 "Minimize teacher idle gaps (availability-aware)",
                                 "Minimize group idle gaps",
-                                "Prefer block's specified room"));
+                                "Prefer block's specified room",
+                                "Non-standard rooms should finish by 2pm"));
 
                 // Assert all expected soft constraints are present
                 for (String expected : expectedSoftConstraints) {
@@ -89,31 +92,32 @@ public class ConstraintConsistencyTest {
         }
 
         /**
-         * Test that "Non-standard rooms should finish by 2pm" is classified as HARD,
-         * not SOFT.
-         * This was reverted from SOFT to HARD on 2026-02-15.
+         * Test that "Non-standard rooms should finish by 2pm" is classified as SOFT,
+         * consistent with SchoolConstraintProvider where it is penalized with
+         * HardSoftScore.ofSoft(10). Aligned 2026-08-11.
          */
         @Test
-        public void test2pmConstraintIsHard() {
+        public void test2pmConstraintIsSoft() {
                 SchoolSchedule dummySchedule = createDummySchedule();
 
-                // Check it IS in hard constraints
-                Map<String, Integer> hardConstraints = BlockScheduleAnalyzer
-                                .analyzeHardConstraintViolations(dummySchedule);
-                assertTrue("2pm constraint should be in HARD constraints",
-                                hardConstraints.containsKey("Non-standard rooms should finish by 2pm"));
-
-                // Check it's NOT in soft constraints
+                // Check it IS in soft constraints
                 Map<String, Integer> softConstraints = BlockScheduleAnalyzer
                                 .analyzeSoftConstraintViolations(dummySchedule);
-                assertFalse("2pm constraint should NOT be in SOFT constraints",
+                assertTrue("2pm constraint should be in SOFT constraints",
                                 softConstraints.containsKey("Non-standard rooms should finish by 2pm"));
+
+                // Check it's NOT in hard constraints
+                Map<String, Integer> hardConstraints = BlockScheduleAnalyzer
+                                .analyzeHardConstraintViolations(dummySchedule);
+                assertFalse("2pm constraint should NOT be in HARD constraints",
+                                hardConstraints.containsKey("Non-standard rooms should finish by 2pm"));
         }
 
         /**
          * Test that the total number of constraints (HARD + SOFT) matches expectations.
          * This helps catch if a constraint is accidentally removed or added.
-         * Updated 2026-07-26: 10 HARD + 6 SOFT = 16 total constraints.
+         * Updated 2026-08-11: 9 HARD + 7 SOFT = 16 total constraints (the 2pm rule was
+         * moved from the HARD map to the SOFT map to match the solver).
          */
         @Test
         public void testTotalConstraintCount() {
@@ -124,11 +128,11 @@ public class ConstraintConsistencyTest {
                 int softCount = BlockScheduleAnalyzer
                                 .analyzeSoftConstraintViolations(dummySchedule).size();
 
-                // Expected counts (as of 2026-07-26)
-                assertEquals("Expected 10 HARD constraints", 10, hardCount);
-                assertEquals("Expected 6 SOFT constraints", 6, softCount);
+                // Expected counts (as of 2026-08-11)
+                assertEquals("Expected 9 HARD constraints", 9, hardCount);
+                assertEquals("Expected 7 SOFT constraints", 7, softCount);
 
-                // Total should be 16 (10 hard + 6 soft)
+                // Total should be 16 (9 hard + 7 soft)
                 assertEquals("Total constraint count mismatch", 16, hardCount + softCount);
         }
 

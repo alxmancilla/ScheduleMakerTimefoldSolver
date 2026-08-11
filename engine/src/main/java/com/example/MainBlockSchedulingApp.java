@@ -11,11 +11,14 @@ import com.example.data.DemoDataGenerator;
 import com.example.domain.SchoolSchedule;
 import com.example.solver.SchoolSolverConfig;
 import com.example.analysis.BlockScheduleAnalyzer;
+import com.example.validation.PreSolveValidator;
+import com.example.validation.ValidationResult;
 
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Main application for block-based scheduling.
@@ -52,29 +55,42 @@ public class MainBlockSchedulingApp {
         System.out.println("  Course Block Assignments: " + initialSchedule.getCourseBlockAssignments().size());
         System.out.println();
 
+        // Validate pinned assignments before solving. Pinned blocks are excluded
+        // from the solver's hard constraints, so invalid pinned data would be
+        // silently accepted; fail fast with a clear report instead.
+        ValidationResult validation = PreSolveValidator.validate(initialSchedule);
+        System.out.println(validation.describe());
+        System.out.println();
+        if (!validation.isValid()) {
+            System.err.println("Aborting solve: fix the pinned assignments above and retry.");
+            System.exit(1);
+        }
+
         // Build solver
         SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory();
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
 
-        // Add event listener to track progress
-        final AtomicInteger stepCounter = new AtomicInteger(0);
+        // Add event listener to track progress. Best-solution events can fire very
+        // frequently, so throttle logging to at most one line every 5 seconds (plus
+        // the first improvement) to keep the output readable.
+        final AtomicInteger improvementCounter = new AtomicInteger(0);
+        final AtomicLong lastLogMillis = new AtomicLong(0);
         final long startTime = System.currentTimeMillis();
 
         solver.addEventListener(new SolverEventListener<SchoolSchedule>() {
             @Override
             public void bestSolutionChanged(BestSolutionChangedEvent<SchoolSchedule> event) {
-                int step = stepCounter.incrementAndGet();
-                long elapsedSeconds = (System.currentTimeMillis() - startTime) / 1000;
-                SchoolSchedule newBestSolution = event.getNewBestSolution();
-
-                // Log every 100 steps or every 10 seconds
-                if (step % 100 == 0 || step <= 10) {
+                int improvement = improvementCounter.incrementAndGet();
+                long now = System.currentTimeMillis();
+                long previous = lastLogMillis.get();
+                // Log the first improvement, then at most one line every 5 seconds.
+                boolean shouldLog = previous == 0 || now - previous >= 5000;
+                if (shouldLog && lastLogMillis.compareAndSet(previous, now)) {
                     System.out.println(String.format(
-                            "[Step %d] Time: %ds | Score: %s | Phase: %s",
-                            step,
-                            elapsedSeconds,
-                            newBestSolution.getScore(),
-                            event.getNewBestScore() != null ? "Active" : "Unknown"));
+                            "[+%ds] new best score: %s (improvement #%d)",
+                            (now - startTime) / 1000,
+                            event.getNewBestSolution().getScore(),
+                            improvement));
                 }
             }
         });

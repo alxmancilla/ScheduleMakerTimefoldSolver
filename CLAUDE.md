@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a school scheduling constraint optimization system built with **Timefold Solver 1.x** and **Java 17**. The solver automatically generates weekly timetables by assigning teachers, courses, timeslots, and rooms while satisfying hard constraints and optimizing soft preferences.
+This is a school **timeslot optimizer** built with **Timefold Solver 1.x** and **Java 17**. Each `CourseBlockAssignment` arrives with its teacher, room, and course already assigned (pre-assigned from the database); the solver's single planning variable is the block's `timeslot`. It places pre-assigned teacher/room/course blocks into weekly timeslots while satisfying hard constraints and optimizing soft preferences.
+
+**Scope note**: Teacher and room are **not** planning variables — they are fixed inputs. The `teacher` and `room` `@PlanningVariable` annotations in `CourseBlockAssignment` are intentionally commented out, and `DataSaver` persists only `block_timeslot_id`. Treat this system as a timeslot optimizer over pre-assigned teacher/room blocks, not a full teacher/room scheduler.
 
 **Current Status**: This project uses **block-based scheduling only**. Hour-based scheduling has been deprecated and removed.
 
 ### Block-Based Scheduling
-The system assigns multi-hour blocks (1-4 hours) to courses, allowing for more realistic scheduling patterns. Blocks represent consecutive teaching periods and are the only supported scheduling mode.
+The system assigns multi-hour blocks (1-4 hours) to timeslots, allowing for more realistic scheduling patterns. Blocks represent consecutive teaching periods and are the only supported scheduling mode.
 
 ## Essential Commands
 
@@ -63,14 +65,14 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 - `Teacher` - Has stable `id`, qualifications (Set<String>), per-day availability map (`Map<DayOfWeek, Set<Integer>>`), and `maxHoursPerWeek` workload limit
 - `Course` - Has `id`, name, `roomRequirement` (legacy single requirement), `roomRequirements` (List for dual requirements), `blockTemplates` (List for custom block decomposition), and `requiredHoursPerWeek`
 - `Group` - Student group with assigned courses and optional `preferredRoom`
-- `Room` - Classroom with `type` (estándar, laboratorio, taller, taller electromecánica, taller electrónica, centro de cómputo) and `building` designation
+- `Room` - Classroom with `type` (estándar, laboratorio, taller, taller electromecánica, taller electrónica, centro de cómputo) and `building` designation. `satisfiesRequirement(req)` uses a convention-seeded capability set: a `laboratorio` room also satisfies an `estándar` requirement (a lab can double as a regular classroom), while every other type satisfies only itself. A plain `estándar` room does NOT satisfy a `laboratorio` requirement.
 - `BlockTimeslot` - Specific day (`DayOfWeek`), start hour (int, 7-14), and length in hours (int, 1-4)
 - `RoomRequirement` - Dual room requirements with `courseId`, `roomType`, `hoursRequired`, `priority`, `defaultPreferredRoom`
 - `BlockTemplate` - Custom block decomposition with `courseId`, `groupId`, `blockIndex`, `blockLength`, `roomType`, `preferredRoomName`, `preferredDay`, `pinAssignment`, `preferredTimeslotId`
 
 ### Constraint System (Block-Based Scheduling)
 
-**Hard Constraints** (10 total in `SchoolConstraintProvider`):
+**Hard Constraints** (9 total in `SchoolConstraintProvider`):
 1. `blockLengthMustMatchTimeslotLength` - Block length must match timeslot length
 2. `teacherMustBeQualified` - Teacher must have qualification matching course name
 3. `teacherMustBeAvailable` - Teacher must be available for entire block duration (checks per-day availability map)
@@ -80,22 +82,22 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 7. `groupCannotHaveTwoCoursesAtSameTime` - Student group cannot have overlapping blocks
 8. `maxTwoBlocksPerCoursePerGroupPerDay` - Maximum 2 blocks per course per group per day
 9. `courseBlocksMustBeConsecutive` - All course blocks on same day must be consecutive
-10. `nonStandardRoomsShouldFinishBy2pm` - Non-standard rooms (CC, TEM, TE, AULA 4, LQ, LMICRO) should finish by 14:00 (SOFT in constraint provider with weight 10, but tracked as HARD in analyzer for historical reasons)
 
 **Soft Constraints** (7 total, quality optimization):
-1. `teacherMaxHoursPerWeek` (weight 5) - Minimize teacher workload violations
-2. `minimizeGroupIdleGaps` (weight 3) - Minimize idle time between blocks for student groups
-3. `preferBlockSpecifiedRoom` (weight 3) - Prefer room specified in `assignment.getPreferredRoomName()` field
-4. `groupPreferredRoomConstraint` (weight 2) - Groups prefer their pre-assigned room (excludes lab blocks using `getSatisfiesRoomType()`)
-5. `minimizeTeacherIdleGaps` (weight 2) - Reduce gaps between blocks for same teacher on same day
-6. `minimizeTeacherBuildingChanges` (weight 1) - Reduce building switches for teachers on same day
-7. `preferCourseBlocksToBeConsecutiveOnSameDay` (weight 3) - Placeholder constraint expected by tests but not yet implemented in constraint provider
+1. `nonStandardRoomsShouldFinishBy2pm` (weight 10) - Non-standard rooms (CC, TEM, TE, AULA 4, LQ, LMICRO) should finish by 14:00. SOFT in the constraint provider **and** reported as SOFT by `BlockScheduleAnalyzer` (both exclude pinned assignments).
+2. `teacherMaxHoursPerWeek` (weight 5) - Minimize teacher workload violations
+3. `minimizeGroupIdleGaps` (weight 3) - Minimize idle time between blocks for student groups. Penalizes only ADJACENT block pairs (via `forEachUniquePair` + `ifNotExists`) so idle hours are counted once per gap, not re-counted by non-adjacent pairs. `BlockScheduleAnalyzer` mirrors this by grouping per (group, day), sorting, and summing adjacent-block gaps.
+4. `preferBlockSpecifiedRoom` (weight 3) - Prefer room specified in `assignment.getPreferredRoomName()` field
+5. `groupPreferredRoomConstraint` (weight 2) - Groups prefer their pre-assigned room (excludes lab blocks using `getSatisfiesRoomType()`)
+6. `minimizeTeacherIdleGaps` (weight 2) - Reduce gaps between blocks for same teacher on same day. Availability-aware (only counts idle hours the teacher is actually available) and penalizes only ADJACENT block pairs (via `forEachUniquePair` + `ifNotExists`) to avoid re-counting the same idle hours across non-adjacent pairs.
+7. `minimizeTeacherBuildingChanges` (weight 1) - Reduce building switches for teachers on same day
 
 ### Solver Configuration
 
-Located in `SchoolSolverConfig`:
-- **Termination**: Best score limit of `0hard/-800soft` OR 120 minutes OR 15 minutes without improvement (see `solverConfig.xml`)
-- Uses **Construction Heuristic** + **Local Search** (Tabu Search, Simulated Annealing)
+Loaded by `SchoolSolverConfig` from `solverConfig.xml`:
+- **Termination** (local-search phase): best score limit `0hard/0soft` OR 5 minutes total (`minutesSpentLimit`) OR 2 minutes without improvement (`unimprovedMinutesSpentLimit`)
+- **Acceptor**: Late Acceptance (`lateAcceptanceSize` 10000) + Tabu Search (`entityTabuSize` 7)
+- Custom phases before local search: `MatchingLengthTimeslotAssigner`, `FIRST_FIT_DECREASING` construction heuristic, then `BlockDefragmenter`
 - Constraint Streams API for declarative constraint modeling
 
 ### Data Generation
@@ -144,7 +146,7 @@ Located in `SchoolSolverConfig`:
 
 ### Room Assignment
 - **CRITICAL**: Always use `assignment.getSatisfiesRoomType()` instead of `course.getRoomRequirement()` for dual room requirement support
-- Lab blocks (`satisfiesRoomType = "laboratorio"`) must use lab rooms
+- Lab blocks (`satisfiesRoomType = "laboratorio"`) must use lab rooms; `estándar` blocks may use either an `estándar` room or a `laboratorio` room (labs double as regular classrooms), but never the reverse
 - The `groupPreferredRoomConstraint` is soft (weight 2) and excludes lab blocks to reduce infeasibility
 - Dual room requirements allow courses to specify multiple room types (e.g., 4h in CC + 1h in estándar)
 - Each block has its own room type requirement via `satisfiesRoomType` field

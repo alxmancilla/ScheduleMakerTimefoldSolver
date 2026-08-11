@@ -1,16 +1,39 @@
 package com.example.domain;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 public class Room {
     private final String name;
     private final String building;
-    private final String type; // 'standard', 'lab'
+    private final String type; // 'estándar', 'laboratorio', 'taller', 'taller electromecánica',
+                               // 'taller electrónica', 'centro de cómputo'
+
+    // The set of room-type requirements this physical room can satisfy. Seeded by
+    // convention from the primary type: a laboratorio can also serve as a plain
+    // classroom (estándar), while every other type satisfies only itself. A plain
+    // estándar room deliberately does NOT satisfy a laboratorio requirement.
+    private final Set<String> capabilities;
 
     public Room(String name, String building, String type) {
         this.name = name;
         this.building = building;
         this.type = type;
+        this.capabilities = capabilitiesFor(type);
+    }
+
+    private static Set<String> capabilitiesFor(String type) {
+        Set<String> caps = new HashSet<>();
+        if (type != null) {
+            caps.add(type);
+            if ("laboratorio".equals(type)) {
+                // A lab is equipped with desks/board, so it can also host a regular class.
+                caps.add("estándar");
+            }
+        }
+        return Collections.unmodifiableSet(caps);
     }
 
     public String getName() {
@@ -26,20 +49,7 @@ public class Room {
     }
 
     public boolean satisfiesRequirement(String requirement) {
-        if ("estándar".equals(requirement)) {
-            return "estándar".equals(type);
-        } else if ("taller".equals(requirement)) {
-            return "taller".equals(type);
-        } else if ("taller electromecánica".equals(requirement)) {
-            return "taller electromecánica".equals(type);
-        } else if ("taller electrónica".equals(requirement)) {
-            return "taller electrónica".equals(type);
-        } else if ("centro de cómputo".equals(requirement)) {
-            return "centro de cómputo".equals(type);
-        } else if ("laboratorio".equals(requirement)) {
-            return ("laboratorio".equals(type) || "estándar".equals(type));
-        }
-        return false;
+        return capabilities.contains(requirement);
     }
 
     @Override

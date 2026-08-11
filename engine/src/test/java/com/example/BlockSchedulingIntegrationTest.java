@@ -93,9 +93,10 @@ public class BlockSchedulingIntegrationTest {
          * lacked a null-guard, inflating the hard score far above the analyzer's count.
          *
          * <p>
-         * The 2pm rule is excluded from the sum because it is intentionally classified
-         * HARD in the analyzer but SOFT (weight 10) in the solver, so it must not
-         * participate in a hard-score comparison.
+         * The 2pm rule ("Non-standard rooms should finish by 2pm") is SOFT (weight 10)
+         * in the solver and is now reported as SOFT by the analyzer, so it no longer
+         * appears in the hard map and does not participate in this hard-score
+         * comparison.
          * </p>
          */
         @Test
@@ -103,9 +104,8 @@ public class BlockSchedulingIntegrationTest {
                 SchoolSchedule solved = buildBoundedSolver(10).solve(DemoDataGenerator.generateBlockDemoData());
 
                 Map<String, Integer> hard = BlockScheduleAnalyzer.analyzeHardConstraintViolations(solved);
-                int analyzerHardTotal = hard.entrySet().stream()
-                                .filter(e -> !"Non-standard rooms should finish by 2pm".equals(e.getKey()))
-                                .mapToInt(Map.Entry::getValue)
+                int analyzerHardTotal = hard.values().stream()
+                                .mapToInt(Integer::intValue)
                                 .sum();
 
                 assertEquals("Analyzer hard total must equal the solver's hard score. Breakdown: " + hard,
