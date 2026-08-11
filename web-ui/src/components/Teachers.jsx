@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher } from '../api';
+import WriteOnly from '../auth/WriteOnly';
 
 const DAY_LABELS = [
   { value: 1, label: 'Mon' },
@@ -159,9 +160,11 @@ function Teachers() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Teachers</h2>
-          <button className="btn btn-success" onClick={handleAdd}>
-            + Add Teacher
-          </button>
+          <WriteOnly>
+            <button className="btn btn-success" onClick={handleAdd}>
+              + Add Teacher
+            </button>
+          </WriteOnly>
         </div>
       </div>
 
@@ -332,12 +335,14 @@ function Teachers() {
                 <td>{teacher.maxHoursPerWeek}</td>
                 <td>{(teacher.qualifications || []).map((q) => q.qualification).join(', ')}</td>
                 <td>
-                  <button className="btn btn-primary" onClick={() => handleEdit(teacher)} style={{ marginRight: '5px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(teacher.id)}>
-                    Delete
-                  </button>
+                  <WriteOnly>
+                    <button className="btn btn-primary" onClick={() => handleEdit(teacher)} style={{ marginRight: '5px' }}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(teacher.id)}>
+                      Delete
+                    </button>
+                  </WriteOnly>
                 </td>
               </tr>
             ))}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getGroups, createGroup, updateGroup, deleteGroup } from '../api';
+import WriteOnly from '../auth/WriteOnly';
 
 function Groups() {
   const [groups, setGroups] = useState([]);
@@ -75,9 +76,11 @@ function Groups() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Student Groups</h2>
-          <button className="btn btn-success" onClick={() => setShowForm(true)}>
-            + Add Group
-          </button>
+          <WriteOnly>
+            <button className="btn btn-success" onClick={() => setShowForm(true)}>
+              + Add Group
+            </button>
+          </WriteOnly>
         </div>
       </div>
 
@@ -124,12 +127,14 @@ function Groups() {
                 <td>{group.name}</td>
                 <td>{group.preferredRoomName || '-'}</td>
                 <td>
-                  <button className="btn btn-primary" onClick={() => handleEdit(group)} style={{ marginRight: '5px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(group.id)}>
-                    Delete
-                  </button>
+                  <WriteOnly>
+                    <button className="btn btn-primary" onClick={() => handleEdit(group)} style={{ marginRight: '5px' }}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(group.id)}>
+                      Delete
+                    </button>
+                  </WriteOnly>
                 </td>
               </tr>
             ))}

@@ -15,6 +15,7 @@ The Schedule Maker Web UI provides a complete interface for viewing and editing 
 - **Base URL**: `http://localhost:8080/api`
 - **Technology Stack**:
   - Spring Boot 3.2.1
+  - Spring Security 6.2 (stateless JWT / OAuth2 Resource Server)
   - Spring Data JPA
   - PostgreSQL JDBC Driver
   - Hibernate ORM
@@ -57,19 +58,31 @@ psql -U mancilla -d school_schedule -f database/datasets/load_final_dataset_bloc
 
 The backend is already configured in `pom.xml` and `application.properties`.
 
-**Start the Spring Boot backend**:
+**Apply the users migration** (first time only) and seed the initial admin:
+
+```bash
+psql -U mancilla -d school_schedule -f database/migrations/add_app_users.sql
+```
+
+**Start the Spring Boot backend** (set a strong `JWT_SECRET` and, on first run, an
+`ADMIN_BOOTSTRAP_PASSWORD` to seed the initial admin):
 
 ```bash
 # From the project root directory
-mvn spring-boot:run -Dspring-boot.run.mainClass=com.example.web.ScheduleWebApplication
+ADMIN_BOOTSTRAP_PASSWORD=change-me JWT_SECRET=$(openssl rand -hex 32) \
+  mvn -pl web spring-boot:run
 ```
 
 The backend will start on `http://localhost:8080`.
 
-**Verify the backend is running**:
+**Verify the backend is running** (all `/api/**` endpoints require a bearer token;
+log in first, then call with the returned token):
 
 ```bash
-curl http://localhost:8080/api/teachers
+TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"change-me"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/teachers
 ```
 
 ### 3. Frontend Setup
@@ -139,7 +152,29 @@ http://localhost:3000
 - Filter by: All, Assigned, Unassigned, Pinned
 - Shows assignment statistics
 
+## Authentication & Roles
+
+The API is protected by **stateless JWT authentication**. Log in to obtain a token,
+then send it as `Authorization: Bearer <token>` on every request. The SPA stores the
+token, attaches it automatically via an Axios interceptor, and redirects to `/login`
+on a `401`.
+
+**Roles** (one per user), enforced server-side:
+
+| Role     | Permissions                                                            |
+|----------|------------------------------------------------------------------------|
+| `READER` | `GET` only.                                                            |
+| `WRITER` | `READER` + `POST`/`PUT`/`DELETE` on domain entities.                   |
+| `ADMIN`  | `WRITER` + user management under `/api/admin/**`.                      |
+
+The UI hides create/edit/delete controls for `READER`s (via the `WriteOnly`
+component), but the backend is the source of truth.
+
 ## API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - Exchange `{username, password}` for `{token, username, role, expiresIn}` (open, no token required)
+- `GET /api/auth/me` - Get the current authenticated `{username, role}`
 
 ### Teachers
 - `GET /api/teachers` - Get all teachers
@@ -219,10 +254,15 @@ lsof -ti:3000 | xargs kill -9
 
 **CORS errors**:
 - Ensure backend is running on port 8080
-- Check CORS configuration in `ScheduleWebApplication.java`
+- Check CORS configuration in `web/src/main/java/com/example/web/security/SecurityConfig.java` (or set `CORS_ALLOWED_ORIGINS`)
+
+**401 Unauthorized / redirected to `/login`**:
+- The token is missing, expired, or invalid — log in again
+- On a fresh database, ensure the migration ran and `ADMIN_BOOTSTRAP_PASSWORD` was set on first boot
+- Ensure `JWT_SECRET` is stable across restarts (a changed secret invalidates existing tokens)
 
 **API calls failing**:
-- Verify backend is running: `curl http://localhost:8080/api/teachers`
+- Verify backend is running (see the login + bearer-token verify commands above)
 - Check browser console for errors
 - Verify proxy configuration in `vite.config.js`
 

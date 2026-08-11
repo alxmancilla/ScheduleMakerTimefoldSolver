@@ -322,6 +322,8 @@ docker run --rm \
   -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
   -e DB_USER=<user> -e DB_PASSWORD=<pass> \
   -e CORS_ALLOWED_ORIGINS=https://app.example.com \
+  -e JWT_SECRET=<random-32+-byte-secret> \
+  -e ADMIN_BOOTSTRAP_PASSWORD=<initial-admin-password> \
   scheduler-web
 ```
 Unlike the engine and reporter (one-shot batch workers), the web image is a
@@ -341,9 +343,53 @@ Both must be running at the same time — start the backend first, then the fron
 
 See [`web-ui/README.md`](web-ui/README.md) and [`WEB_UI_SETUP.md`](WEB_UI_SETUP.md) for the full feature list, REST API endpoint reference, and troubleshooting.
 
+### Authentication & Roles
+
+The web app is protected by **stateless JWT authentication** with role-based access
+control. Every `/api/**` endpoint (except `POST /api/auth/login`) requires a valid
+`Authorization: Bearer <token>` header; the SPA redirects to `/login` on a `401`.
+
+**Roles** (one per user):
+
+| Role     | Permissions                                                         |
+|----------|---------------------------------------------------------------------|
+| `READER` | `GET` only (view schedule and all entities).                        |
+| `WRITER` | `READER` + create/update/delete on domain entities (`POST/PUT/DELETE`). |
+| `ADMIN`  | `WRITER` + full access, including user management under `/api/admin/**`. |
+
+The React UI hides create/edit/delete buttons for `READER`s; the backend enforces
+the rules regardless of the UI.
+
+**Auth endpoints:**
+- `POST /api/auth/login` — exchange `{username, password}` for `{token, username, role, expiresIn}`.
+- `GET /api/auth/me` — echo the current authenticated `{username, role}`.
+
+**Security configuration** (env vars; see `web/src/main/resources/application.properties`):
+
+| Variable                   | Default                    | Purpose                                                        |
+|----------------------------|----------------------------|----------------------------------------------------------------|
+| `JWT_SECRET`               | dev-only insecure default  | HMAC (HS256) signing secret, **≥32 bytes**. Override in prod.   |
+| `JWT_TTL_SECONDS`          | `28800` (8h)               | Issued-token lifetime.                                          |
+| `ADMIN_BOOTSTRAP_USERNAME` | `admin`                    | Username for the seeded initial admin.                         |
+| `ADMIN_BOOTSTRAP_PASSWORD` | *(blank)*                  | When `app_user` is empty, seeds this ADMIN. No user if blank.  |
+
+**First-time setup:** apply the users migration, then boot the web app with
+`ADMIN_BOOTSTRAP_PASSWORD` set to seed the first admin:
+
+```bash
+psql -U mancilla -d school_schedule -f database/migrations/add_app_users.sql
+ADMIN_BOOTSTRAP_PASSWORD=change-me JWT_SECRET=$(openssl rand -hex 32) mvn -pl web spring-boot:run
+```
+
+Log in at `http://localhost:3000/login`, then create additional users via the admin
+API. Additional users can be created through the `ADMIN`-only `/api/admin/**`
+endpoints.
+
 ### 3. Expose It on the Internet (temporary sharing)
 
-⚠️ **The app has no authentication** — every REST endpoint (create/edit/delete included) is open. Only use this to share with people you trust, and tear it down when done.
+⚠️ **Authentication is enabled, but treat public exposure with care** — the JWT
+secret must be a strong random value (`JWT_SECRET`) and the bootstrap admin password
+must be changed. Only share with people you trust, and tear it down when done.
 
 **One-time setup:**
 ```bash

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../api';
+import WriteOnly from '../auth/WriteOnly';
 
 function Courses() {
   const [courses, setCourses] = useState([]);
@@ -80,9 +81,11 @@ function Courses() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Courses</h2>
-          <button className="btn btn-success" onClick={() => setShowForm(true)}>
-            + Add Course
-          </button>
+          <WriteOnly>
+            <button className="btn btn-success" onClick={() => setShowForm(true)}>
+              + Add Course
+            </button>
+          </WriteOnly>
         </div>
       </div>
 
@@ -158,12 +161,14 @@ function Courses() {
                 <td>{course.requiredHoursPerWeek}</td>
                 <td>{course.active ? '✓' : '✗'}</td>
                 <td>
-                  <button className="btn btn-primary" onClick={() => handleEdit(course)} style={{ marginRight: '5px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(course.id)}>
-                    Delete
-                  </button>
+                  <WriteOnly>
+                    <button className="btn btn-primary" onClick={() => handleEdit(course)} style={{ marginRight: '5px' }}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(course.id)}>
+                      Delete
+                    </button>
+                  </WriteOnly>
                 </td>
               </tr>
             ))}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../api';
+import WriteOnly from '../auth/WriteOnly';
 
 function Rooms() {
   const [rooms, setRooms] = useState([]);
@@ -75,9 +76,11 @@ function Rooms() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>Rooms</h2>
-          <button className="btn btn-success" onClick={() => setShowForm(true)}>
-            + Add Room
-          </button>
+          <WriteOnly>
+            <button className="btn btn-success" onClick={() => setShowForm(true)}>
+              + Add Room
+            </button>
+          </WriteOnly>
         </div>
       </div>
 
@@ -131,12 +134,14 @@ function Rooms() {
                 <td>{room.building}</td>
                 <td>{room.type}</td>
                 <td>
-                  <button className="btn btn-primary" onClick={() => handleEdit(room)} style={{ marginRight: '5px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(room.name)}>
-                    Delete
-                  </button>
+                  <WriteOnly>
+                    <button className="btn btn-primary" onClick={() => handleEdit(room)} style={{ marginRight: '5px' }}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(room.name)}>
+                      Delete
+                    </button>
+                  </WriteOnly>
                 </td>
               </tr>
             ))}

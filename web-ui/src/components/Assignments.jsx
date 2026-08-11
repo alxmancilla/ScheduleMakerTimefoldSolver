@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAssignments, createAssignment, updateAssignment, deleteAssignment } from '../api';
+import WriteOnly from '../auth/WriteOnly';
 
 function Assignments() {
   const [assignments, setAssignments] = useState([]);
@@ -100,9 +101,11 @@ function Assignments() {
               <option value="unassigned">Unassigned</option>
               <option value="pinned">Pinned</option>
             </select>
-            <button className="btn btn-success" onClick={() => setShowForm(true)}>
-              + Add Assignment
-            </button>
+            <WriteOnly>
+              <button className="btn btn-success" onClick={() => setShowForm(true)}>
+                + Add Assignment
+              </button>
+            </WriteOnly>
           </div>
         </div>
         <p style={{ marginTop: '10px', color: '#7f8c8d' }}>
@@ -190,12 +193,14 @@ function Assignments() {
                 <td>{assignment.roomName || '-'}</td>
                 <td>{assignment.pinned ? '📌' : ''}</td>
                 <td>
-                  <button className="btn btn-primary" onClick={() => handleEdit(assignment)} style={{ marginRight: '5px' }}>
-                    Edit
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(assignment.id)}>
-                    Delete
-                  </button>
+                  <WriteOnly>
+                    <button className="btn btn-primary" onClick={() => handleEdit(assignment)} style={{ marginRight: '5px' }}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(assignment.id)}>
+                      Delete
+                    </button>
+                  </WriteOnly>
                 </td>
               </tr>
             ))}

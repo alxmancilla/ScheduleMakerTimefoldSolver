@@ -25,7 +25,10 @@ web-ui/.env.*.local
 
 # Datasets
 database/datasets/
-database/migrations/
+database/migrations/*
+# Track the RBAC schema migration (app_user table) even though ad-hoc local
+# migrations under this directory stay ignored.
+!database/migrations/add_app_users.sql
 md_files/
 
 # Build artifacts

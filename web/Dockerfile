@@ -14,7 +14,17 @@
 #     -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
 #     -e DB_USER=<user> -e DB_PASSWORD=<pass> \
 #     -e CORS_ALLOWED_ORIGINS=https://app.example.com \
+#     -e JWT_SECRET=<random-32+-byte-secret> \
+#     -e ADMIN_BOOTSTRAP_PASSWORD=<initial-admin-password> \
 #     scheduler-web
+#
+# Security env vars (see application.properties for defaults):
+#   JWT_SECRET                 HMAC (HS256) signing secret, >=32 bytes. A dev-only
+#                              default is used if unset; MUST be overridden in prod.
+#   JWT_TTL_SECONDS            Token lifetime in seconds (default 28800 = 8h).
+#   ADMIN_BOOTSTRAP_USERNAME   Initial admin username (default "admin").
+#   ADMIN_BOOTSTRAP_PASSWORD   When the app_user table is empty, seeds this ADMIN
+#                              user. No user is created if left blank.
 #
 # The JVM heap auto-sizes to a fraction of the container's memory limit via
 # -XX:MaxRAMPercentage (see JAVA_OPTS below), so setting --memory alone gives a

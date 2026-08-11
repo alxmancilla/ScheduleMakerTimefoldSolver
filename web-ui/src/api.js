@@ -13,6 +13,44 @@ const api = axios.create({
   },
 });
 
+// localStorage key holding the signed JWT.
+export const TOKEN_KEY = 'auth_token';
+
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+// Attach the Bearer token (when present) to every request.
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// On 401 (expired/invalid token), drop the token and bounce to the login page.
+// The login request itself is exempt so a bad-credentials error surfaces inline.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response && error.response.status;
+    const url = error.config && error.config.url;
+    const isLogin = url && url.includes('/auth/login');
+    if (status === 401 && !isLogin) {
+      clearToken();
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth
+export const login = (username, password) => api.post('/auth/login', { username, password });
+export const getCurrentUser = () => api.get('/auth/me');
+
 // Teachers
 export const getTeachers = () => api.get('/teachers');
 export const getTeacher = (id) => api.get(`/teachers/${id}`);

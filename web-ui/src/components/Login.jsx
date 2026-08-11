@@ -1,0 +1,77 @@
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+
+/**
+ * Login page. On success stores the JWT (via AuthContext) and redirects to the
+ * page the user originally requested, or the schedule home page.
+ */
+function Login() {
+  const { login, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const from = location.state?.from?.pathname || '/';
+
+  if (!loading && isAuthenticated) {
+    return <Navigate to={from} replace />;
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(username, password);
+      navigate(from, { replace: true });
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 401) {
+        setError('Invalid username or password.');
+      } else {
+        setError(err.response?.data?.message || 'Login failed: ' + err.message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: '360px', margin: '80px auto' }}>
+      <div className="card">
+        <h2>Sign in</h2>
+        {error && <div className="error">{error}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Username:</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Password:</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default Login;

@@ -7,6 +7,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -33,11 +34,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Web-layer tests for {@link CourseBlockAssignmentController}, covering DTO
- * validation and the error responses produced by {@code GlobalExceptionHandler}.
+ * validation and the error responses produced by
+ * {@code GlobalExceptionHandler}.
  * Uses the MVC slice with a mocked repository so no database is required.
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(CourseBlockAssignmentController.class)
+@AutoConfigureMockMvc(addFilters = false)
 public class CourseBlockAssignmentControllerTest {
 
     @Autowired

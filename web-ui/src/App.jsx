@@ -1,53 +1,71 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import Schedule from './components/Schedule';
 import Teachers from './components/Teachers';
 import Courses from './components/Courses';
 import Rooms from './components/Rooms';
 import Groups from './components/Groups';
 import Assignments from './components/Assignments';
+import Login from './components/Login';
+import ProtectedRoute from './auth/ProtectedRoute';
+import { useAuth } from './auth/AuthContext';
+
+const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
+
+function Layout() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <div className="app">
+      <header className="header">
+        <div className="container">
+          <h1>Schedule Maker</h1>
+          <nav className="nav">
+            <NavLink to="/" className={navLinkClass}>Schedule</NavLink>
+            <NavLink to="/teachers" className={navLinkClass}>Teachers</NavLink>
+            <NavLink to="/courses" className={navLinkClass}>Courses</NavLink>
+            <NavLink to="/rooms" className={navLinkClass}>Rooms</NavLink>
+            <NavLink to="/groups" className={navLinkClass}>Groups</NavLink>
+            <NavLink to="/assignments" className={navLinkClass}>Assignments</NavLink>
+          </nav>
+          {user && (
+            <div className="user-box" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>{user.username} ({user.role})</span>
+              <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <div className="container">
+        <Outlet />
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
     <Router>
-      <div className="app">
-        <header className="header">
-          <div className="container">
-            <h1>Schedule Maker</h1>
-            <nav className="nav">
-              <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>
-                Schedule
-              </NavLink>
-              <NavLink to="/teachers" className={({ isActive }) => isActive ? 'active' : ''}>
-                Teachers
-              </NavLink>
-              <NavLink to="/courses" className={({ isActive }) => isActive ? 'active' : ''}>
-                Courses
-              </NavLink>
-              <NavLink to="/rooms" className={({ isActive }) => isActive ? 'active' : ''}>
-                Rooms
-              </NavLink>
-              <NavLink to="/groups" className={({ isActive }) => isActive ? 'active' : ''}>
-                Groups
-              </NavLink>
-              <NavLink to="/assignments" className={({ isActive }) => isActive ? 'active' : ''}>
-                Assignments
-              </NavLink>
-            </nav>
-          </div>
-        </header>
-        
-        <div className="container">
-          <Routes>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
             <Route path="/" element={<Schedule />} />
             <Route path="/teachers" element={<Teachers />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/assignments" element={<Assignments />} />
-          </Routes>
-        </div>
-      </div>
+          </Route>
+        </Route>
+      </Routes>
     </Router>
   );
 }
