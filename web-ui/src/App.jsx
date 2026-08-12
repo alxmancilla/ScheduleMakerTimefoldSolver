@@ -6,8 +6,11 @@ import Courses from './components/Courses';
 import Rooms from './components/Rooms';
 import Groups from './components/Groups';
 import Assignments from './components/Assignments';
+import Settings from './components/Settings';
 import Login from './components/Login';
 import ProtectedRoute from './auth/ProtectedRoute';
+import AdminRoute from './auth/AdminRoute';
+import AdminOnly from './auth/AdminOnly';
 import { useAuth } from './auth/AuthContext';
 
 const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
@@ -33,6 +36,9 @@ function Layout() {
             <NavLink to="/rooms" className={navLinkClass}>Rooms</NavLink>
             <NavLink to="/groups" className={navLinkClass}>Groups</NavLink>
             <NavLink to="/assignments" className={navLinkClass}>Assignments</NavLink>
+            <AdminOnly>
+              <NavLink to="/settings" className={navLinkClass}>Settings</NavLink>
+            </AdminOnly>
           </nav>
           {user && (
             <div className="user-box" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -63,6 +69,9 @@ function App() {
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/assignments" element={<Assignments />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/settings" element={<Settings />} />
+            </Route>
           </Route>
         </Route>
       </Routes>

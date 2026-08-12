@@ -11,4 +11,11 @@ public interface BlockTimeslotRepository extends JpaRepository<BlockTimeslotEnti
     List<BlockTimeslotEntity> findByDayOfWeek(Integer dayOfWeek);
 
     List<BlockTimeslotEntity> findByLengthHours(Integer lengthHours);
+
+    List<BlockTimeslotEntity> findAllByOrderByDayOfWeekAscStartHourAscLengthHoursAsc();
+
+    boolean existsByDayOfWeekAndStartHourAndLengthHours(Integer dayOfWeek, Integer startHour, Integer lengthHours);
+
+    boolean existsByDayOfWeekAndStartHourAndLengthHoursAndIdNot(
+            Integer dayOfWeek, Integer startHour, Integer lengthHours, String id);
 }

@@ -17,6 +17,8 @@ public interface CourseBlockAssignmentRepository extends JpaRepository<CourseBlo
 
     List<CourseBlockAssignmentEntity> findByPinned(Boolean pinned);
 
+    long countByBlockTimeslotId(String blockTimeslotId);
+
     @Query("SELECT a FROM CourseBlockAssignmentEntity a WHERE a.blockTimeslotId IS NOT NULL")
     List<CourseBlockAssignmentEntity> findAssignedBlocks();
 

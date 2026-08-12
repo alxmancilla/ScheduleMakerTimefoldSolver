@@ -98,6 +98,16 @@ export const getAssignedBlocks = () => api.get('/assignments/assigned');
 export const getUnassignedBlocks = () => api.get('/assignments/unassigned');
 export const getPinnedAssignments = () => api.get('/assignments/pinned');
 
+// Timeslots (read-only, any authenticated role - e.g. for the Assignments form)
+export const listTimeslots = () => api.get('/timeslots');
+
+// Admin: Timeslots
+export const getTimeslots = () => api.get('/admin/timeslots');
+export const getTimeslot = (id) => api.get(`/admin/timeslots/${id}`);
+export const createTimeslot = (timeslot) => api.post('/admin/timeslots', timeslot);
+export const updateTimeslot = (id, timeslot) => api.put(`/admin/timeslots/${id}`, timeslot);
+export const deleteTimeslot = (id) => api.delete(`/admin/timeslots/${id}`);
+
 // Schedule
 export const getScheduleView = () => api.get('/schedule/view');
 export const getScheduleViewByGroup = (groupId) => api.get(`/schedule/view/group/${groupId}`);
