@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
+// The `room` table enforces a CHECK constraint restricting `type` to exactly
+// these values (see database/schema_block_scheduling*.sql). Keep in sync with
+// that constraint and with the same list used in Courses.jsx/Assignments.jsx.
+const ROOM_TYPES = [
+  'estándar',
+  'laboratorio',
+  'taller',
+  'taller electromecánica',
+  'taller electrónica',
+  'centro de cómputo',
+];
+
 function Rooms() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,12 +113,9 @@ function Rooms() {
             <div className="form-group">
               <label>Type:</label>
               <select name="type" defaultValue={editingRoom?.type || 'estándar'}>
-                <option value="estándar">Estándar</option>
-                <option value="laboratorio">Laboratorio</option>
-                <option value="taller">Taller</option>
-                <option value="taller electromecánica">Taller Electromecánica</option>
-                <option value="taller electrónica">Taller Electrónica</option>
-                <option value="centro de cómputo">Centro de Cómputo</option>
+                {ROOM_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
               </select>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
