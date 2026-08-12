@@ -15,7 +15,7 @@ public class CourseDTO {
     }
 
     @NotBlank(message = "Course ID is required", groups = Create.class)
-    @Size(max = 100, message = "Course ID must not exceed 100 characters", groups = Create.class)
+    @Size(max = 5, message = "Course ID must not exceed 5 characters", groups = Create.class)
     @Pattern(regexp = "^[A-Za-z0-9_-]+$", message = "Course ID must contain only letters, numbers, hyphens, and underscores", groups = Create.class)
     private String id;
 
@@ -23,13 +23,17 @@ public class CourseDTO {
     @Size(min = 2, max = 200, message = "Course name must be between 2 and 200 characters")
     private String name;
 
+    @NotBlank(message = "Abbreviation is required")
     @Size(max = 50, message = "Abbreviation must not exceed 50 characters")
     private String abbreviation;
 
-    @Size(max = 10, message = "Semester must not exceed 10 characters")
-    private String semester;
+    @NotNull(message = "Semester is required")
+    @Min(value = 1, message = "Semester must be between 1 and 12")
+    @Max(value = 12, message = "Semester must be between 1 and 12")
+    private Integer semester;
 
-    @Size(max = 50, message = "Component must not exceed 50 characters")
+    @NotBlank(message = "Component is required")
+    @Size(max = 20, message = "Component must not exceed 20 characters")
     private String component;
 
     @Size(max = 100, message = "Room requirement must not exceed 100 characters")
@@ -71,11 +75,11 @@ public class CourseDTO {
         this.abbreviation = abbreviation;
     }
 
-    public String getSemester() {
+    public Integer getSemester() {
         return semester;
     }
 
-    public void setSemester(String semester) {
+    public void setSemester(Integer semester) {
         this.semester = semester;
     }
 

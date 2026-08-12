@@ -145,7 +145,7 @@ public class ConstraintConsistencyTest {
                 // Add minimal data
                 Teacher teacher = new Teacher("TEST", "Test", "Teacher",
                                 new HashSet<>(), new HashMap<>(), 40);
-                Course course = new Course("1", "Test Course", "TEST", "II", "BASICAS",
+                Course course = new Course("1", "Test Course", "TEST", 2, "BASICAS",
                                 "estándar", 4, Boolean.TRUE);
                 Room room = new Room("ROOM1", "Building A", "estándar");
                 Group group = new Group("TEST", "Test Group", new HashSet<>());

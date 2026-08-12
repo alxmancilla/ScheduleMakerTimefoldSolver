@@ -168,7 +168,7 @@ public class DataLoader {
                 String id = rs.getString("id");
                 String name = rs.getString("name");
                 String abbreviation = rs.getString("abbreviation");
-                String semester = rs.getString("semester");
+                int semester = rs.getInt("semester");
                 String component = rs.getString("component");
                 String roomRequirement = rs.getString("room_requirement");
                 int requiredHours = rs.getInt("required_hours_per_week");

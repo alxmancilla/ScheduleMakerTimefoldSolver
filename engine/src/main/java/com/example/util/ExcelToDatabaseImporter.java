@@ -179,7 +179,7 @@ public class ExcelToDatabaseImporter {
                 ps.setString(1, getCellValueAsString(row.getCell(0)));
                 ps.setString(2, getCellValueAsString(row.getCell(1)));
                 ps.setString(3, getCellValueAsString(row.getCell(2)));
-                ps.setString(4, getCellValueAsString(row.getCell(3)));
+                ps.setInt(4, (int) getCellValueAsNumber(row.getCell(3)));
                 ps.setString(5, getCellValueAsString(row.getCell(4)));
                 ps.setString(6, getCellValueAsString(row.getCell(5)));
                 ps.setInt(7, (int) getCellValueAsNumber(row.getCell(6)));

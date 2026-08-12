@@ -8,19 +8,19 @@ import java.time.LocalDateTime;
 public class CourseEntity {
     
     @Id
-    @Column(name = "id", length = 100)
+    @Column(name = "id", length = 5)
     private String id;
-    
+
     @Column(name = "name", length = 200, nullable = false)
     private String name;
-    
-    @Column(name = "abbreviation", length = 50)
+
+    @Column(name = "abbreviation", length = 50, nullable = false)
     private String abbreviation;
     
-    @Column(name = "semester", length = 10)
-    private String semester;
+    @Column(name = "semester", nullable = false)
+    private Integer semester;
     
-    @Column(name = "component", length = 50)
+    @Column(name = "component", length = 20, nullable = false)
     private String component;
     
     @Column(name = "room_requirement", length = 100)
@@ -85,11 +85,11 @@ public class CourseEntity {
         this.abbreviation = abbreviation;
     }
     
-    public String getSemester() {
+    public Integer getSemester() {
         return semester;
     }
-    
-    public void setSemester(String semester) {
+
+    public void setSemester(Integer semester) {
         this.semester = semester;
     }
     

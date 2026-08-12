@@ -63,6 +63,9 @@ public class CourseControllerTest {
         Map<String, Object> body = new HashMap<>();
         body.put("id", "C1");
         body.put("name", "Mathematics");
+        body.put("abbreviation", "MATH");
+        body.put("component", "BASICAS");
+        body.put("semester", 2);
         body.put("requiredHoursPerWeek", 5);
         return body;
     }
@@ -155,6 +158,24 @@ public class CourseControllerTest {
         mockMvc.perform(post("/api/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.requiredHoursPerWeek").exists());
+    }
+
+    @Test
+    public void createCourse_missingSemester_returnsValidationError() throws Exception {
+        Map<String, Object> body = validPayload();
+        body.remove("semester");
+        mockMvc.perform(post("/api/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.semester").exists());
+    }
+
+    @Test
+    public void createCourse_semesterOutOfRange_returnsValidationError() throws Exception {
+        Map<String, Object> body = validPayload();
+        body.put("semester", 13);
+        mockMvc.perform(post("/api/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.semester").exists());
     }
 
     // ---- PUT (update) ----

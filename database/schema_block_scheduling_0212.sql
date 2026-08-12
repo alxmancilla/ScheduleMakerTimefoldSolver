@@ -129,13 +129,14 @@ CREATE TABLE course (
     abbreviation VARCHAR(100) NOT NULL,
     room_requirement VARCHAR(50) NOT NULL,
     required_hours_per_week INTEGER NOT NULL,
-    semester VARCHAR(2) NOT NULL,
+    semester INTEGER NOT NULL,
     component VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT check_course_room_requirement CHECK (room_requirement IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica', 'centro de cómputo', 'laboratorio')),
-    CONSTRAINT check_course_required_hours CHECK (required_hours_per_week > 0)
+    CONSTRAINT check_course_required_hours CHECK (required_hours_per_week > 0),
+    CONSTRAINT check_course_semester CHECK (semester BETWEEN 1 AND 12)
 );
 
 CREATE INDEX idx_course_name ON course(name);
@@ -150,7 +151,7 @@ COMMENT ON COLUMN course.name IS 'Full course name';
 COMMENT ON COLUMN course.abbreviation IS 'Short abbreviation for display';
 COMMENT ON COLUMN course.room_requirement IS 'Type of room required: estándar, taller, centro de cómputo, or laboratorio';
 COMMENT ON COLUMN course.required_hours_per_week IS 'Number of hours per week this course needs';
-COMMENT ON COLUMN course.semester IS 'Semester level (II, IV, VI)';
+COMMENT ON COLUMN course.semester IS 'Semester number (1-12)';
 COMMENT ON COLUMN course.component IS 'Course component category (BASICAS, TADRH, TEM, etc.)';
 COMMENT ON COLUMN course.active IS 'Whether this course is currently active in the curriculum';
 

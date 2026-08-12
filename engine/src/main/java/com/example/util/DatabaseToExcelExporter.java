@@ -173,7 +173,7 @@ public class DatabaseToExcelExporter {
                 row.createCell(0).setCellValue(rs.getString("id"));
                 row.createCell(1).setCellValue(rs.getString("name"));
                 row.createCell(2).setCellValue(rs.getString("abbreviation"));
-                row.createCell(3).setCellValue(rs.getString("semester"));
+                row.createCell(3).setCellValue(rs.getInt("semester"));
                 row.createCell(4).setCellValue(rs.getString("component"));
                 row.createCell(5).setCellValue(rs.getString("room_requirement"));
                 row.createCell(6).setCellValue(rs.getInt("required_hours_per_week"));

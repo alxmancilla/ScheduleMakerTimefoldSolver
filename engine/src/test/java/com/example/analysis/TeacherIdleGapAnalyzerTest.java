@@ -34,7 +34,7 @@ import static org.junit.Assert.assertEquals;
 public class TeacherIdleGapAnalyzerTest {
 
     private static final Course MATH =
-            new Course("1", "Matemáticas", "MAT", "I", "BASICAS", "estándar", 4, true);
+            new Course("1", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
     private static final Group GROUP = new Group("G1", "Group 1", new HashSet<>());
 
     /** Teacher available Monday for the given inclusive hours. */

@@ -25,7 +25,7 @@ import static org.junit.Assert.assertEquals;
 public class GroupIdleGapAnalyzerTest {
 
     private static final Course MATH =
-            new Course("1", "Matemáticas", "MAT", "I", "BASICAS", "estándar", 4, true);
+            new Course("1", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
 
     private static SchoolSchedule scheduleWith(CourseBlockAssignment... assignments) {
         List<CourseBlockAssignment> list = new ArrayList<>(Arrays.asList(assignments));

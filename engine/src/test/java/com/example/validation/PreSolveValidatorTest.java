@@ -27,7 +27,7 @@ import static org.junit.Assert.*;
  */
 public class PreSolveValidatorTest {
 
-    private static final Course MATH = new Course("1", "Matemáticas", "MAT", "I", "BASICAS", "estándar", 4, true);
+    private static final Course MATH = new Course("1", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
 
     /** Teacher qualified for Matemáticas, available Mon 7:00-14:00. */
     private static Teacher qualifiedAvailableTeacher() {

@@ -8,7 +8,7 @@ public class Course {
     private final String id;
     private final String name;
     private final String abbreviation;
-    private final String semester; // 'I', 'II', 'III', 'IV', 'V', 'VI'
+    private final Integer semester; // 1-12
     private final String component; // 'BASICAS', 'TADHR','TEM'
     private final int requiredHoursPerWeek;
     private final String roomRequirement; // 'standard', 'science_lab' (legacy - use roomRequirements instead)
@@ -18,7 +18,7 @@ public class Course {
     private List<RoomRequirement> roomRequirements;
     private List<BlockTemplate> blockTemplates;
 
-    public Course(String id, String name, String abbreviation, String semester, String component,
+    public Course(String id, String name, String abbreviation, Integer semester, String component,
             String roomRequirement, int requiredHoursPerWeek, Boolean active) {
         this.id = id;
         this.name = name;
@@ -32,7 +32,7 @@ public class Course {
 
     // Backwards-compatible constructor: generate an id from the name.
     public Course(String name, String roomRequirement, int requiredHoursPerWeek) {
-        this(sanitizeId("c", null), name, "", "", "", roomRequirement, requiredHoursPerWeek, Boolean.TRUE);
+        this(sanitizeId("c", null), name, "", null, "", roomRequirement, requiredHoursPerWeek, Boolean.TRUE);
     }
 
     private static String sanitizeId(String prefix, String name) {
@@ -54,7 +54,7 @@ public class Course {
         return abbreviation;
     }
 
-    public String getSemester() {
+    public Integer getSemester() {
         return semester;
     }
 
