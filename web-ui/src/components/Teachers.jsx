@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { getTeachers, createTeacher, updateTeacher, deleteTeacher } from '../api';
+import React, { useState, useEffect, useRef } from 'react';
+import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses } from '../api';
 import WriteOnly from '../auth/WriteOnly';
+
+const MIN_CHARS_FOR_SUGGESTIONS = 2;
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const DAY_LABELS = [
   { value: 1, label: 'Mon' },
@@ -22,11 +25,34 @@ function Teachers() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [qualifications, setQualifications] = useState([]);
   const [qualInput, setQualInput] = useState('');
+  const [courseNames, setCourseNames] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const qualBoxRef = useRef(null);
   const [availability, setAvailability] = useState(new Set());
 
   useEffect(() => {
     loadTeachers();
+    loadCourseNames();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (qualBoxRef.current && !qualBoxRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const loadCourseNames = async () => {
+    try {
+      const response = await getCourses();
+      setCourseNames(response.data.map((c) => c.name).filter(Boolean));
+    } catch (err) {
+      // Non-critical: autocomplete just won't have suggestions.
+    }
+  };
 
   const loadTeachers = async () => {
     try {
@@ -47,13 +73,21 @@ function Teachers() {
 
   const availabilityKey = (day, hour) => `${day}-${hour}`;
 
-  const addQualification = () => {
-    const value = qualInput.trim();
+  const addQualification = (rawValue) => {
+    const value = (rawValue ?? qualInput).trim();
     if (value && !qualifications.includes(value)) {
       setQualifications([...qualifications, value]);
     }
     setQualInput('');
+    setShowSuggestions(false);
   };
+
+  const qualSuggestions = (() => {
+    const query = qualInput.trim();
+    if (query.length < MIN_CHARS_FOR_SUGGESTIONS) return [];
+    const pattern = new RegExp(escapeRegExp(query), 'i');
+    return courseNames.filter((name) => pattern.test(name) && !qualifications.includes(name)).slice(0, 8);
+  })();
 
   const removeQualification = (value) => {
     setQualifications(qualifications.filter((q) => q !== value));
@@ -68,6 +102,20 @@ function Teachers() {
       next.add(key);
     }
     setAvailability(next);
+  };
+
+  const checkAllAvailability = () => {
+    const all = new Set();
+    DAY_LABELS.forEach((day) => {
+      AVAILABILITY_HOURS.forEach((hour) => {
+        all.add(availabilityKey(day.value, hour));
+      });
+    });
+    setAvailability(all);
+  };
+
+  const clearAllAvailability = () => {
+    setAvailability(new Set());
   };
 
   const resetForm = () => {
@@ -210,22 +258,66 @@ function Teachers() {
 
             <div className="form-group">
               <label>Qualifications:</label>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
-                <input
-                  type="text"
-                  value={qualInput}
-                  onChange={(e) => setQualInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addQualification();
-                    }
-                  }}
-                  placeholder="Add a qualification and press Enter"
-                />
-                <button type="button" className="btn btn-secondary" onClick={addQualification}>
-                  Add
-                </button>
+              <div ref={qualBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={qualInput}
+                    onChange={(e) => {
+                      setQualInput(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addQualification();
+                      } else if (e.key === 'Escape') {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    placeholder="Type at least 2 letters to search courses, or add a qualification and press Enter"
+                    autoComplete="off"
+                  />
+                  <button type="button" className="btn btn-secondary" onClick={() => addQualification()}>
+                    Add
+                  </button>
+                </div>
+                {showSuggestions && qualSuggestions.length > 0 && (
+                  <ul
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: '90px',
+                      marginTop: '2px',
+                      background: '#fff',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      listStyle: 'none',
+                      padding: '4px 0',
+                      zIndex: 10,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    {qualSuggestions.map((name) => (
+                      <li
+                        key={name}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          addQualification(name);
+                        }}
+                        style={{ padding: '6px 10px', cursor: 'pointer' }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#e8f4f8')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {qualifications.map((q) => (
@@ -265,6 +357,14 @@ function Teachers() {
 
             <div className="form-group">
               <label>Availability:</label>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={checkAllAvailability}>
+                  Check All
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={clearAllAvailability}>
+                  Uncheck All
+                </button>
+              </div>
               <table style={{ borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
