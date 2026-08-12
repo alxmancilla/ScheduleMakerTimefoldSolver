@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getGroups, createGroup, updateGroup, deleteGroup } from '../api';
+import { getGroups, createGroup, updateGroup, deleteGroup, getRooms } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
 function Groups() {
   const [groups, setGroups] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null);
@@ -11,7 +12,17 @@ function Groups() {
 
   useEffect(() => {
     loadGroups();
+    loadRooms();
   }, []);
+
+  const loadRooms = async () => {
+    try {
+      const response = await getRooms();
+      setRooms(response.data);
+    } catch (err) {
+      // Non-critical: the dropdown just won't have options.
+    }
+  };
 
   const loadGroups = async () => {
     try {
@@ -100,7 +111,12 @@ function Groups() {
             </div>
             <div className="form-group">
               <label>Preferred Room (optional):</label>
-              <input type="text" name="preferredRoomName" defaultValue={editingGroup?.preferredRoomName || ''} />
+              <select name="preferredRoomName" defaultValue={editingGroup?.preferredRoomName || ''}>
+                <option value="">-- None --</option>
+                {rooms.map((room) => (
+                  <option key={room.name} value={room.name}>{room.name}</option>
+                ))}
+              </select>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary">Save</button>
