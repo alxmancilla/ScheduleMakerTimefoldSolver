@@ -152,7 +152,7 @@ function Courses() {
                 type="text"
                 name="abbreviation"
                 defaultValue={editingCourse?.abbreviation || ''}
-                maxLength={50}
+                maxLength={100}
                 required
               />
               {fieldErrors.abbreviation && <div className="error">{fieldErrors.abbreviation}</div>}

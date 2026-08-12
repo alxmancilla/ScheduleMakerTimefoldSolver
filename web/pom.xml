@@ -54,6 +54,12 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
+        <!-- Apache POI: reads the .xlsx workbook uploaded via the admin Excel import -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

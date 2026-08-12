@@ -14,7 +14,7 @@ public class CourseEntity {
     @Column(name = "name", length = 200, nullable = false)
     private String name;
 
-    @Column(name = "abbreviation", length = 50, nullable = false)
+    @Column(name = "abbreviation", length = 100, nullable = false)
     private String abbreviation;
     
     @Column(name = "semester", nullable = false)

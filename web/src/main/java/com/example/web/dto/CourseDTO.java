@@ -24,7 +24,7 @@ public class CourseDTO {
     private String name;
 
     @NotBlank(message = "Abbreviation is required")
-    @Size(max = 50, message = "Abbreviation must not exceed 50 characters")
+    @Size(max = 100, message = "Abbreviation must not exceed 100 characters")
     private String abbreviation;
 
     @NotNull(message = "Semester is required")
