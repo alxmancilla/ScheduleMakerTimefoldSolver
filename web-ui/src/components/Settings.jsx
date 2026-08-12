@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { getTimeslots, createTimeslot, updateTimeslot, deleteTimeslot } from '../api';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  getTimeslots, createTimeslot, updateTimeslot, deleteTimeslot,
+  runEngine, getEngineStatus, generateBlocks,
+} from '../api';
+
+const ENGINE_POLL_MS = 3000;
 
 const DAY_LABELS = [
   { value: 1, label: 'Mon' },
@@ -9,6 +14,7 @@ const DAY_LABELS = [
   { value: 5, label: 'Fri' },
 ];
 const dayLabel = (value) => DAY_LABELS.find((d) => d.value === value)?.label || value;
+const formatTimestamp = (value) => (value ? value.replace('T', ' ').split('.')[0] : '-');
 const START_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
 const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
@@ -22,9 +28,70 @@ function Settings() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
+  const [engineStatus, setEngineStatus] = useState(null);
+  const [engineError, setEngineError] = useState(null);
+  const pollRef = useRef(null);
+
   useEffect(() => {
     loadTimeslots();
+    loadEngineStatus();
+    return () => stopPolling();
   }, []);
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  const startPolling = () => {
+    stopPolling();
+    pollRef.current = setInterval(loadEngineStatus, ENGINE_POLL_MS);
+  };
+
+  const loadEngineStatus = async () => {
+    try {
+      const response = await getEngineStatus();
+      setEngineStatus(response.data);
+      if (response.data.state === 'RUNNING') {
+        if (!pollRef.current) startPolling();
+      } else {
+        stopPolling();
+      }
+    } catch (err) {
+      // Non-critical: status just won't update until the next successful poll.
+    }
+  };
+
+  const handleRunEngine = async () => {
+    setEngineError(null);
+    try {
+      const response = await runEngine();
+      setEngineStatus(response.data);
+      startPolling();
+    } catch (err) {
+      setEngineError(err.response?.data?.message || 'Failed to start engine: ' + err.message);
+    }
+  };
+
+  const [blockGenResult, setBlockGenResult] = useState(null);
+  const [blockGenError, setBlockGenError] = useState(null);
+  const [generatingBlocks, setGeneratingBlocks] = useState(false);
+
+  const handleGenerateBlocks = async () => {
+    setGeneratingBlocks(true);
+    setBlockGenError(null);
+    setBlockGenResult(null);
+    try {
+      const response = await generateBlocks();
+      setBlockGenResult(response.data);
+    } catch (err) {
+      setBlockGenError(err.response?.data?.message || 'Failed to generate blocks: ' + err.message);
+    } finally {
+      setGeneratingBlocks(false);
+    }
+  };
 
   const loadTimeslots = async () => {
     try {
@@ -118,6 +185,86 @@ function Settings() {
       <div className="card">
         <h2>Settings</h2>
         <p style={{ color: '#7f8c8d', fontSize: '14px' }}>Admin-only configuration for values used across the scheduler.</p>
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>Solver</h3>
+          <button
+            className="btn btn-success"
+            onClick={handleRunEngine}
+            disabled={engineStatus?.state === 'RUNNING'}
+          >
+            {engineStatus?.state === 'RUNNING' ? 'Running…' : '▶ Start Engine'}
+          </button>
+        </div>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          Runs the solver as a background process (scripts/run-engine.sh) and writes results
+          straight to the database. This can take up to a few minutes.
+        </p>
+        {engineError && <div className="error">{engineError}</div>}
+        {engineStatus && (
+          <div style={{ marginTop: '10px' }}>
+            <div style={{ display: 'flex', gap: '20px', fontSize: '13px', flexWrap: 'wrap' }}>
+              <span><strong>State:</strong> {engineStatus.state}</span>
+              <span><strong>Started:</strong> {formatTimestamp(engineStatus.startedAt)}</span>
+              <span><strong>Finished:</strong> {formatTimestamp(engineStatus.finishedAt)}</span>
+              <span><strong>Exit code:</strong> {engineStatus.exitCode ?? '-'}</span>
+            </div>
+            {engineStatus.log && engineStatus.log.length > 0 && (
+              <pre
+                style={{
+                  marginTop: '10px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  background: '#1e1e1e',
+                  color: '#d4d4d4',
+                  padding: '10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {engineStatus.log.join('\n')}
+              </pre>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>Generate Blocks</h3>
+          <button
+            className="btn btn-success"
+            onClick={handleGenerateBlocks}
+            disabled={generatingBlocks}
+          >
+            {generatingBlocks ? 'Generating…' : '⚙ Generate Blocks'}
+          </button>
+        </div>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          Creates the unassigned schedule blocks the solver needs, one per (group, course) pair in
+          Group_Courses, decomposing each course's required hours into 1-2 hour blocks. Only fills
+          gaps — a (group, course) pair that already has blocks is left untouched, so this is safe
+          to re-run after importing new groups/courses. Run this after the Import tab and before
+          Start Engine.
+        </p>
+        {blockGenError && <div className="error">{blockGenError}</div>}
+        {blockGenResult && (
+          <div style={{ marginTop: '10px', fontSize: '13px' }}>
+            <div style={{ color: '#2e7d32' }}>
+              Created {blockGenResult.blocksCreated} block(s); skipped {blockGenResult.groupCoursesSkippedExisting} pair(s) that already had blocks.
+            </div>
+            {blockGenResult.warnings.length > 0 && (
+              <ul style={{ marginTop: '6px', color: '#c0392b' }}>
+                {blockGenResult.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="card">

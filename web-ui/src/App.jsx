@@ -6,11 +6,15 @@ import Courses from './components/Courses';
 import Rooms from './components/Rooms';
 import Groups from './components/Groups';
 import Assignments from './components/Assignments';
+import Reports from './components/Reports';
+import ImportExcel from './components/Import';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ProtectedRoute from './auth/ProtectedRoute';
 import AdminRoute from './auth/AdminRoute';
 import AdminOnly from './auth/AdminOnly';
+import WriteRoute from './auth/WriteRoute';
+import WriteOnly from './auth/WriteOnly';
 import { useAuth } from './auth/AuthContext';
 
 const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
@@ -36,6 +40,10 @@ function Layout() {
             <NavLink to="/rooms" className={navLinkClass}>Rooms</NavLink>
             <NavLink to="/groups" className={navLinkClass}>Groups</NavLink>
             <NavLink to="/assignments" className={navLinkClass}>Assignments</NavLink>
+            <NavLink to="/reports" className={navLinkClass}>Reports</NavLink>
+            <WriteOnly>
+              <NavLink to="/import" className={navLinkClass}>Import</NavLink>
+            </WriteOnly>
             <AdminOnly>
               <NavLink to="/settings" className={navLinkClass}>Settings</NavLink>
             </AdminOnly>
@@ -69,6 +77,10 @@ function App() {
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/assignments" element={<Assignments />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route element={<WriteRoute />}>
+              <Route path="/import" element={<ImportExcel />} />
+            </Route>
             <Route element={<AdminRoute />}>
               <Route path="/settings" element={<Settings />} />
             </Route>

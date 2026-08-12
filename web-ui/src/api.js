@@ -101,6 +101,29 @@ export const getPinnedAssignments = () => api.get('/assignments/pinned');
 // Timeslots (read-only, any authenticated role - e.g. for the Assignments form)
 export const listTimeslots = () => api.get('/timeslots');
 
+// Admin: Engine (solver)
+export const runEngine = () => api.post('/admin/engine/run');
+export const getEngineStatus = () => api.get('/admin/engine/status');
+
+// Admin: Generate Blocks
+export const generateBlocks = () => api.post('/admin/blocks/generate');
+
+// Reports (read-only for any authenticated role; generate requires WRITER/ADMIN)
+export const listReports = () => api.get('/reports');
+export const getReportStatus = () => api.get('/reports/status');
+export const generateReports = () => api.post('/reports/generate');
+export const downloadReport = (filename) =>
+  api.get(`/reports/${encodeURIComponent(filename)}`, { responseType: 'blob' });
+
+// Excel import (WRITER or ADMIN)
+export const importExcel = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post('/import/excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
 // Admin: Timeslots
 export const getTimeslots = () => api.get('/admin/timeslots');
 export const getTimeslot = (id) => api.get(`/admin/timeslots/${id}`);
