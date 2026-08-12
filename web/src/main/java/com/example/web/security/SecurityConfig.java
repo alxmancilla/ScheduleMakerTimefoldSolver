@@ -113,7 +113,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        // Patterns (not setAllowedOrigins) so a wildcard like
+        // https://*.trycloudflare.com can match the random hostname a fresh
+        // cloudflared quick tunnel gets on every run. Required (rather than
+        // setAllowedOrigins) to combine wildcard matching with allowCredentials.
+        config.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
