@@ -19,6 +19,8 @@ public interface CourseBlockAssignmentRepository extends JpaRepository<CourseBlo
 
     long countByBlockTimeslotId(String blockTimeslotId);
 
+    boolean existsByGroupIdAndCourseId(String groupId, String courseId);
+
     @Query("SELECT a FROM CourseBlockAssignmentEntity a WHERE a.blockTimeslotId IS NOT NULL")
     List<CourseBlockAssignmentEntity> findAssignedBlocks();
 
