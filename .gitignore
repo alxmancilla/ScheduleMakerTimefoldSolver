@@ -49,3 +49,5 @@ calendario-bloques-por-maestro.pdf
 calendario-incumplimientos.pdf
 calendario-por-grupo.pdf
 calendario-por-maestro.pdf
+# Output dir for the admin-triggered "Generate PDFs" button (web/ReportRunnerService)
+/reports/
