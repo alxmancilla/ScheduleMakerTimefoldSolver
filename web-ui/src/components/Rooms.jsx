@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
@@ -15,6 +16,7 @@ const ROOM_TYPES = [
 ];
 
 function Rooms() {
+  const { t } = useTranslation();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,7 +34,7 @@ function Rooms() {
       setRooms(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load rooms: ' + err.message);
+      setError(t('rooms.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
     }
@@ -57,7 +59,7 @@ function Rooms() {
       setEditingRoom(null);
       loadRooms();
     } catch (err) {
-      setError('Failed to save room: ' + err.message);
+      setError(t('rooms.saveFailedPrefix') + err.message);
     }
   };
 
@@ -67,12 +69,12 @@ function Rooms() {
   };
 
   const handleDelete = async (name) => {
-    if (!confirm('Are you sure you want to delete this room?')) return;
+    if (!confirm(t('rooms.confirmDelete'))) return;
     try {
       await deleteRoom(name);
       loadRooms();
     } catch (err) {
-      setError('Failed to delete room: ' + err.message);
+      setError(t('rooms.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -81,16 +83,16 @@ function Rooms() {
     setEditingRoom(null);
   };
 
-  if (loading) return <div className="loading">Loading rooms...</div>;
+  if (loading) return <div className="loading">{t('rooms.loading')}</div>;
 
   return (
     <div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Rooms</h2>
+          <h2>{t('rooms.title')}</h2>
           <WriteOnly>
             <button className="btn btn-success" onClick={() => setShowForm(true)}>
-              + Add Room
+              {t('rooms.addRoom')}
             </button>
           </WriteOnly>
         </div>
@@ -100,18 +102,18 @@ function Rooms() {
 
       {showForm && (
         <div className="card">
-          <h3>{editingRoom ? 'Edit Room' : 'New Room'}</h3>
+          <h3>{editingRoom ? t('rooms.editRoom') : t('rooms.newRoom')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Name:</label>
+              <label>{t('rooms.fields.name')}</label>
               <input type="text" name="name" defaultValue={editingRoom?.name || ''} required disabled={!!editingRoom} />
             </div>
             <div className="form-group">
-              <label>Building:</label>
+              <label>{t('rooms.fields.building')}</label>
               <input type="text" name="building" defaultValue={editingRoom?.building || ''} required />
             </div>
             <div className="form-group">
-              <label>Type:</label>
+              <label>{t('rooms.fields.type')}</label>
               <select name="type" defaultValue={editingRoom?.type || 'estándar'}>
                 {ROOM_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -119,8 +121,8 @@ function Rooms() {
               </select>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary">Save</button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary">{t('common.save')}</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
             </div>
           </form>
         </div>
@@ -130,10 +132,10 @@ function Rooms() {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Building</th>
-              <th>Type</th>
-              <th>Actions</th>
+              <th>{t('rooms.table.name')}</th>
+              <th>{t('rooms.table.building')}</th>
+              <th>{t('rooms.table.type')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -145,10 +147,10 @@ function Rooms() {
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(room)} style={{ marginRight: '5px' }}>
-                      Edit
+                      {t('common.edit')}
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDelete(room.name)}>
-                      Delete
+                      {t('common.delete')}
                     </button>
                   </WriteOnly>
                 </td>
@@ -162,4 +164,3 @@ function Rooms() {
 }
 
 export default Rooms;
-

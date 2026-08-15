@@ -1,0 +1,362 @@
+{
+  "common": {
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "actions": "Acciones",
+    "yes": "Sí",
+    "no": "No",
+    "noneOption": "-- Ninguno --",
+    "days": {
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mié",
+      "thu": "Jue",
+      "fri": "Vie",
+      "sat": "Sáb",
+      "sun": "Dom"
+    },
+    "daysFull": {
+      "monday": "Lunes",
+      "tuesday": "Martes",
+      "wednesday": "Miércoles",
+      "thursday": "Jueves",
+      "friday": "Viernes"
+    }
+  },
+  "nav": {
+    "schedule": "Horario",
+    "teachers": "Maestros",
+    "courses": "Cursos",
+    "rooms": "Aulas",
+    "groups": "Grupos",
+    "assignments": "Asignaciones",
+    "reports": "Reportes",
+    "import": "Importar",
+    "settings": "Configuración",
+    "users": "Usuarios",
+    "logout": "Cerrar sesión",
+    "language": "Idioma"
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "username": "Usuario:",
+    "password": "Contraseña:",
+    "signIn": "Iniciar sesión",
+    "signingIn": "Iniciando sesión…",
+    "invalidCredentials": "Usuario o contraseña incorrectos.",
+    "failedPrefix": "Error al iniciar sesión: "
+  },
+  "teachers": {
+    "title": "Maestros",
+    "addTeacher": "+ Agregar Maestro",
+    "editTeacher": "Editar Maestro",
+    "newTeacher": "Nuevo Maestro",
+    "loading": "Cargando maestros...",
+    "loadFailedPrefix": "Error al cargar maestros: ",
+    "saveFailedPrefix": "Error al guardar maestro: ",
+    "deleteFailedPrefix": "Error al eliminar maestro: ",
+    "confirmDelete": "¿Está seguro de que desea eliminar este maestro?",
+    "fields": {
+      "id": "ID:",
+      "name": "Nombre:",
+      "lastName": "Apellido:",
+      "maxHoursPerWeek": "Máximo de Horas por Semana:",
+      "qualifications": "Cursos:",
+      "availability": "Disponibilidad:"
+    },
+    "qualificationsPlaceholder": "Escriba al menos 2 letras para buscar cursos, o agregue un curso y presione Enter",
+    "add": "Agregar",
+    "noQualifications": "No se han agregado cursos",
+    "checkAll": "Marcar Todo",
+    "uncheckAll": "Desmarcar Todo",
+    "table": {
+      "id": "ID",
+      "name": "Nombre",
+      "lastName": "Apellido",
+      "maxHoursWeek": "Máx Horas/Sem",
+      "qualifications": "Cursos",
+      "actions": "Acciones"
+    },
+    "available": "disponible",
+    "unavailable": "no disponible",
+    "days": {
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mié",
+      "thu": "Jue",
+      "fri": "Vie"
+    }
+  },
+  "courses": {
+    "title": "Cursos",
+    "addCourse": "+ Agregar Curso",
+    "editCourse": "Editar Curso",
+    "newCourse": "Nuevo Curso",
+    "loading": "Cargando cursos...",
+    "loadFailedPrefix": "Error al cargar cursos: ",
+    "saveFailedPrefix": "Error al guardar curso: ",
+    "deleteFailedPrefix": "Error al eliminar curso: ",
+    "confirmDelete": "¿Está seguro de que desea eliminar este curso?",
+    "fields": {
+      "id": "ID:",
+      "name": "Nombre:",
+      "abbreviation": "Abreviatura:",
+      "semester": "Semestre:",
+      "component": "Componente:",
+      "roomRequirement": "Requisito de Aula:",
+      "requiredHoursPerWeek": "Horas Requeridas por Semana:",
+      "active": "Activo:"
+    },
+    "componentPlaceholder": "p. ej. BASICAS, TPROG, TEM",
+    "table": {
+      "id": "ID",
+      "name": "Nombre",
+      "semester": "Semestre",
+      "roomReq": "Req. Aula",
+      "hoursWeek": "Horas/Sem",
+      "active": "Activo"
+    }
+  },
+  "rooms": {
+    "title": "Aulas",
+    "addRoom": "+ Agregar Aula",
+    "editRoom": "Editar Aula",
+    "newRoom": "Nueva Aula",
+    "loading": "Cargando aulas...",
+    "loadFailedPrefix": "Error al cargar aulas: ",
+    "saveFailedPrefix": "Error al guardar aula: ",
+    "deleteFailedPrefix": "Error al eliminar aula: ",
+    "confirmDelete": "¿Está seguro de que desea eliminar esta aula?",
+    "fields": {
+      "name": "Nombre:",
+      "building": "Edificio:",
+      "type": "Tipo:"
+    },
+    "table": {
+      "name": "Nombre",
+      "building": "Edificio",
+      "type": "Tipo"
+    }
+  },
+  "groups": {
+    "title": "Grupos de Estudiantes",
+    "addGroup": "+ Agregar Grupo",
+    "editGroup": "Editar Grupo",
+    "newGroup": "Nuevo Grupo",
+    "loading": "Cargando grupos...",
+    "loadFailedPrefix": "Error al cargar grupos: ",
+    "saveFailedPrefix": "Error al guardar grupo: ",
+    "deleteFailedPrefix": "Error al eliminar grupo: ",
+    "confirmDelete": "¿Está seguro de que desea eliminar este grupo?",
+    "fields": {
+      "id": "ID:",
+      "name": "Nombre:",
+      "preferredRoom": "Aula Preferida (opcional):"
+    },
+    "table": {
+      "id": "ID",
+      "name": "Nombre",
+      "preferredRoom": "Aula Preferida"
+    }
+  },
+  "assignments": {
+    "title": "Asignaciones de Bloques de Curso",
+    "addAssignment": "+ Agregar Asignación",
+    "editAssignment": "Editar Asignación",
+    "newAssignment": "Nueva Asignación",
+    "loading": "Cargando asignaciones...",
+    "loadFailedPrefix": "Error al cargar asignaciones: ",
+    "saveFailedPrefix": "Error al guardar asignación: ",
+    "deleteFailedPrefix": "Error al eliminar asignación: ",
+    "confirmDelete": "¿Está seguro de que desea eliminar esta asignación?",
+    "showing": "Mostrando {{filtered}} de {{total}} asignaciones",
+    "filters": {
+      "all": "Todas",
+      "assigned": "Asignadas",
+      "unassigned": "Sin Asignar",
+      "pinned": "Fijadas"
+    },
+    "fields": {
+      "id": "ID de Asignación:",
+      "idPatternTitle": "Solo letras, números, guiones y guiones bajos",
+      "group": "Grupo:",
+      "groupPlaceholder": "-- Seleccione un grupo --",
+      "course": "Curso:",
+      "coursePlaceholder": "-- Seleccione un curso --",
+      "blockLength": "Duración del Bloque (horas):",
+      "teacher": "Maestro (opcional):",
+      "blockTimeslot": "Horario de Bloque (opcional):",
+      "room": "Aula (opcional):",
+      "satisfiesRoomType": "Satisface Tipo de Aula (opcional):",
+      "preferredRoom": "Aula Preferida (opcional):",
+      "pin": "Fijar Asignación:"
+    },
+    "pinHint": "Las asignaciones fijadas requieren un horario de bloque.",
+    "pinnedRequiresTimeslotError": "Una asignación fijada debe tener un horario de bloque",
+    "cannotSavePinned": "No se puede guardar: las asignaciones fijadas requieren un horario de bloque.",
+    "table": {
+      "id": "ID",
+      "group": "Grupo",
+      "course": "Curso",
+      "blockLength": "Duración",
+      "teacher": "Maestro",
+      "schedule": "Horario",
+      "room": "Aula",
+      "pinned": "Fijada"
+    }
+  },
+  "reports": {
+    "title": "Reportes",
+    "refresh": "Actualizar",
+    "generatePdfs": "Generar PDFs",
+    "generating": "Generando…",
+    "loading": "Cargando reportes...",
+    "loadFailedPrefix": "Error al cargar reportes: ",
+    "genFailedPrefix": "Error al iniciar la generación de reportes: ",
+    "openFailedPrefix": "Error al abrir ",
+    "description": "Cada ejecución de \"Generar PDFs\" conserva su propio conjunto de archivos en lugar de sobrescribir el anterior, por lo que las ejecuciones pasadas permanecen aquí para comparar con las más recientes.",
+    "lastGeneration": "Última generación: ",
+    "finishedSuffix": " — finalizado {{timestamp}}",
+    "runningSuffix": " — se está generando una nueva ejecución ahora.",
+    "noFilesInRun": "No hay archivos en esta ejecución",
+    "noReportsYet": "Aún no se han generado reportes",
+    "table": {
+      "report": "Reporte",
+      "size": "Tamaño"
+    },
+    "opening": "Abriendo…",
+    "view": "Ver"
+  },
+  "importExcel": {
+    "title": "Importar Excel",
+    "description": "Actualiza o inserta datos base del problema (hojas de Maestros, Cursos, Aulas, Grupos, Group_Courses) por ID/nombre — las filas existentes se actualizan, las nuevas se crean. No modifica los horarios ni el calendario resuelto; ejecute el solver después para asignar los cursos/grupos importados.",
+    "importing": "Importando…",
+    "importButton": "Importar Excel",
+    "failedPrefix": "Error al importar el archivo: ",
+    "importedSummary": "Importado: {{teachers}} maestros, {{courses}} cursos, {{rooms}} aulas, {{groups}} grupos, {{groupCourses}} vínculos grupo-curso.",
+    "rejected": "Importación rechazada — no se escribió nada. Corrija estos errores y vuelva a cargar:"
+  },
+  "settings": {
+    "title": "Configuración",
+    "description": "Configuración exclusiva para administradores de valores usados en todo el planificador.",
+    "loading": "Cargando configuración...",
+    "solver": {
+      "title": "Solver",
+      "startEngine": "Iniciar Motor",
+      "running": "Ejecutando…",
+      "description": "Ejecuta el solver como un proceso en segundo plano (scripts/run-engine.sh) y escribe los resultados directamente en la base de datos. Esto puede tardar hasta unos minutos.",
+      "startFailedPrefix": "Error al iniciar el motor: ",
+      "state": "Estado:",
+      "started": "Iniciado:",
+      "finished": "Finalizado:",
+      "exitCode": "Código de salida:"
+    },
+    "complianceSnapshots": {
+      "title": "Instantáneas de Cumplimiento",
+      "refresh": "Actualizar",
+      "description": "Exclusivo para administradores. Se genera automáticamente una instantánea calendario-incumplimientos.pdf justo después de cada ejecución exitosa del motor, capturando las violaciones de restricciones de esa ejecución en el momento en que finalizó. Se almacena por separado de la pestaña Reportes y es visible solo para ADMIN.",
+      "loadFailedPrefix": "Error al cargar las instantáneas de cumplimiento: ",
+      "openFailedPrefix": "Error al abrir ",
+      "none": "Aún no hay instantáneas de cumplimiento — ejecute el solver arriba para generar una.",
+      "table": {
+        "run": "Ejecución",
+        "file": "Archivo"
+      },
+      "opening": "Abriendo…",
+      "view": "Ver"
+    },
+    "generateBlocks": {
+      "title": "Generar Bloques",
+      "button": "Generar Bloques",
+      "generating": "Generando…",
+      "description": "Crea los bloques de horario sin asignar que necesita el solver, uno por cada par (grupo, curso) en Group_Courses, descomponiendo las horas requeridas de cada curso en bloques de 1-2 horas. Solo llena los vacíos — un par (grupo, curso) que ya tiene bloques queda sin modificar, por lo que es seguro volver a ejecutarlo después de importar nuevos grupos/cursos. Ejecute esto después de la pestaña Importar y antes de Iniciar Motor.",
+      "failedPrefix": "Error al generar bloques: ",
+      "resultSummary": "Se crearon {{created}} bloque(s); se omitieron {{skipped}} par(es) que ya tenían bloques."
+    },
+    "timeslots": {
+      "title": "Horarios",
+      "addTimeslot": "+ Agregar Horario",
+      "editTimeslot": "Editar Horario",
+      "newTimeslot": "Nuevo Horario",
+      "loadFailedPrefix": "Error al cargar horarios: ",
+      "saveFailedPrefix": "Error al guardar horario: ",
+      "deleteFailedPrefix": "Error al eliminar horario: ",
+      "confirmDelete": "¿Eliminar {{day}} {{start}}:00-{{end}}:00?",
+      "fields": {
+        "day": "Día:",
+        "startHour": "Hora de Inicio:",
+        "length": "Duración (horas):",
+        "endsAt": "Termina a las:"
+      },
+      "exceedsDayBounds": " — excede el día escolar (máx 15:00)",
+      "table": {
+        "day": "Día",
+        "start": "Inicio",
+        "end": "Fin",
+        "length": "Duración (h)"
+      },
+      "none": "No hay horarios definidos"
+    }
+  },
+  "users": {
+    "title": "Usuarios",
+    "addUser": "+ Agregar Usuario",
+    "editUserPrefix": "Editar Usuario: ",
+    "newUser": "Nuevo Usuario",
+    "loading": "Cargando usuarios...",
+    "loadFailedPrefix": "Error al cargar usuarios: ",
+    "saveFailedPrefix": "Error al guardar usuario: ",
+    "deleteFailedPrefix": "Error al eliminar usuario: ",
+    "confirmDelete": "¿Eliminar el usuario \"{{username}}\"?",
+    "description": "Exclusivo para administradores. Gestiona quién puede iniciar sesión y con qué rol (ADMIN, WRITER, READER). No puede eliminar su propia cuenta, y el último ADMIN habilitado restante no puede eliminarse, degradarse ni deshabilitarse.",
+    "fields": {
+      "username": "Usuario:",
+      "password": "Contraseña:",
+      "role": "Rol:",
+      "enabled": "Habilitado",
+      "preferredLanguage": "Idioma Preferido:"
+    },
+    "resetPassword": "Restablecer Contraseña",
+    "resetPasswordFor": "Nueva contraseña para {{username}}:",
+    "resetFailedPrefix": "Error al restablecer la contraseña: ",
+    "selfDeleteTooltip": "No puede eliminar su propia cuenta",
+    "table": {
+      "username": "Usuario",
+      "role": "Rol",
+      "enabled": "Habilitado",
+      "language": "Idioma",
+      "created": "Creado"
+    },
+    "you": " (usted)",
+    "noUsers": "No se encontraron usuarios"
+  },
+  "schedule": {
+    "title": "Vista del Horario",
+    "gridView": "Vista de Cuadrícula",
+    "listView": "Vista de Lista",
+    "group": "Grupo:",
+    "teacher": "Maestro:",
+    "allTeachers": "Todos los Maestros",
+    "clearTeacherFilter": "Limpiar Filtro de Maestro",
+    "showing": "Mostrando {{filtered}} de {{total}} asignaciones",
+    "groupSuffix": " | Grupo: {{name}}",
+    "teacherSuffix": " | Maestro: {{name}}",
+    "loading": "Cargando horario...",
+    "loadFailedPrefix": "Error al cargar el horario: ",
+    "noData": "No hay datos de horario",
+    "hour": "Hora",
+    "list": {
+      "day": "Día",
+      "time": "Hora",
+      "course": "Curso",
+      "group": "Grupo",
+      "teacher": "Maestro",
+      "room": "Aula",
+      "pinned": "Fijado"
+    },
+    "noAssignments": "No se encontraron asignaciones para los filtros seleccionados",
+    "pinnedLabel": "FIJADO"
+  }
+}

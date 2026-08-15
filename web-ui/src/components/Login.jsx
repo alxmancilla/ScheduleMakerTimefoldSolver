@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthContext';
 
 /**
@@ -10,6 +11,7 @@ function Login() {
   const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -31,9 +33,9 @@ function Login() {
     } catch (err) {
       const status = err.response?.status;
       if (status === 401) {
-        setError('Invalid username or password.');
+        setError(t('login.invalidCredentials'));
       } else {
-        setError(err.response?.data?.message || 'Login failed: ' + err.message);
+        setError(err.response?.data?.message || t('login.failedPrefix') + err.message);
       }
     } finally {
       setSubmitting(false);
@@ -43,11 +45,11 @@ function Login() {
   return (
     <div style={{ maxWidth: '360px', margin: '80px auto' }}>
       <div className="card">
-        <h2>Sign in</h2>
+        <h2>{t('login.title')}</h2>
         {error && <div className="error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Username:</label>
+            <label>{t('login.username')}</label>
             <input
               type="text"
               value={username}
@@ -57,7 +59,7 @@ function Login() {
             />
           </div>
           <div className="form-group">
-            <label>Password:</label>
+            <label>{t('login.password')}</label>
             <input
               type="password"
               value={password}
@@ -66,7 +68,7 @@ function Login() {
             />
           </div>
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Sign in'}
+            {submitting ? t('login.signingIn') : t('login.signIn')}
           </button>
         </form>
       </div>

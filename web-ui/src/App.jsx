@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Schedule from './components/Schedule';
 import Teachers from './components/Teachers';
 import Courses from './components/Courses';
@@ -9,6 +10,7 @@ import Assignments from './components/Assignments';
 import Reports from './components/Reports';
 import ImportExcel from './components/Import';
 import Settings from './components/Settings';
+import Users from './components/Users';
 import Login from './components/Login';
 import ProtectedRoute from './auth/ProtectedRoute';
 import AdminRoute from './auth/AdminRoute';
@@ -20,8 +22,9 @@ import { useAuth } from './auth/AuthContext';
 const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
 
 function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, changeLanguage } = useAuth();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
 
   const handleLogout = () => {
     logout();
@@ -34,24 +37,34 @@ function Layout() {
         <div className="container">
           <h1>Schedule Maker</h1>
           <nav className="nav">
-            <NavLink to="/" className={navLinkClass}>Schedule</NavLink>
-            <NavLink to="/teachers" className={navLinkClass}>Teachers</NavLink>
-            <NavLink to="/courses" className={navLinkClass}>Courses</NavLink>
-            <NavLink to="/rooms" className={navLinkClass}>Rooms</NavLink>
-            <NavLink to="/groups" className={navLinkClass}>Groups</NavLink>
-            <NavLink to="/assignments" className={navLinkClass}>Assignments</NavLink>
-            <NavLink to="/reports" className={navLinkClass}>Reports</NavLink>
+            <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
+            <NavLink to="/teachers" className={navLinkClass}>{t('nav.teachers')}</NavLink>
+            <NavLink to="/courses" className={navLinkClass}>{t('nav.courses')}</NavLink>
+            <NavLink to="/rooms" className={navLinkClass}>{t('nav.rooms')}</NavLink>
+            <NavLink to="/groups" className={navLinkClass}>{t('nav.groups')}</NavLink>
+            <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
+            <NavLink to="/reports" className={navLinkClass}>{t('nav.reports')}</NavLink>
             <WriteOnly>
-              <NavLink to="/import" className={navLinkClass}>Import</NavLink>
+              <NavLink to="/import" className={navLinkClass}>{t('nav.import')}</NavLink>
             </WriteOnly>
             <AdminOnly>
-              <NavLink to="/settings" className={navLinkClass}>Settings</NavLink>
+              <NavLink to="/settings" className={navLinkClass}>{t('nav.settings')}</NavLink>
+              <NavLink to="/users" className={navLinkClass}>{t('nav.users')}</NavLink>
             </AdminOnly>
           </nav>
           {user && (
             <div className="user-box" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label htmlFor="language-select" style={{ display: 'none' }}>{t('nav.language')}</label>
+              <select
+                id="language-select"
+                value={i18n.language}
+                onChange={(e) => changeLanguage(e.target.value)}
+              >
+                <option value="en">EN</option>
+                <option value="es">ES</option>
+              </select>
               <span>{user.username} ({user.role})</span>
-              <button className="btn btn-secondary" onClick={handleLogout}>Logout</button>
+              <button className="btn btn-secondary" onClick={handleLogout}>{t('nav.logout')}</button>
             </div>
           )}
         </div>
@@ -83,6 +96,7 @@ function App() {
             </Route>
             <Route element={<AdminRoute />}>
               <Route path="/settings" element={<Settings />} />
+              <Route path="/users" element={<Users />} />
             </Route>
           </Route>
         </Route>

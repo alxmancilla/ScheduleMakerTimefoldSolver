@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
@@ -6,16 +7,17 @@ const MIN_CHARS_FOR_SUGGESTIONS = 2;
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const DAY_LABELS = [
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
+  { value: 1, dayKey: 'mon' },
+  { value: 2, dayKey: 'tue' },
+  { value: 3, dayKey: 'wed' },
+  { value: 4, dayKey: 'thu' },
+  { value: 5, dayKey: 'fri' },
 ];
 const AVAILABILITY_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
 const EMPTY_FORM = { id: '', name: '', lastName: '', maxHoursPerWeek: 40 };
 
 function Teachers() {
+  const { t } = useTranslation();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,7 +63,7 @@ function Teachers() {
       setTeachers(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load teachers: ' + err.message);
+      setError(t('teachers.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
     }
@@ -156,7 +158,7 @@ function Teachers() {
       if (data?.errors) {
         setFieldErrors(data.errors);
       }
-      setError(data?.message || 'Failed to save teacher: ' + err.message);
+      setError(data?.message || t('teachers.saveFailedPrefix') + err.message);
     }
   };
 
@@ -186,12 +188,12 @@ function Teachers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this teacher?')) return;
+    if (!confirm(t('teachers.confirmDelete'))) return;
     try {
       await deleteTeacher(id);
       loadTeachers();
     } catch (err) {
-      setError('Failed to delete teacher: ' + err.message);
+      setError(t('teachers.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -201,16 +203,16 @@ function Teachers() {
     resetForm();
   };
 
-  if (loading) return <div className="loading">Loading teachers...</div>;
+  if (loading) return <div className="loading">{t('teachers.loading')}</div>;
 
   return (
     <div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Teachers</h2>
+          <h2>{t('teachers.title')}</h2>
           <WriteOnly>
             <button className="btn btn-success" onClick={handleAdd}>
-              + Add Teacher
+              {t('teachers.addTeacher')}
             </button>
           </WriteOnly>
         </div>
@@ -220,10 +222,10 @@ function Teachers() {
 
       {showForm && (
         <div className="card">
-          <h3>{editingTeacher ? 'Edit Teacher' : 'New Teacher'}</h3>
+          <h3>{editingTeacher ? t('teachers.editTeacher') : t('teachers.newTeacher')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>ID:</label>
+              <label>{t('teachers.fields.id')}</label>
               <input
                 type="text"
                 name="id"
@@ -235,17 +237,17 @@ function Teachers() {
               {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
             </div>
             <div className="form-group">
-              <label>Name:</label>
+              <label>{t('teachers.fields.name')}</label>
               <input type="text" name="name" value={form.name} onChange={handleField} required />
               {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
             </div>
             <div className="form-group">
-              <label>Last Name:</label>
+              <label>{t('teachers.fields.lastName')}</label>
               <input type="text" name="lastName" value={form.lastName} onChange={handleField} required />
               {fieldErrors.lastName && <div className="error">{fieldErrors.lastName}</div>}
             </div>
             <div className="form-group">
-              <label>Max Hours Per Week:</label>
+              <label>{t('teachers.fields.maxHoursPerWeek')}</label>
               <input
                 type="number"
                 name="maxHoursPerWeek"
@@ -257,7 +259,7 @@ function Teachers() {
             </div>
 
             <div className="form-group">
-              <label>Qualifications:</label>
+              <label>{t('teachers.fields.qualifications')}</label>
               <div ref={qualBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <input
@@ -276,11 +278,11 @@ function Teachers() {
                         setShowSuggestions(false);
                       }
                     }}
-                    placeholder="Type at least 2 letters to search courses, or add a qualification and press Enter"
+                    placeholder={t('teachers.qualificationsPlaceholder')}
                     autoComplete="off"
                   />
                   <button type="button" className="btn btn-secondary" onClick={() => addQualification()}>
-                    Add
+                    {t('teachers.add')}
                   </button>
                 </div>
                 {showSuggestions && qualSuggestions.length > 0 && (
@@ -350,19 +352,19 @@ function Teachers() {
                   </span>
                 ))}
                 {qualifications.length === 0 && (
-                  <span style={{ color: '#7f8c8d', fontSize: '13px' }}>No qualifications added</span>
+                  <span style={{ color: '#7f8c8d', fontSize: '13px' }}>{t('teachers.noQualifications')}</span>
                 )}
               </div>
             </div>
 
             <div className="form-group">
-              <label>Availability:</label>
+              <label>{t('teachers.fields.availability')}</label>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
                 <button type="button" className="btn btn-secondary" onClick={checkAllAvailability}>
-                  Check All
+                  {t('teachers.checkAll')}
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={clearAllAvailability}>
-                  Uncheck All
+                  {t('teachers.uncheckAll')}
                 </button>
               </div>
               <table style={{ borderCollapse: 'collapse' }}>
@@ -370,7 +372,7 @@ function Teachers() {
                   <tr>
                     <th style={{ padding: '4px 8px' }}></th>
                     {DAY_LABELS.map((day) => (
-                      <th key={day.value} style={{ padding: '4px 8px', textAlign: 'center' }}>{day.label}</th>
+                      <th key={day.value} style={{ padding: '4px 8px', textAlign: 'center' }}>{t(`teachers.days.${day.dayKey}`)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -380,6 +382,7 @@ function Teachers() {
                       <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{hour}:00</td>
                       {DAY_LABELS.map((day) => {
                         const active = availability.has(availabilityKey(day.value, hour));
+                        const dayLabel = t(`teachers.days.${day.dayKey}`);
                         return (
                           <td key={day.value} style={{ padding: '2px', textAlign: 'center' }}>
                             <button
@@ -393,7 +396,7 @@ function Teachers() {
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                               }}
-                              aria-label={`${day.label} ${hour}:00 ${active ? 'available' : 'unavailable'}`}
+                              aria-label={`${dayLabel} ${hour}:00 ${active ? t('teachers.available') : t('teachers.unavailable')}`}
                             >
                               {active ? '✓' : ''}
                             </button>
@@ -407,8 +410,8 @@ function Teachers() {
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary">Save</button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary">{t('common.save')}</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
             </div>
           </form>
         </div>
@@ -418,12 +421,12 @@ function Teachers() {
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Last Name</th>
-              <th>Max Hours/Week</th>
-              <th>Qualifications</th>
-              <th>Actions</th>
+              <th>{t('teachers.table.id')}</th>
+              <th>{t('teachers.table.name')}</th>
+              <th>{t('teachers.table.lastName')}</th>
+              <th>{t('teachers.table.maxHoursWeek')}</th>
+              <th>{t('teachers.table.qualifications')}</th>
+              <th>{t('teachers.table.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -437,10 +440,10 @@ function Teachers() {
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(teacher)} style={{ marginRight: '5px' }}>
-                      Edit
+                      {t('common.edit')}
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDelete(teacher.id)}>
-                      Delete
+                      {t('common.delete')}
                     </button>
                   </WriteOnly>
                 </td>

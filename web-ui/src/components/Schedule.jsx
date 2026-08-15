@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getScheduleView, getGroups } from '../api';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
 
 function Schedule() {
+  const { t } = useTranslation();
+  const DAYS = DAY_KEYS.map((key) => t(`common.daysFull.${key}`));
   const [schedule, setSchedule] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,7 +44,7 @@ function Schedule() {
       setSchedule(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load schedule: ' + err.message);
+      setError(t('schedule.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
     }
@@ -109,9 +112,9 @@ function Schedule() {
     setSelectedTeacherId(e.target.value);
   };
 
-  if (loading) return <div className="loading">Loading schedule...</div>;
+  if (loading) return <div className="loading">{t('schedule.loading')}</div>;
   if (error) return <div className="error">{error}</div>;
-  if (!schedule) return <div className="loading">No schedule data</div>;
+  if (!schedule) return <div className="loading">{t('schedule.noData')}</div>;
 
   const filteredEntries = getFilteredEntries();
   const teachersForGroup = getTeachersForGroup();
@@ -120,20 +123,20 @@ function Schedule() {
     <div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Schedule View</h2>
+          <h2>{t('schedule.title')}</h2>
           <div>
             <button
               className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setViewMode('grid')}
               style={{ marginRight: '10px' }}
             >
-              Grid View
+              {t('schedule.gridView')}
             </button>
             <button
               className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setViewMode('list')}
             >
-              List View
+              {t('schedule.listView')}
             </button>
           </div>
         </div>
@@ -141,7 +144,7 @@ function Schedule() {
         {/* Filters */}
         <div style={{ marginTop: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label htmlFor="groupFilter" style={{ fontWeight: 'bold' }}>Group:</label>
+            <label htmlFor="groupFilter" style={{ fontWeight: 'bold' }}>{t('schedule.group')}</label>
             <select
               id="groupFilter"
               value={selectedGroupId}
@@ -155,7 +158,7 @@ function Schedule() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <label htmlFor="teacherFilter" style={{ fontWeight: 'bold' }}>Teacher:</label>
+            <label htmlFor="teacherFilter" style={{ fontWeight: 'bold' }}>{t('schedule.teacher')}</label>
             <select
               id="teacherFilter"
               value={selectedTeacherId}
@@ -163,7 +166,7 @@ function Schedule() {
               style={{ padding: '8px', minWidth: '200px' }}
               disabled={!selectedGroupId}
             >
-              <option value="">All Teachers</option>
+              <option value="">{t('schedule.allTeachers')}</option>
               {teachersForGroup.map(teacher => (
                 <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
               ))}
@@ -176,15 +179,15 @@ function Schedule() {
               onClick={() => setSelectedTeacherId('')}
               style={{ padding: '8px 16px' }}
             >
-              Clear Teacher Filter
+              {t('schedule.clearTeacherFilter')}
             </button>
           )}
         </div>
 
         <p style={{ marginTop: '15px', color: '#7f8c8d' }}>
-          Showing {filteredEntries.length} of {schedule.entries.length} assignments
-          {selectedGroupId && ` | Group: ${groups.find(g => g.id === selectedGroupId)?.name || selectedGroupId}`}
-          {selectedTeacherId && ` | Teacher: ${teachersForGroup.find(t => t.id === selectedTeacherId)?.name || selectedTeacherId}`}
+          {t('schedule.showing', { filtered: filteredEntries.length, total: schedule.entries.length })}
+          {selectedGroupId && t('schedule.groupSuffix', { name: groups.find(g => g.id === selectedGroupId)?.name || selectedGroupId })}
+          {selectedTeacherId && t('schedule.teacherSuffix', { name: teachersForGroup.find(t2 => t2.id === selectedTeacherId)?.name || selectedTeacherId })}
         </p>
       </div>
 
@@ -193,7 +196,7 @@ function Schedule() {
           <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ width: '80px', border: '1px solid #ddd', padding: '8px' }}>Hour</th>
+                <th style={{ width: '80px', border: '1px solid #ddd', padding: '8px' }}>{t('schedule.hour')}</th>
                 {DAYS.map((day, idx) => (
                   <th key={idx} style={{ border: '1px solid #ddd', padding: '8px' }}>{day}</th>
                 ))}
@@ -251,7 +254,7 @@ function Schedule() {
                             <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
                               {entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)
                             </div>
-                            {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 PINNED</div>}
+                            {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 {t('schedule.pinnedLabel')}</div>}
                           </div>
                         ))}
                       </td>
@@ -267,13 +270,13 @@ function Schedule() {
           <table>
             <thead>
               <tr>
-                <th>Day</th>
-                <th>Time</th>
-                <th>Course</th>
-                <th>Group</th>
-                <th>Teacher</th>
-                <th>Room</th>
-                <th>Pinned</th>
+                <th>{t('schedule.list.day')}</th>
+                <th>{t('schedule.list.time')}</th>
+                <th>{t('schedule.list.course')}</th>
+                <th>{t('schedule.list.group')}</th>
+                <th>{t('schedule.list.teacher')}</th>
+                <th>{t('schedule.list.room')}</th>
+                <th>{t('schedule.list.pinned')}</th>
               </tr>
             </thead>
             <tbody>
@@ -292,7 +295,7 @@ function Schedule() {
               ) : (
                 <tr>
                   <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#7f8c8d' }}>
-                    No assignments found for the selected filters
+                    {t('schedule.noAssignments')}
                   </td>
                 </tr>
               )}
@@ -305,4 +308,3 @@ function Schedule() {
 }
 
 export default Schedule;
-

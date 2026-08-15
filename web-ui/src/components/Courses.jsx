@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getCourses, createCourse, updateCourse, deleteCourse } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
@@ -18,6 +19,7 @@ const ROOM_TYPES = [
 const SEMESTERS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 function Courses() {
+  const { t } = useTranslation();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,7 +38,7 @@ function Courses() {
       setCourses(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load courses: ' + err.message);
+      setError(t('courses.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ function Courses() {
       if (data?.errors) {
         setFieldErrors(data.errors);
       }
-      setError(data?.message || 'Failed to save course: ' + err.message);
+      setError(data?.message || t('courses.saveFailedPrefix') + err.message);
     }
   };
 
@@ -84,12 +86,12 @@ function Courses() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this course?')) return;
+    if (!confirm(t('courses.confirmDelete'))) return;
     try {
       await deleteCourse(id);
       loadCourses();
     } catch (err) {
-      setError('Failed to delete course: ' + err.message);
+      setError(t('courses.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -100,13 +102,13 @@ function Courses() {
     setError(null);
   };
 
-  if (loading) return <div className="loading">Loading courses...</div>;
+  if (loading) return <div className="loading">{t('courses.loading')}</div>;
 
   return (
     <div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Courses</h2>
+          <h2>{t('courses.title')}</h2>
           <WriteOnly>
             <button
               className="btn btn-success"
@@ -117,7 +119,7 @@ function Courses() {
                 setShowForm(true);
               }}
             >
-              + Add Course
+              {t('courses.addCourse')}
             </button>
           </WriteOnly>
         </div>
@@ -127,10 +129,10 @@ function Courses() {
 
       {showForm && (
         <div className="card">
-          <h3>{editingCourse ? 'Edit Course' : 'New Course'}</h3>
+          <h3>{editingCourse ? t('courses.editCourse') : t('courses.newCourse')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>ID:</label>
+              <label>{t('courses.fields.id')}</label>
               <input
                 type="text"
                 name="id"
@@ -142,12 +144,12 @@ function Courses() {
               {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
             </div>
             <div className="form-group">
-              <label>Name:</label>
+              <label>{t('courses.fields.name')}</label>
               <input type="text" name="name" defaultValue={editingCourse?.name || ''} required />
               {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
             </div>
             <div className="form-group">
-              <label>Abbreviation:</label>
+              <label>{t('courses.fields.abbreviation')}</label>
               <input
                 type="text"
                 name="abbreviation"
@@ -158,7 +160,7 @@ function Courses() {
               {fieldErrors.abbreviation && <div className="error">{fieldErrors.abbreviation}</div>}
             </div>
             <div className="form-group">
-              <label>Semester:</label>
+              <label>{t('courses.fields.semester')}</label>
               <select name="semester" defaultValue={editingCourse?.semester || 1}>
                 {SEMESTERS.map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -167,19 +169,19 @@ function Courses() {
               {fieldErrors.semester && <div className="error">{fieldErrors.semester}</div>}
             </div>
             <div className="form-group">
-              <label>Component:</label>
+              <label>{t('courses.fields.component')}</label>
               <input
                 type="text"
                 name="component"
                 defaultValue={editingCourse?.component || ''}
                 maxLength={20}
                 required
-                placeholder="e.g. BASICAS, TPROG, TEM"
+                placeholder={t('courses.componentPlaceholder')}
               />
               {fieldErrors.component && <div className="error">{fieldErrors.component}</div>}
             </div>
             <div className="form-group">
-              <label>Room Requirement:</label>
+              <label>{t('courses.fields.roomRequirement')}</label>
               <select name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'estándar'}>
                 {ROOM_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
@@ -187,19 +189,19 @@ function Courses() {
               </select>
             </div>
             <div className="form-group">
-              <label>Required Hours Per Week:</label>
+              <label>{t('courses.fields.requiredHoursPerWeek')}</label>
               <input type="number" name="requiredHoursPerWeek" defaultValue={editingCourse?.requiredHoursPerWeek || 1} required />
             </div>
             <div className="form-group">
-              <label>Active:</label>
+              <label>{t('courses.fields.active')}</label>
               <select name="active" defaultValue={editingCourse?.active?.toString() || 'true'}>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
+                <option value="true">{t('common.yes')}</option>
+                <option value="false">{t('common.no')}</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary">Save</button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary">{t('common.save')}</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
             </div>
           </form>
         </div>
@@ -209,13 +211,13 @@ function Courses() {
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Semester</th>
-              <th>Room Req.</th>
-              <th>Hours/Week</th>
-              <th>Active</th>
-              <th>Actions</th>
+              <th>{t('courses.table.id')}</th>
+              <th>{t('courses.table.name')}</th>
+              <th>{t('courses.table.semester')}</th>
+              <th>{t('courses.table.roomReq')}</th>
+              <th>{t('courses.table.hoursWeek')}</th>
+              <th>{t('courses.table.active')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -230,10 +232,10 @@ function Courses() {
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(course)} style={{ marginRight: '5px' }}>
-                      Edit
+                      {t('common.edit')}
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDelete(course.id)}>
-                      Delete
+                      {t('common.delete')}
                     </button>
                   </WriteOnly>
                 </td>
@@ -247,4 +249,3 @@ function Courses() {
 }
 
 export default Courses;
-

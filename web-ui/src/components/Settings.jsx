@@ -1,25 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   getTimeslots, createTimeslot, updateTimeslot, deleteTimeslot,
   runEngine, getEngineStatus, generateBlocks,
+  listAdminReports, downloadAdminReport,
 } from '../api';
 
 const ENGINE_POLL_MS = 3000;
 
 const DAY_LABELS = [
-  { value: 1, label: 'Mon' },
-  { value: 2, label: 'Tue' },
-  { value: 3, label: 'Wed' },
-  { value: 4, label: 'Thu' },
-  { value: 5, label: 'Fri' },
+  { value: 1, key: 'mon' },
+  { value: 2, key: 'tue' },
+  { value: 3, key: 'wed' },
+  { value: 4, key: 'thu' },
+  { value: 5, key: 'fri' },
 ];
-const dayLabel = (value) => DAY_LABELS.find((d) => d.value === value)?.label || value;
 const formatTimestamp = (value) => (value ? value.replace('T', ' ').split('.')[0] : '-');
 const START_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
 const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 
 function Settings() {
+  const { t } = useTranslation();
+  const dayLabel = (value) => t(`common.days.${DAY_LABELS.find((d) => d.value === value)?.key || 'mon'}`);
+
   const [timeslots, setTimeslots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,11 +36,41 @@ function Settings() {
   const [engineError, setEngineError] = useState(null);
   const pollRef = useRef(null);
 
+  const [adminReports, setAdminReports] = useState([]);
+  const [adminReportsError, setAdminReportsError] = useState(null);
+  const [openingSnapshot, setOpeningSnapshot] = useState(null);
+
   useEffect(() => {
     loadTimeslots();
     loadEngineStatus();
+    loadAdminReports();
     return () => stopPolling();
   }, []);
+
+  const loadAdminReports = async () => {
+    try {
+      const response = await listAdminReports();
+      setAdminReports(response.data);
+      setAdminReportsError(null);
+    } catch (err) {
+      setAdminReportsError(t('settings.complianceSnapshots.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const handleViewSnapshot = async (runId, filename) => {
+    const key = `${runId}::${filename}`;
+    setOpeningSnapshot(key);
+    try {
+      const response = await downloadAdminReport(runId, filename);
+      const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch (err) {
+      setAdminReportsError(t('settings.complianceSnapshots.openFailedPrefix') + filename + ': ' + err.message);
+    } finally {
+      setOpeningSnapshot(null);
+    }
+  };
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -58,6 +92,8 @@ function Settings() {
         if (!pollRef.current) startPolling();
       } else {
         stopPolling();
+        // A run that just finished may have added a new compliance snapshot.
+        loadAdminReports();
       }
     } catch (err) {
       // Non-critical: status just won't update until the next successful poll.
@@ -71,7 +107,7 @@ function Settings() {
       setEngineStatus(response.data);
       startPolling();
     } catch (err) {
-      setEngineError(err.response?.data?.message || 'Failed to start engine: ' + err.message);
+      setEngineError(err.response?.data?.message || t('settings.solver.startFailedPrefix') + err.message);
     }
   };
 
@@ -87,7 +123,7 @@ function Settings() {
       const response = await generateBlocks();
       setBlockGenResult(response.data);
     } catch (err) {
-      setBlockGenError(err.response?.data?.message || 'Failed to generate blocks: ' + err.message);
+      setBlockGenError(err.response?.data?.message || t('settings.generateBlocks.failedPrefix') + err.message);
     } finally {
       setGeneratingBlocks(false);
     }
@@ -100,7 +136,7 @@ function Settings() {
       setTimeslots(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load timeslots: ' + err.message);
+      setError(t('settings.timeslots.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
     }
@@ -161,55 +197,58 @@ function Settings() {
       if (data?.errors) {
         setFieldErrors(data.errors);
       }
-      setError(data?.message || 'Failed to save timeslot: ' + err.message);
+      setError(data?.message || t('settings.timeslots.saveFailedPrefix') + err.message);
     }
   };
 
   const handleDelete = async (timeslot) => {
-    if (!confirm(`Delete ${dayLabel(timeslot.dayOfWeek)} ${timeslot.startHour}:00-${timeslot.startHour + timeslot.lengthHours}:00?`)) return;
+    if (!confirm(t('settings.timeslots.confirmDelete', {
+      day: dayLabel(timeslot.dayOfWeek),
+      start: timeslot.startHour,
+      end: timeslot.startHour + timeslot.lengthHours,
+    }))) return;
     try {
       await deleteTimeslot(timeslot.id);
       loadTimeslots();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete timeslot: ' + err.message);
+      setError(err.response?.data?.message || t('settings.timeslots.deleteFailedPrefix') + err.message);
     }
   };
 
   const endHour = form.startHour + form.lengthHours;
   const exceedsDayBounds = endHour > 15;
 
-  if (loading) return <div className="loading">Loading settings...</div>;
+  if (loading) return <div className="loading">{t('settings.loading')}</div>;
 
   return (
     <div>
       <div className="card">
-        <h2>Settings</h2>
-        <p style={{ color: '#7f8c8d', fontSize: '14px' }}>Admin-only configuration for values used across the scheduler.</p>
+        <h2>{t('settings.title')}</h2>
+        <p style={{ color: '#7f8c8d', fontSize: '14px' }}>{t('settings.description')}</p>
       </div>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>Solver</h3>
+          <h3>{t('settings.solver.title')}</h3>
           <button
             className="btn btn-success"
             onClick={handleRunEngine}
             disabled={engineStatus?.state === 'RUNNING'}
           >
-            {engineStatus?.state === 'RUNNING' ? 'Running…' : '▶ Start Engine'}
+            {engineStatus?.state === 'RUNNING' ? t('settings.solver.running') : `▶ ${t('settings.solver.startEngine')}`}
           </button>
         </div>
         <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
-          Runs the solver as a background process (scripts/run-engine.sh) and writes results
-          straight to the database. This can take up to a few minutes.
+          {t('settings.solver.description')}
         </p>
         {engineError && <div className="error">{engineError}</div>}
         {engineStatus && (
           <div style={{ marginTop: '10px' }}>
             <div style={{ display: 'flex', gap: '20px', fontSize: '13px', flexWrap: 'wrap' }}>
-              <span><strong>State:</strong> {engineStatus.state}</span>
-              <span><strong>Started:</strong> {formatTimestamp(engineStatus.startedAt)}</span>
-              <span><strong>Finished:</strong> {formatTimestamp(engineStatus.finishedAt)}</span>
-              <span><strong>Exit code:</strong> {engineStatus.exitCode ?? '-'}</span>
+              <span><strong>{t('settings.solver.state')}</strong> {engineStatus.state}</span>
+              <span><strong>{t('settings.solver.started')}</strong> {formatTimestamp(engineStatus.startedAt)}</span>
+              <span><strong>{t('settings.solver.finished')}</strong> {formatTimestamp(engineStatus.finishedAt)}</span>
+              <span><strong>{t('settings.solver.exitCode')}</strong> {engineStatus.exitCode ?? '-'}</span>
             </div>
             {engineStatus.log && engineStatus.log.length > 0 && (
               <pre
@@ -234,27 +273,73 @@ function Settings() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>Generate Blocks</h3>
+          <h3>{t('settings.complianceSnapshots.title')}</h3>
+          <button className="btn btn-secondary" onClick={loadAdminReports}>↻ {t('settings.complianceSnapshots.refresh')}</button>
+        </div>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          {t('settings.complianceSnapshots.description')}
+        </p>
+        {adminReportsError && <div className="error">{adminReportsError}</div>}
+        {adminReports.length === 0 && !adminReportsError && (
+          <p style={{ color: '#7f8c8d', fontSize: '13px' }}>{t('settings.complianceSnapshots.none')}</p>
+        )}
+        {adminReports.length > 0 && (
+          <table style={{ marginTop: '8px' }}>
+            <thead>
+              <tr>
+                <th>{t('settings.complianceSnapshots.table.run')}</th>
+                <th>{t('settings.complianceSnapshots.table.file')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adminReports.map((run) =>
+                run.files.map((f) => {
+                  const key = `${run.runId}::${f.filename}`;
+                  return (
+                    <tr key={key}>
+                      <td>{formatTimestamp(run.generatedAt)}</td>
+                      <td>{f.filename}</td>
+                      <td>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleViewSnapshot(run.runId, f.filename)}
+                          disabled={openingSnapshot === key}
+                        >
+                          {openingSnapshot === key ? t('settings.complianceSnapshots.opening') : t('settings.complianceSnapshots.view')}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('settings.generateBlocks.title')}</h3>
           <button
             className="btn btn-success"
             onClick={handleGenerateBlocks}
             disabled={generatingBlocks}
           >
-            {generatingBlocks ? 'Generating…' : '⚙ Generate Blocks'}
+            {generatingBlocks ? t('settings.generateBlocks.generating') : `⚙ ${t('settings.generateBlocks.button')}`}
           </button>
         </div>
         <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
-          Creates the unassigned schedule blocks the solver needs, one per (group, course) pair in
-          Group_Courses, decomposing each course's required hours into 1-2 hour blocks. Only fills
-          gaps — a (group, course) pair that already has blocks is left untouched, so this is safe
-          to re-run after importing new groups/courses. Run this after the Import tab and before
-          Start Engine.
+          {t('settings.generateBlocks.description')}
         </p>
         {blockGenError && <div className="error">{blockGenError}</div>}
         {blockGenResult && (
           <div style={{ marginTop: '10px', fontSize: '13px' }}>
             <div style={{ color: '#2e7d32' }}>
-              Created {blockGenResult.blocksCreated} block(s); skipped {blockGenResult.groupCoursesSkippedExisting} pair(s) that already had blocks.
+              {t('settings.generateBlocks.resultSummary', {
+                created: blockGenResult.blocksCreated,
+                skipped: blockGenResult.groupCoursesSkippedExisting,
+              })}
             </div>
             {blockGenResult.warnings.length > 0 && (
               <ul style={{ marginTop: '6px', color: '#c0392b' }}>
@@ -269,9 +354,9 @@ function Settings() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>Timeslots</h3>
+          <h3>{t('settings.timeslots.title')}</h3>
           <button className="btn btn-success" onClick={handleAdd}>
-            + Add Timeslot
+            {t('settings.timeslots.addTimeslot')}
           </button>
         </div>
       </div>
@@ -280,19 +365,19 @@ function Settings() {
 
       {showForm && (
         <div className="card">
-          <h3>{editingTimeslot ? 'Edit Timeslot' : 'New Timeslot'}</h3>
+          <h3>{editingTimeslot ? t('settings.timeslots.editTimeslot') : t('settings.timeslots.newTimeslot')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Day:</label>
+              <label>{t('settings.timeslots.fields.day')}</label>
               <select name="dayOfWeek" value={form.dayOfWeek} onChange={handleField}>
                 {DAY_LABELS.map((day) => (
-                  <option key={day.value} value={day.value}>{day.label}</option>
+                  <option key={day.value} value={day.value}>{t(`common.days.${day.key}`)}</option>
                 ))}
               </select>
               {fieldErrors.dayOfWeek && <div className="error">{fieldErrors.dayOfWeek}</div>}
             </div>
             <div className="form-group">
-              <label>Start Hour:</label>
+              <label>{t('settings.timeslots.fields.startHour')}</label>
               <select name="startHour" value={form.startHour} onChange={handleField}>
                 {START_HOURS.map((h) => (
                   <option key={h} value={h}>{h}:00</option>
@@ -301,7 +386,7 @@ function Settings() {
               {fieldErrors.startHour && <div className="error">{fieldErrors.startHour}</div>}
             </div>
             <div className="form-group">
-              <label>Length (hours):</label>
+              <label>{t('settings.timeslots.fields.length')}</label>
               <select name="lengthHours" value={form.lengthHours} onChange={handleField}>
                 {LENGTHS.map((l) => (
                   <option key={l} value={l}>{l}</option>
@@ -310,15 +395,15 @@ function Settings() {
               {fieldErrors.lengthHours && <div className="error">{fieldErrors.lengthHours}</div>}
             </div>
             <div className="form-group">
-              <label>Ends at:</label>
+              <label>{t('settings.timeslots.fields.endsAt')}</label>
               <span style={{ color: exceedsDayBounds ? '#c0392b' : undefined }}>
-                {endHour}:00{exceedsDayBounds ? ' — exceeds the school day (max 15:00)' : ''}
+                {endHour}:00{exceedsDayBounds ? t('settings.timeslots.exceedsDayBounds') : ''}
               </span>
               {fieldErrors.withinDayBounds && <div className="error">{fieldErrors.withinDayBounds}</div>}
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary" disabled={exceedsDayBounds}>Save</button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={exceedsDayBounds}>{t('common.save')}</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
             </div>
           </form>
         </div>
@@ -328,11 +413,11 @@ function Settings() {
         <table>
           <thead>
             <tr>
-              <th>Day</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Length (h)</th>
-              <th>Actions</th>
+              <th>{t('settings.timeslots.table.day')}</th>
+              <th>{t('settings.timeslots.table.start')}</th>
+              <th>{t('settings.timeslots.table.end')}</th>
+              <th>{t('settings.timeslots.table.length')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -344,17 +429,17 @@ function Settings() {
                 <td>{timeslot.lengthHours}</td>
                 <td>
                   <button className="btn btn-primary" onClick={() => handleEdit(timeslot)} style={{ marginRight: '5px' }}>
-                    Edit
+                    {t('common.edit')}
                   </button>
                   <button className="btn btn-danger" onClick={() => handleDelete(timeslot)}>
-                    Delete
+                    {t('common.delete')}
                   </button>
                 </td>
               </tr>
             ))}
             {timeslots.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: '#7f8c8d' }}>No timeslots defined</td>
+                <td colSpan={5} style={{ color: '#7f8c8d' }}>{t('settings.timeslots.none')}</td>
               </tr>
             )}
           </tbody>

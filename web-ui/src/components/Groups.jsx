@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getGroups, createGroup, updateGroup, deleteGroup, getRooms } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
 function Groups() {
+  const { t } = useTranslation();
   const [groups, setGroups] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ function Groups() {
       setGroups(response.data);
       setError(null);
     } catch (err) {
-      setError('Failed to load groups: ' + err.message);
+      setError(t('groups.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
     }
@@ -56,7 +58,7 @@ function Groups() {
       setEditingGroup(null);
       loadGroups();
     } catch (err) {
-      setError('Failed to save group: ' + err.message);
+      setError(t('groups.saveFailedPrefix') + err.message);
     }
   };
 
@@ -66,12 +68,12 @@ function Groups() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this group?')) return;
+    if (!confirm(t('groups.confirmDelete'))) return;
     try {
       await deleteGroup(id);
       loadGroups();
     } catch (err) {
-      setError('Failed to delete group: ' + err.message);
+      setError(t('groups.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -80,16 +82,16 @@ function Groups() {
     setEditingGroup(null);
   };
 
-  if (loading) return <div className="loading">Loading groups...</div>;
+  if (loading) return <div className="loading">{t('groups.loading')}</div>;
 
   return (
     <div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>Student Groups</h2>
+          <h2>{t('groups.title')}</h2>
           <WriteOnly>
             <button className="btn btn-success" onClick={() => setShowForm(true)}>
-              + Add Group
+              {t('groups.addGroup')}
             </button>
           </WriteOnly>
         </div>
@@ -99,28 +101,28 @@ function Groups() {
 
       {showForm && (
         <div className="card">
-          <h3>{editingGroup ? 'Edit Group' : 'New Group'}</h3>
+          <h3>{editingGroup ? t('groups.editGroup') : t('groups.newGroup')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>ID:</label>
+              <label>{t('groups.fields.id')}</label>
               <input type="text" name="id" defaultValue={editingGroup?.id || ''} required disabled={!!editingGroup} />
             </div>
             <div className="form-group">
-              <label>Name:</label>
+              <label>{t('groups.fields.name')}</label>
               <input type="text" name="name" defaultValue={editingGroup?.name || ''} required />
             </div>
             <div className="form-group">
-              <label>Preferred Room (optional):</label>
+              <label>{t('groups.fields.preferredRoom')}</label>
               <select name="preferredRoomName" defaultValue={editingGroup?.preferredRoomName || ''}>
-                <option value="">-- None --</option>
+                <option value="">{t('common.noneOption')}</option>
                 {rooms.map((room) => (
                   <option key={room.name} value={room.name}>{room.name}</option>
                 ))}
               </select>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary">Save</button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary">{t('common.save')}</button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
             </div>
           </form>
         </div>
@@ -130,10 +132,10 @@ function Groups() {
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Preferred Room</th>
-              <th>Actions</th>
+              <th>{t('groups.table.id')}</th>
+              <th>{t('groups.table.name')}</th>
+              <th>{t('groups.table.preferredRoom')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -145,10 +147,10 @@ function Groups() {
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(group)} style={{ marginRight: '5px' }}>
-                      Edit
+                      {t('common.edit')}
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDelete(group.id)}>
-                      Delete
+                      {t('common.delete')}
                     </button>
                   </WriteOnly>
                 </td>
@@ -162,4 +164,3 @@ function Groups() {
 }
 
 export default Groups;
-

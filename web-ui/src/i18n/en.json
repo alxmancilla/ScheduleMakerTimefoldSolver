@@ -1,0 +1,362 @@
+{
+  "common": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "actions": "Actions",
+    "yes": "Yes",
+    "no": "No",
+    "noneOption": "-- None --",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "daysFull": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday"
+    }
+  },
+  "nav": {
+    "schedule": "Schedule",
+    "teachers": "Teachers",
+    "courses": "Courses",
+    "rooms": "Rooms",
+    "groups": "Groups",
+    "assignments": "Assignments",
+    "reports": "Reports",
+    "import": "Import",
+    "settings": "Settings",
+    "users": "Users",
+    "logout": "Logout",
+    "language": "Language"
+  },
+  "login": {
+    "title": "Sign in",
+    "username": "Username:",
+    "password": "Password:",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "invalidCredentials": "Invalid username or password.",
+    "failedPrefix": "Login failed: "
+  },
+  "teachers": {
+    "title": "Teachers",
+    "addTeacher": "+ Add Teacher",
+    "editTeacher": "Edit Teacher",
+    "newTeacher": "New Teacher",
+    "loading": "Loading teachers...",
+    "loadFailedPrefix": "Failed to load teachers: ",
+    "saveFailedPrefix": "Failed to save teacher: ",
+    "deleteFailedPrefix": "Failed to delete teacher: ",
+    "confirmDelete": "Are you sure you want to delete this teacher?",
+    "fields": {
+      "id": "ID:",
+      "name": "Name:",
+      "lastName": "Last Name:",
+      "maxHoursPerWeek": "Max Hours Per Week:",
+      "qualifications": "Courses:",
+      "availability": "Availability:"
+    },
+    "qualificationsPlaceholder": "Type at least 2 letters to search courses, or add a course and press Enter",
+    "add": "Add",
+    "noQualifications": "No courses added",
+    "checkAll": "Check All",
+    "uncheckAll": "Uncheck All",
+    "table": {
+      "id": "ID",
+      "name": "Name",
+      "lastName": "Last Name",
+      "maxHoursWeek": "Max Hours/Week",
+      "qualifications": "Courses",
+      "actions": "Actions"
+    },
+    "available": "available",
+    "unavailable": "unavailable",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri"
+    }
+  },
+  "courses": {
+    "title": "Courses",
+    "addCourse": "+ Add Course",
+    "editCourse": "Edit Course",
+    "newCourse": "New Course",
+    "loading": "Loading courses...",
+    "loadFailedPrefix": "Failed to load courses: ",
+    "saveFailedPrefix": "Failed to save course: ",
+    "deleteFailedPrefix": "Failed to delete course: ",
+    "confirmDelete": "Are you sure you want to delete this course?",
+    "fields": {
+      "id": "ID:",
+      "name": "Name:",
+      "abbreviation": "Abbreviation:",
+      "semester": "Semester:",
+      "component": "Component:",
+      "roomRequirement": "Room Requirement:",
+      "requiredHoursPerWeek": "Required Hours Per Week:",
+      "active": "Active:"
+    },
+    "componentPlaceholder": "e.g. BASICAS, TPROG, TEM",
+    "table": {
+      "id": "ID",
+      "name": "Name",
+      "semester": "Semester",
+      "roomReq": "Room Req.",
+      "hoursWeek": "Hours/Week",
+      "active": "Active"
+    }
+  },
+  "rooms": {
+    "title": "Rooms",
+    "addRoom": "+ Add Room",
+    "editRoom": "Edit Room",
+    "newRoom": "New Room",
+    "loading": "Loading rooms...",
+    "loadFailedPrefix": "Failed to load rooms: ",
+    "saveFailedPrefix": "Failed to save room: ",
+    "deleteFailedPrefix": "Failed to delete room: ",
+    "confirmDelete": "Are you sure you want to delete this room?",
+    "fields": {
+      "name": "Name:",
+      "building": "Building:",
+      "type": "Type:"
+    },
+    "table": {
+      "name": "Name",
+      "building": "Building",
+      "type": "Type"
+    }
+  },
+  "groups": {
+    "title": "Student Groups",
+    "addGroup": "+ Add Group",
+    "editGroup": "Edit Group",
+    "newGroup": "New Group",
+    "loading": "Loading groups...",
+    "loadFailedPrefix": "Failed to load groups: ",
+    "saveFailedPrefix": "Failed to save group: ",
+    "deleteFailedPrefix": "Failed to delete group: ",
+    "confirmDelete": "Are you sure you want to delete this group?",
+    "fields": {
+      "id": "ID:",
+      "name": "Name:",
+      "preferredRoom": "Preferred Room (optional):"
+    },
+    "table": {
+      "id": "ID",
+      "name": "Name",
+      "preferredRoom": "Preferred Room"
+    }
+  },
+  "assignments": {
+    "title": "Course Block Assignments",
+    "addAssignment": "+ Add Assignment",
+    "editAssignment": "Edit Assignment",
+    "newAssignment": "New Assignment",
+    "loading": "Loading assignments...",
+    "loadFailedPrefix": "Failed to load assignments: ",
+    "saveFailedPrefix": "Failed to save assignment: ",
+    "deleteFailedPrefix": "Failed to delete assignment: ",
+    "confirmDelete": "Are you sure you want to delete this assignment?",
+    "showing": "Showing {{filtered}} of {{total}} assignments",
+    "filters": {
+      "all": "All",
+      "assigned": "Assigned",
+      "unassigned": "Unassigned",
+      "pinned": "Pinned"
+    },
+    "fields": {
+      "id": "Assignment ID:",
+      "idPatternTitle": "Only letters, numbers, hyphens, and underscores",
+      "group": "Group:",
+      "groupPlaceholder": "-- Select a group --",
+      "course": "Course:",
+      "coursePlaceholder": "-- Select a course --",
+      "blockLength": "Block Length (hours):",
+      "teacher": "Teacher (optional):",
+      "blockTimeslot": "Block Timeslot (optional):",
+      "room": "Room (optional):",
+      "satisfiesRoomType": "Satisfies Room Type (optional):",
+      "preferredRoom": "Preferred Room (optional):",
+      "pin": "Pin Assignment:"
+    },
+    "pinHint": "Pinned assignments require a block timeslot.",
+    "pinnedRequiresTimeslotError": "A pinned assignment must have a block timeslot",
+    "cannotSavePinned": "Cannot save: pinned assignments require a block timeslot.",
+    "table": {
+      "id": "ID",
+      "group": "Group",
+      "course": "Course",
+      "blockLength": "Block Length",
+      "teacher": "Teacher",
+      "schedule": "Schedule",
+      "room": "Room",
+      "pinned": "Pinned"
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "refresh": "Refresh",
+    "generatePdfs": "Generate PDFs",
+    "generating": "Generating…",
+    "loading": "Loading reports...",
+    "loadFailedPrefix": "Failed to load reports: ",
+    "genFailedPrefix": "Failed to start report generation: ",
+    "openFailedPrefix": "Failed to open ",
+    "description": "Each \"Generate PDFs\" run keeps its own set of files instead of overwriting the last one, so past runs stay here to compare against newer ones.",
+    "lastGeneration": "Last generation: ",
+    "finishedSuffix": " — finished {{timestamp}}",
+    "runningSuffix": " — a new run is being generated now.",
+    "noFilesInRun": "No files in this run",
+    "noReportsYet": "No reports generated yet",
+    "table": {
+      "report": "Report",
+      "size": "Size"
+    },
+    "opening": "Opening…",
+    "view": "View"
+  },
+  "importExcel": {
+    "title": "Import Excel",
+    "description": "Upserts base problem data (Teachers, Courses, Rooms, Groups, Group_Courses sheets) by ID/name — existing rows are updated, new ones created. Does not touch timeslots or the solved schedule; run the solver afterward to assign the imported courses/groups.",
+    "importing": "Importing…",
+    "importButton": "Import Excel",
+    "failedPrefix": "Failed to import file: ",
+    "importedSummary": "Imported: {{teachers}} teachers, {{courses}} courses, {{rooms}} rooms, {{groups}} groups, {{groupCourses}} group-course links.",
+    "rejected": "Import rejected — nothing was written. Fix these and re-upload:"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Admin-only configuration for values used across the scheduler.",
+    "loading": "Loading settings...",
+    "solver": {
+      "title": "Solver",
+      "startEngine": "Start Engine",
+      "running": "Running…",
+      "description": "Runs the solver as a background process (scripts/run-engine.sh) and writes results straight to the database. This can take up to a few minutes.",
+      "startFailedPrefix": "Failed to start engine: ",
+      "state": "State:",
+      "started": "Started:",
+      "finished": "Finished:",
+      "exitCode": "Exit code:"
+    },
+    "complianceSnapshots": {
+      "title": "Compliance Snapshots",
+      "refresh": "Refresh",
+      "description": "Admin-only. A calendario-incumplimientos.pdf snapshot is generated automatically right after each successful engine run, capturing that run's constraint violations at the moment it finished. Stored separately from the Reports tab and visible only to ADMIN.",
+      "loadFailedPrefix": "Failed to load compliance snapshots: ",
+      "openFailedPrefix": "Failed to open ",
+      "none": "No compliance snapshots yet — run the solver above to generate one.",
+      "table": {
+        "run": "Run",
+        "file": "File"
+      },
+      "opening": "Opening…",
+      "view": "View"
+    },
+    "generateBlocks": {
+      "title": "Generate Blocks",
+      "button": "Generate Blocks",
+      "generating": "Generating…",
+      "description": "Creates the unassigned schedule blocks the solver needs, one per (group, course) pair in Group_Courses, decomposing each course's required hours into 1-2 hour blocks. Only fills gaps — a (group, course) pair that already has blocks is left untouched, so this is safe to re-run after importing new groups/courses. Run this after the Import tab and before Start Engine.",
+      "failedPrefix": "Failed to generate blocks: ",
+      "resultSummary": "Created {{created}} block(s); skipped {{skipped}} pair(s) that already had blocks."
+    },
+    "timeslots": {
+      "title": "Timeslots",
+      "addTimeslot": "+ Add Timeslot",
+      "editTimeslot": "Edit Timeslot",
+      "newTimeslot": "New Timeslot",
+      "loadFailedPrefix": "Failed to load timeslots: ",
+      "saveFailedPrefix": "Failed to save timeslot: ",
+      "deleteFailedPrefix": "Failed to delete timeslot: ",
+      "confirmDelete": "Delete {{day}} {{start}}:00-{{end}}:00?",
+      "fields": {
+        "day": "Day:",
+        "startHour": "Start Hour:",
+        "length": "Length (hours):",
+        "endsAt": "Ends at:"
+      },
+      "exceedsDayBounds": " — exceeds the school day (max 15:00)",
+      "table": {
+        "day": "Day",
+        "start": "Start",
+        "end": "End",
+        "length": "Length (h)"
+      },
+      "none": "No timeslots defined"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "+ Add User",
+    "editUserPrefix": "Edit User: ",
+    "newUser": "New User",
+    "loading": "Loading users...",
+    "loadFailedPrefix": "Failed to load users: ",
+    "saveFailedPrefix": "Failed to save user: ",
+    "deleteFailedPrefix": "Failed to delete user: ",
+    "confirmDelete": "Delete user \"{{username}}\"?",
+    "description": "Admin-only. Manages who can sign in and with which role (ADMIN, WRITER, READER). You can't delete your own account, and the last remaining enabled ADMIN can't be deleted, demoted, or disabled.",
+    "fields": {
+      "username": "Username:",
+      "password": "Password:",
+      "role": "Role:",
+      "enabled": "Enabled",
+      "preferredLanguage": "Preferred Language:"
+    },
+    "resetPassword": "Reset Password",
+    "resetPasswordFor": "New password for {{username}}:",
+    "resetFailedPrefix": "Failed to reset password: ",
+    "selfDeleteTooltip": "Can't delete your own account",
+    "table": {
+      "username": "Username",
+      "role": "Role",
+      "enabled": "Enabled",
+      "language": "Language",
+      "created": "Created"
+    },
+    "you": " (you)",
+    "noUsers": "No users found"
+  },
+  "schedule": {
+    "title": "Schedule View",
+    "gridView": "Grid View",
+    "listView": "List View",
+    "group": "Group:",
+    "teacher": "Teacher:",
+    "allTeachers": "All Teachers",
+    "clearTeacherFilter": "Clear Teacher Filter",
+    "showing": "Showing {{filtered}} of {{total}} assignments",
+    "groupSuffix": " | Group: {{name}}",
+    "teacherSuffix": " | Teacher: {{name}}",
+    "loading": "Loading schedule...",
+    "loadFailedPrefix": "Failed to load schedule: ",
+    "noData": "No schedule data",
+    "hour": "Hour",
+    "list": {
+      "day": "Day",
+      "time": "Time",
+      "course": "Course",
+      "group": "Group",
+      "teacher": "Teacher",
+      "room": "Room",
+      "pinned": "Pinned"
+    },
+    "noAssignments": "No assignments found for the selected filters",
+    "pinnedLabel": "PINNED"
+  }
+}

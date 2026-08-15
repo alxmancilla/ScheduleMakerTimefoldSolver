@@ -50,6 +50,7 @@ api.interceptors.response.use(
 // Auth
 export const login = (username, password) => api.post('/auth/login', { username, password });
 export const getCurrentUser = () => api.get('/auth/me');
+export const updatePreferredLanguage = (language) => api.put('/auth/preferred-language', { language });
 
 // Teachers
 export const getTeachers = () => api.get('/teachers');
@@ -108,12 +109,29 @@ export const getEngineStatus = () => api.get('/admin/engine/status');
 // Admin: Generate Blocks
 export const generateBlocks = () => api.post('/admin/blocks/generate');
 
+// Admin: compliance-snapshot PDFs (calendario-incumplimientos.pdf),
+// generated automatically after each engine run - ADMIN only, distinct from
+// the WRITER-accessible /reports runs above.
+export const listAdminReports = () => api.get('/admin/reports');
+export const downloadAdminReport = (runId, filename) =>
+  api.get(`/admin/reports/${encodeURIComponent(runId)}/${encodeURIComponent(filename)}`, { responseType: 'blob' });
+
+// Admin: application users (who can sign in and with which role)
+export const getUsers = () => api.get('/admin/users');
+export const createUser = (user) => api.post('/admin/users', user);
+export const updateUser = (username, user) => api.put(`/admin/users/${encodeURIComponent(username)}`, user);
+export const resetUserPassword = (username, newPassword) =>
+  api.put(`/admin/users/${encodeURIComponent(username)}/password`, { newPassword });
+export const deleteUser = (username) => api.delete(`/admin/users/${encodeURIComponent(username)}`);
+
 // Reports (read-only for any authenticated role; generate requires WRITER/ADMIN)
+// listReports() returns past "Generate PDFs" runs, newest first, each with its own
+// files - past runs aren't overwritten, so they stay around for comparison.
 export const listReports = () => api.get('/reports');
 export const getReportStatus = () => api.get('/reports/status');
 export const generateReports = () => api.post('/reports/generate');
-export const downloadReport = (filename) =>
-  api.get(`/reports/${encodeURIComponent(filename)}`, { responseType: 'blob' });
+export const downloadReport = (runId, filename) =>
+  api.get(`/reports/${encodeURIComponent(runId)}/${encodeURIComponent(filename)}`, { responseType: 'blob' });
 
 // Excel import (WRITER or ADMIN)
 export const importExcel = (file) => {
