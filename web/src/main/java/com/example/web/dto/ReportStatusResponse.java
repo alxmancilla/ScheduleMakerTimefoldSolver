@@ -16,6 +16,7 @@ public class ReportStatusResponse {
     private final LocalDateTime startedAt;
     private final LocalDateTime finishedAt;
     private final Integer exitCode;
+    private final String runId;
     private final List<String> log;
 
     public ReportStatusResponse(ReportRunnerService.Snapshot snapshot) {
@@ -23,6 +24,7 @@ public class ReportStatusResponse {
         this.startedAt = snapshot.startedAt;
         this.finishedAt = snapshot.finishedAt;
         this.exitCode = snapshot.exitCode;
+        this.runId = snapshot.runId;
         this.log = snapshot.logLines;
     }
 
@@ -40,6 +42,10 @@ public class ReportStatusResponse {
 
     public Integer getExitCode() {
         return exitCode;
+    }
+
+    public String getRunId() {
+        return runId;
     }
 
     public List<String> getLog() {

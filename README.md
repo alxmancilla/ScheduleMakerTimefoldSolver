@@ -258,9 +258,9 @@ REPORTER_OUTPUT_DIR=./reports \
 ./scripts/run-reporter.sh
 ```
 This writes:
-- `calendario-bloques-incumplimientos.pdf` - Constraint violations
-- `calendario-bloques-por-maestro.pdf` - Schedule by teacher
-- `calendario-bloques-por-grupo.pdf` - Schedule by student group
+- `calendario-incumplimientos.pdf` - Constraint violations
+- `calendario-por-maestro.pdf` - Schedule by teacher
+- `calendario-por-grupo.pdf` - Schedule by student group
 
 **3. Run as a container** (see `reporter/Dockerfile`)
 ```bash
@@ -638,9 +638,9 @@ Group schedule conflicts (5):
 - Minimize teacher building changes: 15 violations (weight 1)
 
 PDF reports written to:
-  - calendario-bloques-incumplimientos.pdf
-  - calendario-bloques-por-maestro.pdf
-  - calendario-bloques-por-grupo.pdf
+  - calendario-incumplimientos.pdf
+  - calendario-por-maestro.pdf
+  - calendario-por-grupo.pdf
 ```
 
 **Current Challenges**:

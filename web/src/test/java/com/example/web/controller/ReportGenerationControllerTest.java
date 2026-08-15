@@ -35,7 +35,7 @@ public class ReportGenerationControllerTest {
     private ReportRunnerService reportRunnerService;
 
     private ReportRunnerService.Snapshot snapshot(ReportRunnerService.State state) {
-        return new ReportRunnerService.Snapshot(state, null, null, null, List.of());
+        return new ReportRunnerService.Snapshot(state, null, null, null, null, List.of());
     }
 
     @Test

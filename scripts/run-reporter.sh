@@ -13,6 +13,9 @@
 #   DB_PASSWORD          DB password   (default: empty)
 #   REPORTER_JAR         Path to the shaded reporter jar (default: newest under reporter/target)
 #   REPORTER_OUTPUT_DIR  Where PDF reports are written  (default: current directory)
+#   REPORT_TARGET         "all" (default) writes all three PDFs; "violations" writes
+#                         only calendario-incumplimientos.pdf; "schedules" writes only
+#                         the by-teacher/by-group PDFs (no violations report)
 #   JAVA_OPTS            Extra JVM flags (e.g. -Xmx1g)
 #
 # Exit code is that of the JVM: non-zero on failure, so cron/orchestrators can

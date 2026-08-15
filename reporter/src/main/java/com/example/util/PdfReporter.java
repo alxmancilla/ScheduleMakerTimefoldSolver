@@ -154,7 +154,29 @@ public class PdfReporter {
         generateBlockScheduleByGroupPdf(schedule, byGroupPath);
     }
 
-    private static void generateBlockViolationsPdf(SchoolSchedule schedule,
+    /**
+     * Generate just the by-teacher and by-group schedule PDFs, without the
+     * violations report. Used by the WRITER-triggered "Generate PDFs" button:
+     * the violations report (calendario-incumplimientos.pdf) is generated only
+     * automatically right after each engine run (see EngineRunnerService), not
+     * on demand here, so it always reflects a specific solve rather than
+     * whatever the schedule happens to look like when someone clicks the button.
+     */
+    public static void generateBlockSchedulePdfs(SchoolSchedule schedule, String baseName) throws IOException {
+        String byTeacherPath = baseName + "-por-maestro.pdf";
+        String byGroupPath = baseName + "-por-grupo.pdf";
+
+        generateBlockScheduleByTeacherPdf(schedule, byTeacherPath);
+        generateBlockScheduleByGroupPdf(schedule, byGroupPath);
+    }
+
+    /**
+     * Generate just the violations PDF (<outputPath>), without the
+     * by-teacher/by-group schedule reports. Used for the admin-only
+     * compliance snapshot generated automatically right after each engine
+     * run, where only the incumplimientos report is needed.
+     */
+    public static void generateBlockViolationsPdf(SchoolSchedule schedule,
             Map<String, Integer> hardViolations,
             Map<String, Integer> softViolations,
             String outputPath) throws IOException {
@@ -279,7 +301,7 @@ public class PdfReporter {
                     cs.beginText();
                     cs.setFont(PDType1Font.HELVETICA_BOLD, 15);
                     cs.newLineAtOffset(margin, currentY);
-                    cs.showText("Calendario (Bloques) - Maestr@: " + teacherName);
+                    cs.showText("Calendario: " + teacherName);
                     cs.newLineAtOffset(0, -heading * 1.5f);
                     currentY -= heading * 1.5f;
                     cs.endText();
@@ -395,7 +417,7 @@ public class PdfReporter {
                     cs.beginText();
                     cs.setFont(PDType1Font.HELVETICA_BOLD, 15);
                     cs.newLineAtOffset(margin, currentY);
-                    cs.showText("Calendario (Bloques) - Grupo: " + groupName);
+                    cs.showText("Calendario: " + groupName);
                     cs.newLineAtOffset(0, -heading * 1.5f);
                     currentY -= heading * 1.5f;
                     cs.endText();

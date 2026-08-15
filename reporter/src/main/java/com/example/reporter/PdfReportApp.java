@@ -57,13 +57,33 @@ public class PdfReportApp {
         softViolations.forEach((k, v) -> System.out.println("- " + k + ": " + v));
         System.out.println();
 
-        // Write the three PDF reports into the working directory.
-        String base = "calendario-bloques";
-        PdfReporter.generateBlockReports(schedule, violations, softViolations, base);
-        System.out.println("PDF reports written to:");
-        System.out.println("  - " + base + "-incumplimientos.pdf");
-        System.out.println("  - " + base + "-por-maestro.pdf");
-        System.out.println("  - " + base + "-por-grupo.pdf");
+        // Write PDF report(s) into the working directory, per REPORT_TARGET:
+        //   violations (EngineRunnerService's automatic post-solve admin snapshot)
+        //     -> only calendario-incumplimientos.pdf
+        //   schedules (ReportRunnerService's WRITER-triggered "Generate PDFs" button)
+        //     -> only the by-teacher/by-group reports, never the violations report -
+        //        that one only ever comes from a specific solve, not from whatever
+        //        the schedule happens to look like when someone clicks the button
+        //   all (default; direct/manual runs outside the web app)
+        //     -> all three
+        String base = "calendario";
+        String reportTarget = System.getenv().getOrDefault("REPORT_TARGET", "all");
+        if ("violations".equalsIgnoreCase(reportTarget)) {
+            PdfReporter.generateBlockViolationsPdf(schedule, violations, softViolations, base + "-incumplimientos.pdf");
+            System.out.println("PDF report written to:");
+            System.out.println("  - " + base + "-incumplimientos.pdf");
+        } else if ("schedules".equalsIgnoreCase(reportTarget)) {
+            PdfReporter.generateBlockSchedulePdfs(schedule, base);
+            System.out.println("PDF reports written to:");
+            System.out.println("  - " + base + "-por-maestro.pdf");
+            System.out.println("  - " + base + "-por-grupo.pdf");
+        } else {
+            PdfReporter.generateBlockReports(schedule, violations, softViolations, base);
+            System.out.println("PDF reports written to:");
+            System.out.println("  - " + base + "-incumplimientos.pdf");
+            System.out.println("  - " + base + "-por-maestro.pdf");
+            System.out.println("  - " + base + "-por-grupo.pdf");
+        }
         System.out.println();
         System.out.println("=== PDF Reporting Complete! ===");
     }

@@ -1,18 +1,14 @@
 package com.example.web.dto;
 
-import java.time.LocalDateTime;
-
-/** Metadata for one generated PDF report, for the Reports tab's file list. */
+/** Metadata for one generated PDF within a report run, for the Reports tab. */
 public class ReportFileResponse {
 
     private final String filename;
     private final long sizeBytes;
-    private final LocalDateTime lastModified;
 
-    public ReportFileResponse(String filename, long sizeBytes, LocalDateTime lastModified) {
+    public ReportFileResponse(String filename, long sizeBytes) {
         this.filename = filename;
         this.sizeBytes = sizeBytes;
-        this.lastModified = lastModified;
     }
 
     public String getFilename() {
@@ -21,9 +17,5 @@ public class ReportFileResponse {
 
     public long getSizeBytes() {
         return sizeBytes;
-    }
-
-    public LocalDateTime getLastModified() {
-        return lastModified;
     }
 }

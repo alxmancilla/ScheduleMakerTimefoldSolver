@@ -41,9 +41,9 @@ mvn -X clean compile
 ### Output Files
 
 The **reporter** module generates three PDF reports from the persisted schedule:
-- `calendario-bloques-incumplimientos.pdf` - Constraint violation analysis
-- `calendario-bloques-por-maestro.pdf` - Schedule grouped by teacher
-- `calendario-bloques-por-grupo.pdf` - Schedule grouped by student group
+- `calendario-incumplimientos.pdf` - Constraint violation analysis
+- `calendario-por-maestro.pdf` - Schedule grouped by teacher
+- `calendario-por-grupo.pdf` - Schedule grouped by student group
 
 ## Architecture Overview
 

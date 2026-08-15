@@ -2,8 +2,8 @@ package com.example.web.controller;
 
 import com.example.web.dto.ReportFileResponse;
 import com.example.web.dto.ReportRunResponse;
-import com.example.web.dto.ReportStatusResponse;
 import com.example.web.exception.ResourceNotFoundException;
+import com.example.web.service.EngineRunnerService;
 import com.example.web.service.ReportRunnerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
@@ -26,23 +26,24 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Read-only access to generated PDF report runs for any authenticated role
- * (READER/WRITER/ADMIN) - the Reports tab. Each "Generate PDFs" run writes
- * its files into its own timestamped subdirectory of the reports folder
- * (see ReportRunnerService), so past runs stay listed here for comparison
- * instead of being overwritten by the next generation. Generating a new run
- * is handled separately by ReportGenerationController.
+ * Admin-only access to the compliance-snapshot PDFs (just
+ * calendario-incumplimientos.pdf) that EngineRunnerService generates
+ * automatically right after each successful engine run. Mounted under
+ * /api/admin/**, which SecurityConfig already restricts to the ADMIN role -
+ * unlike /api/reports (the WRITER-triggered "Generate PDFs" runs), which any
+ * authenticated role can read. Mirrors ReportController's run/file listing
+ * shape and path-traversal-safe download handling.
  */
 @RestController
-@RequestMapping("/api/reports")
-public class ReportController {
+@RequestMapping("/api/admin/reports")
+public class AdminReportController {
 
     @Autowired
-    private ReportRunnerService reportRunnerService;
+    private EngineRunnerService engineRunnerService;
 
     @GetMapping
     public List<ReportRunResponse> listRuns() {
-        File reportsDir = reportRunnerService.getReportsDir();
+        File reportsDir = engineRunnerService.getAdminReportsDir();
         File[] runDirs = reportsDir.isDirectory() ? reportsDir.listFiles(File::isDirectory) : null;
         if (runDirs == null) {
             return List.of();
@@ -51,11 +52,6 @@ public class ReportController {
                 .sorted(Comparator.comparing(File::getName).reversed())
                 .map(this::toRunResponse)
                 .toList();
-    }
-
-    @GetMapping("/status")
-    public ReportStatusResponse getStatus() {
-        return new ReportStatusResponse(reportRunnerService.getSnapshot());
     }
 
     @GetMapping("/{runId}/{filename}")
@@ -96,7 +92,7 @@ public class ReportController {
         if (isUnsafeSegment(runId) || isUnsafeSegment(filename)) {
             throw new ResourceNotFoundException("Report", runId + "/" + filename);
         }
-        File file = new File(new File(reportRunnerService.getReportsDir(), runId), filename);
+        File file = new File(new File(engineRunnerService.getAdminReportsDir(), runId), filename);
         if (!file.isFile()) {
             throw new ResourceNotFoundException("Report", runId + "/" + filename);
         }

@@ -52,3 +52,5 @@ calendario-por-grupo.pdf
 calendario-por-maestro.pdf
 # Output dir for the admin-triggered "Generate PDFs" button (web/ReportRunnerService)
 /reports/
+# Admin-only compliance-snapshot PDFs, generated automatically after each engine run (web/EngineRunnerService)
+/admin-reports/
