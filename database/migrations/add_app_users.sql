@@ -18,15 +18,18 @@
 SET client_encoding = 'UTF8';
 
 CREATE TABLE IF NOT EXISTS app_user (
-    username      VARCHAR(100) PRIMARY KEY,
-    password_hash VARCHAR(100) NOT NULL,
-    role          VARCHAR(20)  NOT NULL
-                    CHECK (role IN ('ADMIN', 'WRITER', 'READER')),
-    enabled       BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+    username           VARCHAR(100) PRIMARY KEY,
+    password_hash      VARCHAR(100) NOT NULL,
+    role               VARCHAR(20)  NOT NULL
+                         CHECK (role IN ('ADMIN', 'WRITER', 'READER')),
+    enabled            BOOLEAN      NOT NULL DEFAULT TRUE,
+    preferred_language VARCHAR(5)   NOT NULL DEFAULT 'en'
+                         CHECK (preferred_language IN ('en', 'es')),
+    created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMENT ON TABLE app_user IS 'Web application users for authentication and RBAC.';
 COMMENT ON COLUMN app_user.password_hash IS 'BCrypt hash of the user password.';
 COMMENT ON COLUMN app_user.role IS 'One of ADMIN, WRITER, READER.';
+COMMENT ON COLUMN app_user.preferred_language IS 'UI language preference: en or es. Defaults to en.';

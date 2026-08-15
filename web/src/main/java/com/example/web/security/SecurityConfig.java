@@ -60,6 +60,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
+                        // A personal UI preference, not a domain-data write: any authenticated
+                        // role (including READER) may update their own, unlike the general PUT
+                        // rule below which requires WRITER/ADMIN.
+                        .requestMatchers(HttpMethod.PUT, "/api/auth/preferred-language")
+                        .hasAnyRole("READER", "WRITER", "ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("READER", "WRITER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("WRITER", "ADMIN")

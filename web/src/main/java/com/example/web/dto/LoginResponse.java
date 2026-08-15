@@ -11,12 +11,14 @@ public class LoginResponse {
     private final String username;
     private final String role;
     private final long expiresInSeconds;
+    private final String preferredLanguage;
 
-    public LoginResponse(String token, String username, String role, long expiresInSeconds) {
+    public LoginResponse(String token, String username, String role, long expiresInSeconds, String preferredLanguage) {
         this.token = token;
         this.username = username;
         this.role = role;
         this.expiresInSeconds = expiresInSeconds;
+        this.preferredLanguage = preferredLanguage;
     }
 
     public String getToken() {
@@ -37,5 +39,9 @@ public class LoginResponse {
 
     public long getExpiresInSeconds() {
         return expiresInSeconds;
+    }
+
+    public String getPreferredLanguage() {
+        return preferredLanguage;
     }
 }

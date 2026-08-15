@@ -30,6 +30,7 @@ database/migrations/*
 # migration even though ad-hoc local migrations under this directory stay ignored.
 !database/migrations/add_app_users.sql
 !database/migrations/course_semester_to_integer.sql
+!database/migrations/add_user_preferred_language.sql
 md_files/
 
 # Build artifacts

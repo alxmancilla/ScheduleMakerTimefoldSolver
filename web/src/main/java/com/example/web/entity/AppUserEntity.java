@@ -25,6 +25,9 @@ public class AppUserEntity {
     @Column(name = "enabled", nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "preferred_language", length = 5, nullable = false)
+    private String preferredLanguage = "en";
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -83,6 +86,14 @@ public class AppUserEntity {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getPreferredLanguage() {
+        return preferredLanguage;
+    }
+
+    public void setPreferredLanguage(String preferredLanguage) {
+        this.preferredLanguage = preferredLanguage;
     }
 
     public LocalDateTime getCreatedAt() {
