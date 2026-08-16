@@ -1,7 +1,9 @@
 package com.example.web.controller;
 
 import com.example.web.entity.CourseEntity;
+import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
+import com.example.web.repository.CourseRoomRequirementRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -51,6 +53,12 @@ public class CourseControllerTest {
 
     @MockBean
     private CourseRepository courseRepository;
+
+    @MockBean
+    private CourseBlockAssignmentRepository assignmentRepository;
+
+    @MockBean
+    private CourseRoomRequirementRepository roomRequirementRepository;
 
     private CourseEntity course;
 
@@ -219,6 +227,7 @@ public class CourseControllerTest {
     @Test
     public void deleteCourse_existing_returns204() throws Exception {
         when(courseRepository.findById("C1")).thenReturn(Optional.of(course));
+        when(assignmentRepository.countByCourseId("C1")).thenReturn(0L);
         mockMvc.perform(delete("/api/courses/C1"))
                 .andExpect(status().isNoContent());
         verify(courseRepository).delete(course);
@@ -230,5 +239,39 @@ public class CourseControllerTest {
         mockMvc.perform(delete("/api/courses/nope"))
                 .andExpect(status().isNotFound());
         verify(courseRepository, never()).delete(any(CourseEntity.class));
+    }
+
+    @Test
+    public void deleteCourse_inUse_returns400() throws Exception {
+        when(courseRepository.findById("C1")).thenReturn(Optional.of(course));
+        when(assignmentRepository.countByCourseId("C1")).thenReturn(3L);
+        mockMvc.perform(delete("/api/courses/C1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("3 schedule block")));
+        verify(courseRepository, never()).delete(any(CourseEntity.class));
+    }
+
+    // ---- GET /components ----
+
+    @Test
+    public void getDistinctComponents_returnsList() throws Exception {
+        when(courseRepository.findDistinctComponents()).thenReturn(List.of("BASICAS", "TPROG"));
+        mockMvc.perform(get("/api/courses/components"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0]").value("BASICAS"))
+                .andExpect(jsonPath("$[1]").value("TPROG"));
+    }
+
+    // ---- GET /with-room-requirements ----
+
+    @Test
+    public void getCourseIdsWithRoomRequirements_returnsList() throws Exception {
+        when(roomRequirementRepository.findDistinctCourseIds()).thenReturn(List.of("C1", "C3"));
+        mockMvc.perform(get("/api/courses/with-room-requirements"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0]").value("C1"))
+                .andExpect(jsonPath("$[1]").value("C3"));
     }
 }

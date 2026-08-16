@@ -2,6 +2,7 @@ package com.example.web.repository;
 
 import com.example.web.entity.CourseEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -12,5 +13,9 @@ public interface CourseRepository extends JpaRepository<CourseEntity, String> {
     List<CourseEntity> findByNameContainingIgnoreCase(String name);
     List<CourseEntity> findByActive(Boolean active);
     Optional<CourseEntity> findByName(String name);
+    boolean existsByName(String name);
+
+    @Query("SELECT DISTINCT c.component FROM CourseEntity c ORDER BY c.component")
+    List<String> findDistinctComponents();
 }
 

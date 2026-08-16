@@ -3,6 +3,7 @@ package com.example.web.controller;
 import com.example.web.dto.StudentGroupDTO;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.exception.ResourceNotFoundException;
+import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.StudentGroupRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
@@ -19,6 +20,9 @@ public class StudentGroupController {
 
     @Autowired
     private StudentGroupRepository groupRepository;
+
+    @Autowired
+    private CourseBlockAssignmentRepository assignmentRepository;
 
     @GetMapping
     public List<StudentGroupEntity> getAllGroups() {
@@ -60,6 +64,14 @@ public class StudentGroupController {
     public ResponseEntity<Void> deleteGroup(@PathVariable String id) {
         StudentGroupEntity group = groupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Group", id));
+        // course_block_assignment.group_id is ON DELETE CASCADE, so deleting the
+        // group would silently delete every schedule block for it too - block
+        // instead, same guard shape as TimeslotController.
+        long usageCount = assignmentRepository.countByGroupId(id);
+        if (usageCount > 0) {
+            throw new IllegalArgumentException(
+                    "Cannot delete: this group has " + usageCount + " schedule block(s). Delete those assignments first.");
+        }
         groupRepository.delete(group);
         return ResponseEntity.noContent().build();
     }

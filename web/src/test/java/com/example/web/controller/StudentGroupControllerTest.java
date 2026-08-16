@@ -1,6 +1,7 @@
 package com.example.web.controller;
 
 import com.example.web.entity.StudentGroupEntity;
+import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.StudentGroupRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
@@ -51,6 +52,9 @@ public class StudentGroupControllerTest {
 
     @MockBean
     private StudentGroupRepository groupRepository;
+
+    @MockBean
+    private CourseBlockAssignmentRepository assignmentRepository;
 
     private StudentGroupEntity group;
 
@@ -188,6 +192,7 @@ public class StudentGroupControllerTest {
     @Test
     public void deleteGroup_existing_returns204() throws Exception {
         when(groupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(assignmentRepository.countByGroupId("G1")).thenReturn(0L);
         mockMvc.perform(delete("/api/groups/G1"))
                 .andExpect(status().isNoContent());
         verify(groupRepository).delete(group);
@@ -198,6 +203,16 @@ public class StudentGroupControllerTest {
         when(groupRepository.findById("nope")).thenReturn(Optional.empty());
         mockMvc.perform(delete("/api/groups/nope"))
                 .andExpect(status().isNotFound());
+        verify(groupRepository, never()).delete(any(StudentGroupEntity.class));
+    }
+
+    @Test
+    public void deleteGroup_inUse_returns400() throws Exception {
+        when(groupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(assignmentRepository.countByGroupId("G1")).thenReturn(5L);
+        mockMvc.perform(delete("/api/groups/G1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("5 schedule block")));
         verify(groupRepository, never()).delete(any(StudentGroupEntity.class));
     }
 }
