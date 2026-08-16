@@ -45,7 +45,8 @@
     "settings": "Configuración",
     "users": "Usuarios",
     "logout": "Cerrar sesión",
-    "language": "Idioma"
+    "language": "Idioma",
+    "mySchedule": "Mi Horario"
   },
   "login": {
     "title": "Iniciar sesión",
@@ -84,6 +85,7 @@
       "name": "Nombre",
       "lastName": "Apellido",
       "maxHoursWeek": "Máx Horas/Sem",
+      "workload": "Carga",
       "qualifications": "Cursos",
       "actions": "Acciones"
     },
@@ -216,16 +218,19 @@
     "fields": {
       "name": "Nombre:",
       "building": "Edificio:",
-      "type": "Tipo:"
+      "type": "Tipo:",
+      "capacity": "Capacidad (opcional):"
     },
     "table": {
       "name": "Nombre",
       "building": "Edificio",
-      "type": "Tipo"
+      "type": "Tipo",
+      "capacity": "Capacidad"
     },
     "savedMessage": "Aula guardada",
     "deletedMessage": "Aula eliminada",
-    "searchPlaceholder": "Buscar por nombre o edificio..."
+    "searchPlaceholder": "Buscar por nombre o edificio...",
+    "capacityPlaceholder": "p. ej. 30"
   },
   "groups": {
     "title": "Grupos de Estudiantes",
@@ -240,12 +245,14 @@
     "fields": {
       "id": "ID:",
       "name": "Nombre:",
-      "preferredRoom": "Aula Preferida (opcional):"
+      "preferredRoom": "Aula Preferida (opcional):",
+      "studentCount": "Número de Alumnos (opcional):"
     },
     "table": {
       "id": "ID",
       "name": "Nombre",
-      "preferredRoom": "Aula Preferida"
+      "preferredRoom": "Aula Preferida",
+      "studentCount": "Alumnos"
     },
     "courses": {
       "title": "Cursos",
@@ -265,7 +272,8 @@
     },
     "savedMessage": "Grupo guardado",
     "deletedMessage": "Grupo eliminado",
-    "searchPlaceholder": "Buscar por ID o nombre..."
+    "searchPlaceholder": "Buscar por ID o nombre...",
+    "studentCountPlaceholder": "p. ej. 28"
   },
   "assignments": {
     "title": "Asignaciones de Bloques de Curso",
@@ -408,6 +416,32 @@
       "none": "No hay horarios definidos",
       "savedMessage": "Horario guardado",
       "deletedMessage": "Horario eliminado"
+    },
+    "term": {
+      "title": "Periodo Actual",
+      "description": "Una etiqueta de texto libre que se muestra en el encabezado para todos (p. ej. \"Otoño 2026\"). Es solo organizativa - el solver nunca la utiliza.",
+      "fields": {
+        "label": "Etiqueta del Periodo:"
+      },
+      "placeholder": "p. ej. Otoño 2026",
+      "saving": "Guardando...",
+      "savedMessage": "Periodo guardado",
+      "saveFailedPrefix": "Error al guardar el periodo: ",
+      "loadFailedPrefix": "Error al cargar el periodo: "
+    },
+    "auditLog": {
+      "title": "Actividad Reciente",
+      "description": "Las últimas 200 acciones de escritura (crear/actualizar/eliminar), registradas automáticamente para trazabilidad.",
+      "refresh": "Actualizar",
+      "none": "Aún no hay actividad registrada.",
+      "loadFailedPrefix": "Error al cargar la actividad: ",
+      "table": {
+        "when": "Cuándo",
+        "user": "Usuario",
+        "method": "Método",
+        "path": "Ruta",
+        "status": "Estado"
+      }
     }
   },
   "users": {
@@ -426,7 +460,8 @@
       "password": "Contraseña:",
       "role": "Rol:",
       "enabled": "Habilitado",
-      "preferredLanguage": "Idioma Preferido:"
+      "preferredLanguage": "Idioma Preferido:",
+      "linkedTeacher": "Maestro Vinculado (opcional):"
     },
     "resetPassword": "Restablecer Contraseña",
     "resetPasswordFor": "Nueva contraseña para {{username}}:",
@@ -437,7 +472,8 @@
       "role": "Rol",
       "enabled": "Habilitado",
       "language": "Idioma",
-      "created": "Creado"
+      "created": "Creado",
+      "linkedTeacher": "Maestro Vinculado"
     },
     "you": " (usted)",
     "noUsers": "No se encontraron usuarios",
@@ -471,5 +507,12 @@
     },
     "noAssignments": "No se encontraron asignaciones para los filtros seleccionados",
     "pinnedLabel": "FIJADO"
+  },
+  "mySchedule": {
+    "title": "Mi Horario",
+    "loading": "Cargando tu horario...",
+    "loadFailedPrefix": "Error al cargar tu horario: ",
+    "noTeacherLinked": "Tu cuenta aún no está vinculada a un maestro. Pide a un administrador que la vincule en Usuarios.",
+    "none": "Aún no hay bloques programados."
   }
 }

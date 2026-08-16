@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Schedule from './components/Schedule';
+import MySchedule from './components/MySchedule';
 import Teachers from './components/Teachers';
 import Courses from './components/Courses';
 import Rooms from './components/Rooms';
@@ -18,6 +19,7 @@ import AdminOnly from './auth/AdminOnly';
 import WriteRoute from './auth/WriteRoute';
 import WriteOnly from './auth/WriteOnly';
 import { useAuth } from './auth/AuthContext';
+import { getTerm, TERM_UPDATED_EVENT } from './api';
 
 const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
 
@@ -68,10 +70,35 @@ function AdminNavDropdown() {
   );
 }
 
+/** TEACHER accounts land on their own schedule; every other role sees the full Schedule view. */
+function Home() {
+  const { user } = useAuth();
+  return user?.role === 'TEACHER' ? <MySchedule /> : <Schedule />;
+}
+
 function Layout() {
   const { user, logout, changeLanguage } = useAuth();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const [termLabel, setTermLabel] = useState('');
+
+  useEffect(() => {
+    const loadTerm = () => {
+      getTerm()
+        .then((res) => setTermLabel(res.data.label || ''))
+        .catch(() => {
+          // Non-critical: the header just won't show a term label.
+        });
+    };
+    loadTerm();
+    // Layout doesn't remount on client-side navigation, so without this the
+    // header would keep showing the term label from whenever it first
+    // mounted even after Settings saves a new one; TERM_UPDATED_EVENT lets
+    // that save push a refresh here immediately instead of waiting for a
+    // full page reload.
+    window.addEventListener(TERM_UPDATED_EVENT, loadTerm);
+    return () => window.removeEventListener(TERM_UPDATED_EVENT, loadTerm);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -82,21 +109,32 @@ function Layout() {
     <div className="app">
       <header className="header">
         <div className="container">
-          <Link to="/" className="header-home-link"><h1>Schedule Maker</h1></Link>
+          <Link to="/" className="header-home-link">
+            <h1>
+              Schedule Maker
+              {termLabel && <span className="header-term-label"> · {termLabel}</span>}
+            </h1>
+          </Link>
           <nav className="nav">
-            <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
-            <NavLink to="/teachers" className={navLinkClass}>{t('nav.teachers')}</NavLink>
-            <NavLink to="/courses" className={navLinkClass}>{t('nav.courses')}</NavLink>
-            <NavLink to="/rooms" className={navLinkClass}>{t('nav.rooms')}</NavLink>
-            <NavLink to="/groups" className={navLinkClass}>{t('nav.groups')}</NavLink>
-            <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
-            <NavLink to="/reports" className={navLinkClass}>{t('nav.reports')}</NavLink>
-            <WriteOnly>
-              <NavLink to="/import" className={navLinkClass}>{t('nav.import')}</NavLink>
-            </WriteOnly>
-            <AdminOnly>
-              <AdminNavDropdown />
-            </AdminOnly>
+            {user?.role === 'TEACHER' ? (
+              <NavLink to="/" className={navLinkClass}>{t('nav.mySchedule')}</NavLink>
+            ) : (
+              <>
+                <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
+                <NavLink to="/teachers" className={navLinkClass}>{t('nav.teachers')}</NavLink>
+                <NavLink to="/courses" className={navLinkClass}>{t('nav.courses')}</NavLink>
+                <NavLink to="/rooms" className={navLinkClass}>{t('nav.rooms')}</NavLink>
+                <NavLink to="/groups" className={navLinkClass}>{t('nav.groups')}</NavLink>
+                <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
+                <NavLink to="/reports" className={navLinkClass}>{t('nav.reports')}</NavLink>
+                <WriteOnly>
+                  <NavLink to="/import" className={navLinkClass}>{t('nav.import')}</NavLink>
+                </WriteOnly>
+                <AdminOnly>
+                  <AdminNavDropdown />
+                </AdminOnly>
+              </>
+            )}
           </nav>
           {user && (
             <div className="user-box" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -130,7 +168,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>
-            <Route path="/" element={<Schedule />} />
+            <Route path="/" element={<Home />} />
             <Route path="/teachers" element={<Teachers />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/rooms" element={<Rooms />} />

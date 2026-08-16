@@ -38,10 +38,12 @@ function Rooms() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const capacity = formData.get('capacity');
     const room = {
       name: formData.get('name'),
       building: formData.get('building'),
       type: formData.get('type'),
+      capacity: capacity ? parseInt(capacity, 10) : null,
     };
 
     try {
@@ -127,6 +129,10 @@ function Rooms() {
                 ))}
               </select>
             </div>
+            <div className="form-group">
+              <label>{t('rooms.fields.capacity')}</label>
+              <input type="number" name="capacity" min={1} defaultValue={editingRoom?.capacity ?? ''} placeholder={t('rooms.capacityPlaceholder')} />
+            </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary">{t('common.save')}</button>
               <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
@@ -150,6 +156,7 @@ function Rooms() {
               <th>{t('rooms.table.name')}</th>
               <th>{t('rooms.table.building')}</th>
               <th>{t('rooms.table.type')}</th>
+              <th>{t('rooms.table.capacity')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
@@ -159,6 +166,7 @@ function Rooms() {
                 <td>{room.name}</td>
                 <td>{room.building}</td>
                 <td>{room.type}</td>
+                <td>{room.capacity ?? '-'}</td>
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(room)} style={{ marginRight: '5px' }}>

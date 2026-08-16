@@ -76,10 +76,12 @@ function Groups() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const studentCount = formData.get('studentCount');
     const group = {
       id: formData.get('id'),
       name: formData.get('name'),
       preferredRoomName: formData.get('preferredRoomName') || null,
+      studentCount: studentCount ? parseInt(studentCount, 10) : null,
     };
 
     try {
@@ -205,6 +207,10 @@ function Groups() {
                 ))}
               </select>
             </div>
+            <div className="form-group">
+              <label>{t('groups.fields.studentCount')}</label>
+              <input type="number" name="studentCount" min={1} defaultValue={editingGroup?.studentCount ?? ''} placeholder={t('groups.studentCountPlaceholder')} />
+            </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary">{t('common.save')}</button>
               <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
@@ -282,6 +288,7 @@ function Groups() {
               <th>{t('groups.table.id')}</th>
               <th>{t('groups.table.name')}</th>
               <th>{t('groups.table.preferredRoom')}</th>
+              <th>{t('groups.table.studentCount')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
@@ -291,6 +298,7 @@ function Groups() {
                 <td>{group.id}</td>
                 <td>{group.name}</td>
                 <td>{group.preferredRoomName || '-'}</td>
+                <td>{group.studentCount ?? '-'}</td>
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(group)} style={{ marginRight: '5px' }}>

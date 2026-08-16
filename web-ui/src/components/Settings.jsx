@@ -4,9 +4,11 @@ import {
   getTimeslots, createTimeslot, updateTimeslot, deleteTimeslot,
   runEngine, getEngineStatus, generateBlocks,
   listAdminReports, downloadAdminReport,
+  getTerm, updateTerm, getAuditLog,
 } from '../api';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
+import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const ENGINE_POLL_MS = 3000;
 
@@ -44,12 +46,56 @@ function Settings() {
   const [adminReportsError, setAdminReportsError] = useState(null);
   const [openingSnapshot, setOpeningSnapshot] = useState(null);
 
+  const [termInput, setTermInput] = useState('');
+  const [termError, setTermError] = useState(null);
+  const [savingTerm, setSavingTerm] = useState(false);
+
+  const [auditLog, setAuditLog] = useState([]);
+  const [auditLogError, setAuditLogError] = useState(null);
+
   useEffect(() => {
     loadTimeslots();
     loadEngineStatus();
     loadAdminReports();
+    loadTerm();
+    loadAuditLog();
     return () => stopPolling();
   }, []);
+
+  const loadAuditLog = async () => {
+    try {
+      const response = await getAuditLog();
+      setAuditLog(response.data);
+      setAuditLogError(null);
+    } catch (err) {
+      setAuditLogError(t('settings.auditLog.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const loadTerm = async () => {
+    try {
+      const response = await getTerm();
+      setTermInput(response.data.label || '');
+      setTermError(null);
+    } catch (err) {
+      setTermError(t('settings.term.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const handleSaveTerm = async (e) => {
+    e.preventDefault();
+    setSavingTerm(true);
+    setTermError(null);
+    try {
+      const response = await updateTerm(termInput.trim());
+      setTermInput(response.data.label || '');
+      showToast(t('settings.term.savedMessage'));
+    } catch (err) {
+      setTermError(err.response?.data?.message || t('settings.term.saveFailedPrefix') + err.message);
+    } finally {
+      setSavingTerm(false);
+    }
+  };
 
   const loadAdminReports = async () => {
     try {
@@ -224,6 +270,8 @@ function Settings() {
   const endHour = form.startHour + form.lengthHours;
   const exceedsDayBounds = endHour > 15;
 
+  const auditLogPagination = usePagination(auditLog);
+
   if (loading) return <div className="loading">{t('settings.loading')}</div>;
 
   return (
@@ -231,6 +279,29 @@ function Settings() {
       <div className="card">
         <h2>{t('settings.title')}</h2>
         <p style={{ color: '#7f8c8d', fontSize: '14px' }}>{t('settings.description')}</p>
+      </div>
+
+      <div className="card">
+        <h3>{t('settings.term.title')}</h3>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          {t('settings.term.description')}
+        </p>
+        {termError && <div className="error">{termError}</div>}
+        <form onSubmit={handleSaveTerm} style={{ display: 'flex', gap: '10px', marginTop: '10px', alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ marginBottom: 0, flex: 1, maxWidth: '320px' }}>
+            <label>{t('settings.term.fields.label')}</label>
+            <input
+              type="text"
+              value={termInput}
+              onChange={(e) => setTermInput(e.target.value)}
+              maxLength={100}
+              placeholder={t('settings.term.placeholder')}
+            />
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={savingTerm}>
+            {savingTerm ? t('settings.term.saving') : t('common.save')}
+          </button>
+        </form>
       </div>
 
       <div className="card">
@@ -415,41 +486,96 @@ function Settings() {
         </div>
       )}
 
+      {timeslots.length === 0 ? (
+        <div className="card">
+          <p style={{ color: '#7f8c8d' }}>{t('settings.timeslots.none')}</p>
+        </div>
+      ) : (
+        DAY_LABELS.map((day) => {
+          const dayTimeslots = timeslots
+            .filter((ts) => ts.dayOfWeek === day.value)
+            .sort((a, b) => a.startHour - b.startHour);
+          if (dayTimeslots.length === 0) return null;
+          return (
+            <div className="card" key={day.value}>
+              <h4 style={{ marginBottom: '10px', color: '#2c3e50' }}>{t(`common.days.${day.key}`)}</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t('settings.timeslots.table.start')}</th>
+                    <th>{t('settings.timeslots.table.end')}</th>
+                    <th>{t('settings.timeslots.table.length')}</th>
+                    <th>{t('common.actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dayTimeslots.map((timeslot) => (
+                    <tr key={timeslot.id}>
+                      <td>{timeslot.startHour}:00</td>
+                      <td>{timeslot.startHour + timeslot.lengthHours}:00</td>
+                      <td>{timeslot.lengthHours}</td>
+                      <td>
+                        <button className="btn btn-primary" onClick={() => handleEdit(timeslot)} style={{ marginRight: '5px' }}>
+                          {t('common.edit')}
+                        </button>
+                        <button className="btn btn-danger" onClick={() => handleDelete(timeslot)}>
+                          {t('common.delete')}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })
+      )}
+
       <div className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>{t('settings.timeslots.table.day')}</th>
-              <th>{t('settings.timeslots.table.start')}</th>
-              <th>{t('settings.timeslots.table.end')}</th>
-              <th>{t('settings.timeslots.table.length')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {timeslots.map((timeslot) => (
-              <tr key={timeslot.id}>
-                <td>{dayLabel(timeslot.dayOfWeek)}</td>
-                <td>{timeslot.startHour}:00</td>
-                <td>{timeslot.startHour + timeslot.lengthHours}:00</td>
-                <td>{timeslot.lengthHours}</td>
-                <td>
-                  <button className="btn btn-primary" onClick={() => handleEdit(timeslot)} style={{ marginRight: '5px' }}>
-                    {t('common.edit')}
-                  </button>
-                  <button className="btn btn-danger" onClick={() => handleDelete(timeslot)}>
-                    {t('common.delete')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {timeslots.length === 0 && (
-              <tr>
-                <td colSpan={5} style={{ color: '#7f8c8d' }}>{t('settings.timeslots.none')}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('settings.auditLog.title')}</h3>
+          <button className="btn btn-secondary" onClick={loadAuditLog}>↻ {t('settings.auditLog.refresh')}</button>
+        </div>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          {t('settings.auditLog.description')}
+        </p>
+        {auditLogError && <div className="error">{auditLogError}</div>}
+        {auditLog.length === 0 && !auditLogError && (
+          <p style={{ color: '#7f8c8d', fontSize: '13px' }}>{t('settings.auditLog.none')}</p>
+        )}
+        {auditLog.length > 0 && (
+          <>
+            <table style={{ marginTop: '8px' }}>
+              <thead>
+                <tr>
+                  <th>{t('settings.auditLog.table.when')}</th>
+                  <th>{t('settings.auditLog.table.user')}</th>
+                  <th>{t('settings.auditLog.table.method')}</th>
+                  <th>{t('settings.auditLog.table.path')}</th>
+                  <th>{t('settings.auditLog.table.status')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogPagination.pageItems.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{formatTimestamp(entry.occurredAt)}</td>
+                    <td>{entry.username}</td>
+                    <td>{entry.httpMethod}</td>
+                    <td>{entry.path}</td>
+                    <td>{entry.statusCode}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <Pagination
+              page={auditLogPagination.page}
+              pageCount={auditLogPagination.pageCount}
+              totalItems={auditLogPagination.totalItems}
+              pageSize={DEFAULT_PAGE_SIZE}
+              onPageChange={auditLogPagination.setPage}
+            />
+          </>
+        )}
       </div>
     </div>
   );

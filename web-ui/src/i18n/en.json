@@ -45,7 +45,8 @@
     "settings": "Settings",
     "users": "Users",
     "logout": "Logout",
-    "language": "Language"
+    "language": "Language",
+    "mySchedule": "My Schedule"
   },
   "login": {
     "title": "Sign in",
@@ -84,6 +85,7 @@
       "name": "Name",
       "lastName": "Last Name",
       "maxHoursWeek": "Max Hours/Week",
+      "workload": "Workload",
       "qualifications": "Courses",
       "actions": "Actions"
     },
@@ -216,16 +218,19 @@
     "fields": {
       "name": "Name:",
       "building": "Building:",
-      "type": "Type:"
+      "type": "Type:",
+      "capacity": "Capacity (optional):"
     },
     "table": {
       "name": "Name",
       "building": "Building",
-      "type": "Type"
+      "type": "Type",
+      "capacity": "Capacity"
     },
     "savedMessage": "Room saved",
     "deletedMessage": "Room deleted",
-    "searchPlaceholder": "Search by name or building..."
+    "searchPlaceholder": "Search by name or building...",
+    "capacityPlaceholder": "e.g. 30"
   },
   "groups": {
     "title": "Student Groups",
@@ -240,12 +245,14 @@
     "fields": {
       "id": "ID:",
       "name": "Name:",
-      "preferredRoom": "Preferred Room (optional):"
+      "preferredRoom": "Preferred Room (optional):",
+      "studentCount": "Student Count (optional):"
     },
     "table": {
       "id": "ID",
       "name": "Name",
-      "preferredRoom": "Preferred Room"
+      "preferredRoom": "Preferred Room",
+      "studentCount": "Students"
     },
     "courses": {
       "title": "Courses",
@@ -265,7 +272,8 @@
     },
     "savedMessage": "Group saved",
     "deletedMessage": "Group deleted",
-    "searchPlaceholder": "Search by ID or name..."
+    "searchPlaceholder": "Search by ID or name...",
+    "studentCountPlaceholder": "e.g. 28"
   },
   "assignments": {
     "title": "Course Block Assignments",
@@ -408,6 +416,32 @@
       "none": "No timeslots defined",
       "savedMessage": "Timeslot saved",
       "deletedMessage": "Timeslot deleted"
+    },
+    "term": {
+      "title": "Current Term",
+      "description": "A free-text label shown in the header for everyone (e.g. \"Fall 2026\"). Purely organizational - the solver never reads it.",
+      "fields": {
+        "label": "Term Label:"
+      },
+      "placeholder": "e.g. Fall 2026",
+      "saving": "Saving...",
+      "savedMessage": "Term saved",
+      "saveFailedPrefix": "Failed to save term: ",
+      "loadFailedPrefix": "Failed to load term: "
+    },
+    "auditLog": {
+      "title": "Recent Activity",
+      "description": "The most recent 200 write actions (create/update/delete), logged automatically for accountability.",
+      "refresh": "Refresh",
+      "none": "No activity logged yet.",
+      "loadFailedPrefix": "Failed to load activity log: ",
+      "table": {
+        "when": "When",
+        "user": "User",
+        "method": "Method",
+        "path": "Path",
+        "status": "Status"
+      }
     }
   },
   "users": {
@@ -426,7 +460,8 @@
       "password": "Password:",
       "role": "Role:",
       "enabled": "Enabled",
-      "preferredLanguage": "Preferred Language:"
+      "preferredLanguage": "Preferred Language:",
+      "linkedTeacher": "Linked Teacher (optional):"
     },
     "resetPassword": "Reset Password",
     "resetPasswordFor": "New password for {{username}}:",
@@ -437,7 +472,8 @@
       "role": "Role",
       "enabled": "Enabled",
       "language": "Language",
-      "created": "Created"
+      "created": "Created",
+      "linkedTeacher": "Linked Teacher"
     },
     "you": " (you)",
     "noUsers": "No users found",
@@ -471,5 +507,12 @@
     },
     "noAssignments": "No assignments found for the selected filters",
     "pinnedLabel": "PINNED"
+  },
+  "mySchedule": {
+    "title": "My Schedule",
+    "loading": "Loading your schedule...",
+    "loadFailedPrefix": "Failed to load your schedule: ",
+    "noTeacherLinked": "Your account isn't linked to a teacher record yet. Ask an admin to link it in Users.",
+    "none": "No blocks scheduled yet."
   }
 }

@@ -178,11 +178,29 @@ export const createTimeslot = (timeslot) => api.post('/admin/timeslots', timeslo
 export const updateTimeslot = (id, timeslot) => api.put(`/admin/timeslots/${id}`, timeslot);
 export const deleteTimeslot = (id) => api.delete(`/admin/timeslots/${id}`);
 
+// School term (current term/period label, e.g. "Fall 2026") - read is open to
+// any authenticated role (shown in the header), write is ADMIN-only.
+// TERM_UPDATED_EVENT: the header (App.jsx's Layout) mounts once and doesn't
+// re-fetch on client-side navigation, so updateTerm() dispatches this on the
+// window after a successful save - the header listens for it to refresh
+// immediately instead of waiting for a full page reload.
+export const TERM_UPDATED_EVENT = 'term-updated';
+export const getTerm = () => api.get('/term');
+export const updateTerm = (label) =>
+  api.put('/admin/term', { label }).then((res) => {
+    window.dispatchEvent(new Event(TERM_UPDATED_EVENT));
+    return res;
+  });
+
+// Admin: audit log (most recent 200 write requests, logged automatically)
+export const getAuditLog = () => api.get('/admin/audit-log');
+
 // Schedule
 export const getScheduleView = () => api.get('/schedule/view');
 export const getScheduleViewByGroup = (groupId) => api.get(`/schedule/view/group/${groupId}`);
 export const getScheduleViewByTeacher = (teacherId) => api.get(`/schedule/view/teacher/${teacherId}`);
 export const getScheduleViewByRoom = (roomName) => api.get(`/schedule/view/room/${roomName}`);
+export const getMyScheduleView = () => api.get('/schedule/view/me');
 
 export default api;
 

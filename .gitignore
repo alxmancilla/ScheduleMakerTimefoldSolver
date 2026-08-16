@@ -33,6 +33,10 @@ database/migrations/*
 !database/migrations/add_app_users.sql
 !database/migrations/course_semester_to_integer.sql
 !database/migrations/add_user_preferred_language.sql
+!database/migrations/add_room_capacity_and_group_size.sql
+!database/migrations/add_school_term.sql
+!database/migrations/add_schedule_audit_log.sql
+!database/migrations/add_teacher_role.sql
 md_files/
 
 # Build artifacts

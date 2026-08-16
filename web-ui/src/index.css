@@ -41,6 +41,12 @@ code {
   text-decoration: none;
 }
 
+.header-term-label {
+  font-size: 14px;
+  font-weight: normal;
+  color: #bdc3c7;
+}
+
 .nav {
   display: flex;
   gap: 20px;

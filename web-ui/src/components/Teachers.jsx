@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses } from '../api';
+import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses, getAssignments } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
@@ -37,11 +37,31 @@ function Teachers() {
   const qualBoxRef = useRef(null);
   const [availability, setAvailability] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [assignedHoursByTeacher, setAssignedHoursByTeacher] = useState({});
 
   useEffect(() => {
     loadTeachers();
     loadCourseNames();
+    loadWorkload();
   }, []);
+
+  // Current teacher workload: hours already placed on the schedule, computed
+  // client-side from the existing assignments list (blockLength summed per
+  // teacher, assigned blocks only) rather than a dedicated backend endpoint.
+  const loadWorkload = async () => {
+    try {
+      const response = await getAssignments();
+      const hours = {};
+      response.data.forEach((a) => {
+        if (a.teacherId && a.blockTimeslotId) {
+          hours[a.teacherId] = (hours[a.teacherId] || 0) + (a.blockLength || 0);
+        }
+      });
+      setAssignedHoursByTeacher(hours);
+    } catch (err) {
+      // Non-critical: the workload column just won't have data.
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -452,6 +472,7 @@ function Teachers() {
               <th>{t('teachers.table.name')}</th>
               <th>{t('teachers.table.lastName')}</th>
               <th>{t('teachers.table.maxHoursWeek')}</th>
+              <th>{t('teachers.table.workload')}</th>
               <th>{t('teachers.table.qualifications')}</th>
               <th>{t('teachers.table.actions')}</th>
             </tr>
@@ -463,6 +484,24 @@ function Teachers() {
                 <td>{teacher.name}</td>
                 <td>{teacher.lastName}</td>
                 <td>{teacher.maxHoursPerWeek}</td>
+                <td>
+                  {(() => {
+                    const assigned = assignedHoursByTeacher[teacher.id] || 0;
+                    const max = teacher.maxHoursPerWeek || 0;
+                    const pct = max > 0 ? Math.round((assigned / max) * 100) : 0;
+                    const barColor = pct > 100 ? '#e74c3c' : pct >= 80 ? '#f39c12' : '#27ae60';
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '120px' }}>
+                        <div style={{ flex: 1, background: '#ecf0f1', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(pct, 100)}%`, background: barColor, height: '100%' }} />
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#7f8c8d', whiteSpace: 'nowrap' }}>
+                          {assigned}/{max}h
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </td>
                 <td>{(teacher.qualifications || []).map((q) => q.qualification).join(', ')}</td>
                 <td>
                   <WriteOnly>

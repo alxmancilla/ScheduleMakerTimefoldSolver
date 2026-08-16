@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getUsers, createUser, updateUser, resetUserPassword, deleteUser } from '../api';
+import { getUsers, createUser, updateUser, resetUserPassword, deleteUser, getTeachers } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 
-const ROLES = ['ADMIN', 'WRITER', 'READER'];
+const ROLES = ['ADMIN', 'WRITER', 'READER', 'TEACHER'];
 // Each language's own native name, shown regardless of the current UI language
 // (the conventional pattern for language pickers).
 const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
 ];
-const EMPTY_FORM = { username: '', password: '', role: 'READER', enabled: true, preferredLanguage: 'en' };
+const EMPTY_FORM = { username: '', password: '', role: 'READER', enabled: true, preferredLanguage: 'en', teacherId: '' };
 const formatTimestamp = (value) => (value ? value.replace('T', ' ').split('.')[0] : '-');
 
 function Users() {
@@ -32,9 +32,21 @@ function Users() {
   const [newPassword, setNewPassword] = useState('');
   const [resetError, setResetError] = useState(null);
 
+  const [teachers, setTeachers] = useState([]);
+
   useEffect(() => {
     loadUsers();
+    loadTeachers();
   }, []);
+
+  const loadTeachers = async () => {
+    try {
+      const response = await getTeachers();
+      setTeachers(response.data);
+    } catch (err) {
+      // Non-critical: the teacher-link dropdown just won't have options.
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -64,7 +76,14 @@ function Users() {
 
   const handleEdit = (u) => {
     setEditingUser(u);
-    setForm({ username: u.username, password: '', role: u.role, enabled: u.enabled, preferredLanguage: u.preferredLanguage });
+    setForm({
+      username: u.username,
+      password: '',
+      role: u.role,
+      enabled: u.enabled,
+      preferredLanguage: u.preferredLanguage,
+      teacherId: u.teacherId || '',
+    });
     setFieldErrors({});
     setError(null);
     setShowForm(true);
@@ -83,10 +102,16 @@ function Users() {
     setFieldErrors({});
     setError(null);
     try {
+      const teacherId = form.role === 'TEACHER' ? (form.teacherId || null) : null;
       if (editingUser) {
-        await updateUser(editingUser.username, { role: form.role, enabled: form.enabled, preferredLanguage: form.preferredLanguage });
+        await updateUser(editingUser.username, {
+          role: form.role,
+          enabled: form.enabled,
+          preferredLanguage: form.preferredLanguage,
+          teacherId,
+        });
       } else {
-        await createUser({ username: form.username, password: form.password, role: form.role });
+        await createUser({ username: form.username, password: form.password, role: form.role, teacherId });
       }
       handleCancel();
       loadUsers();
@@ -192,6 +217,18 @@ function Users() {
               </select>
               {fieldErrors.role && <div className="error">{fieldErrors.role}</div>}
             </div>
+            {form.role === 'TEACHER' && (
+              <div className="form-group">
+                <label>{t('users.fields.linkedTeacher')}</label>
+                <select name="teacherId" value={form.teacherId} onChange={handleField}>
+                  <option value="">{t('common.noneOption')}</option>
+                  {teachers.map((tch) => (
+                    <option key={tch.id} value={tch.id}>{tch.id} - {tch.name} {tch.lastName}</option>
+                  ))}
+                </select>
+                {fieldErrors.teacherId && <div className="error">{fieldErrors.teacherId}</div>}
+              </div>
+            )}
             {editingUser && (
               <>
                 <div className="form-group">
@@ -232,6 +269,7 @@ function Users() {
             <tr>
               <th>{t('users.table.username')}</th>
               <th>{t('users.table.role')}</th>
+              <th>{t('users.table.linkedTeacher')}</th>
               <th>{t('users.table.enabled')}</th>
               <th>{t('users.table.language')}</th>
               <th>{t('users.table.created')}</th>
@@ -244,6 +282,7 @@ function Users() {
                 <tr>
                   <td>{u.username}{currentUser?.username === u.username && t('users.you')}</td>
                   <td>{u.role}</td>
+                  <td>{u.teacherId || '-'}</td>
                   <td>{u.enabled ? t('common.yes') : t('common.no')}</td>
                   <td>{u.preferredLanguage}</td>
                   <td>{formatTimestamp(u.createdAt)}</td>
@@ -266,7 +305,7 @@ function Users() {
                 </tr>
                 {resettingUsername === u.username && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <form onSubmit={handleSubmitReset} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <label style={{ margin: 0 }}>{t('users.resetPasswordFor', { username: u.username })}</label>
                         <input
@@ -288,7 +327,7 @@ function Users() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ color: '#7f8c8d' }}>{t('users.noUsers')}</td>
+                <td colSpan={7} style={{ color: '#7f8c8d' }}>{t('users.noUsers')}</td>
               </tr>
             )}
           </tbody>
