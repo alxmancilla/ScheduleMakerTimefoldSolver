@@ -28,6 +28,10 @@ public class AppUserEntity {
     @Column(name = "preferred_language", length = 5, nullable = false)
     private String preferredLanguage = "en";
 
+    /** Optional link to a teacher record. Meaningful only for TEACHER-role accounts. */
+    @Column(name = "teacher_id", length = 100)
+    private String teacherId;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -94,6 +98,14 @@ public class AppUserEntity {
 
     public void setPreferredLanguage(String preferredLanguage) {
         this.preferredLanguage = preferredLanguage;
+    }
+
+    public String getTeacherId() {
+        return teacherId;
+    }
+
+    public void setTeacherId(String teacherId) {
+        this.teacherId = teacherId;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 public class UpdateUserRequest {
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(ADMIN|WRITER|READER)$", message = "Role must be ADMIN, WRITER, or READER")
+    @Pattern(regexp = "^(ADMIN|WRITER|READER|TEACHER)$", message = "Role must be ADMIN, WRITER, READER, or TEACHER")
     private String role;
 
     @NotNull(message = "Enabled is required")
@@ -17,6 +17,9 @@ public class UpdateUserRequest {
     @NotBlank(message = "Preferred language is required")
     @Pattern(regexp = "^(en|es)$", message = "Preferred language must be 'en' or 'es'")
     private String preferredLanguage;
+
+    /** Optional; only meaningful when role is TEACHER. */
+    private String teacherId;
 
     public UpdateUserRequest() {
     }
@@ -43,5 +46,13 @@ public class UpdateUserRequest {
 
     public void setPreferredLanguage(String preferredLanguage) {
         this.preferredLanguage = preferredLanguage;
+    }
+
+    public String getTeacherId() {
+        return teacherId;
+    }
+
+    public void setTeacherId(String teacherId) {
+        this.teacherId = teacherId;
     }
 }

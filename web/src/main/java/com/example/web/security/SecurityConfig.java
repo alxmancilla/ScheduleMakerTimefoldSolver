@@ -64,8 +64,18 @@ public class SecurityConfig {
                         // role (including READER) may update their own, unlike the general PUT
                         // rule below which requires WRITER/ADMIN.
                         .requestMatchers(HttpMethod.PUT, "/api/auth/preferred-language")
-                        .hasAnyRole("READER", "WRITER", "ADMIN")
+                        .hasAnyRole("READER", "WRITER", "ADMIN", "TEACHER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // TEACHER is deliberately NOT in the general GET rule below - it can only
+                        // read its own schedule/identity/term, not the broader domain data every
+                        // other role can. Without this exception, GET /api/auth/me (used on every
+                        // page load to hydrate the session) would 403 for TEACHER and immediately
+                        // log them back out.
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me")
+                        .hasAnyRole("TEACHER", "READER", "WRITER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/schedule/view/me")
+                        .hasAnyRole("TEACHER", "READER", "WRITER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/term").hasAnyRole("READER", "WRITER", "ADMIN", "TEACHER")
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("READER", "WRITER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("WRITER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("WRITER", "ADMIN")

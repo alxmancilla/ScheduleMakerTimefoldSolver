@@ -138,6 +138,22 @@ public class AuthControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "erin", roles = "TEACHER")
+    public void me_teacherRole_returnsOk() throws Exception {
+        // Regression: GET /api/auth/me is called on every page load to hydrate the
+        // session. It must stay reachable by TEACHER even though TEACHER is
+        // deliberately excluded from the general GET /api/** rule - otherwise a
+        // TEACHER-role user gets logged straight back out on every reload.
+        AppUserEntity entity = new AppUserEntity("erin", "hash", "TEACHER", true);
+        when(userRepository.findById("erin")).thenReturn(Optional.of(entity));
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("erin"))
+                .andExpect(jsonPath("$.role").value("TEACHER"));
+    }
+
+    @Test
     public void updateLanguage_anonymous_isUnauthorized() throws Exception {
         mockMvc.perform(put("/api/auth/preferred-language").contentType(MediaType.APPLICATION_JSON)
                 .content(json(Map.of("language", "es"))))

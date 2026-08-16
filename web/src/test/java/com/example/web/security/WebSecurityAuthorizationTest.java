@@ -116,6 +116,17 @@ public class WebSecurityAuthorizationTest {
     }
 
     @Test
+    @WithMockUser(roles = "TEACHER")
+    public void teacher_cannotReadGeneralDomainData() throws Exception {
+        // TEACHER is scoped to its own schedule/identity/term only (see the
+        // dedicated matchers in SecurityConfig for those specific paths) - it must
+        // NOT be swept into the general "any authenticated role can GET /api/**"
+        // rule that READER/WRITER/ADMIN share.
+        mockMvc.perform(get("/api/teachers"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(roles = "ADMIN")
     public void admin_passesAdminRouteAuthorization() throws Exception {
         // No /api/admin handler exists in this slice, so once ADMIN clears the

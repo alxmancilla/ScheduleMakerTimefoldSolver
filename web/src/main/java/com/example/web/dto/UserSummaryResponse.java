@@ -14,6 +14,7 @@ public class UserSummaryResponse {
     private final String role;
     private final boolean enabled;
     private final String preferredLanguage;
+    private final String teacherId;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
 
@@ -22,6 +23,7 @@ public class UserSummaryResponse {
         this.role = user.getRole();
         this.enabled = user.isEnabled();
         this.preferredLanguage = user.getPreferredLanguage();
+        this.teacherId = user.getTeacherId();
         this.createdAt = user.getCreatedAt();
         this.updatedAt = user.getUpdatedAt();
     }
@@ -40,6 +42,10 @@ public class UserSummaryResponse {
 
     public String getPreferredLanguage() {
         return preferredLanguage;
+    }
+
+    public String getTeacherId() {
+        return teacherId;
     }
 
     public LocalDateTime getCreatedAt() {

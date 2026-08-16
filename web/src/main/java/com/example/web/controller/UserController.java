@@ -54,6 +54,7 @@ public class UserController {
                 passwordEncoder.encode(request.getPassword()),
                 request.getRole(),
                 true);
+        user.setTeacherId(request.getTeacherId());
         return new UserSummaryResponse(userRepository.save(user));
     }
 
@@ -68,6 +69,7 @@ public class UserController {
         user.setRole(request.getRole());
         user.setEnabled(request.getEnabled());
         user.setPreferredLanguage(request.getPreferredLanguage());
+        user.setTeacherId(request.getTeacherId());
         return new UserSummaryResponse(userRepository.save(user));
     }
 

@@ -17,8 +17,11 @@ public class CreateUserRequest {
     private String password;
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(ADMIN|WRITER|READER)$", message = "Role must be ADMIN, WRITER, or READER")
+    @Pattern(regexp = "^(ADMIN|WRITER|READER|TEACHER)$", message = "Role must be ADMIN, WRITER, READER, or TEACHER")
     private String role;
+
+    /** Optional; only meaningful when role is TEACHER. */
+    private String teacherId;
 
     public CreateUserRequest() {
     }
@@ -45,5 +48,13 @@ public class CreateUserRequest {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getTeacherId() {
+        return teacherId;
+    }
+
+    public void setTeacherId(String teacherId) {
+        this.teacherId = teacherId;
     }
 }

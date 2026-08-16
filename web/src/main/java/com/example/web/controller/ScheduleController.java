@@ -4,6 +4,7 @@ import com.example.web.dto.ScheduleViewDTO;
 import com.example.web.entity.*;
 import com.example.web.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -30,6 +31,9 @@ public class ScheduleController {
 
         @Autowired
         private StudentGroupRepository groupRepository;
+
+        @Autowired
+        private AppUserRepository appUserRepository;
 
         @GetMapping("/view")
         public ScheduleViewDTO getScheduleView() {
@@ -94,6 +98,28 @@ public class ScheduleController {
 
         @GetMapping("/view/teacher/{teacherId}")
         public ScheduleViewDTO getScheduleViewByTeacher(@PathVariable String teacherId) {
+                List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findByTeacherId(teacherId)
+                                .stream()
+                                .filter(a -> a.getBlockTimeslotId() != null)
+                                .collect(Collectors.toList());
+
+                return buildScheduleView(assignments);
+        }
+
+        /**
+         * A TEACHER-role account's own schedule, resolved from their app_user.teacher_id
+         * link rather than a path parameter - unlike the other /view/* endpoints, this
+         * one is reachable by the TEACHER role (see SecurityConfig), which has no
+         * broader read access to pick another teacher's schedule.
+         */
+        @GetMapping("/view/me")
+        public ScheduleViewDTO getMyScheduleView(Authentication authentication) {
+                String teacherId = appUserRepository.findById(authentication.getName())
+                                .map(AppUserEntity::getTeacherId)
+                                .orElse(null);
+                if (teacherId == null) {
+                        return buildScheduleView(Collections.emptyList());
+                }
                 List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findByTeacherId(teacherId)
                                 .stream()
                                 .filter(a -> a.getBlockTimeslotId() != null)
