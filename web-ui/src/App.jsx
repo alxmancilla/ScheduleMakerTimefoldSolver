@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Schedule from './components/Schedule';
 import Teachers from './components/Teachers';
@@ -82,7 +82,7 @@ function Layout() {
     <div className="app">
       <header className="header">
         <div className="container">
-          <h1>Schedule Maker</h1>
+          <Link to="/" className="header-home-link"><h1>Schedule Maker</h1></Link>
           <nav className="nav">
             <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
             <NavLink to="/teachers" className={navLinkClass}>{t('nav.teachers')}</NavLink>

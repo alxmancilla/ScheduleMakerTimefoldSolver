@@ -196,7 +196,12 @@
     },
     "savedMessage": "Course saved",
     "deletedMessage": "Course deleted",
-    "searchPlaceholder": "Search by ID or name..."
+    "searchPlaceholder": "Search by ID or name...",
+    "tabs": {
+      "details": "Details",
+      "roomRequirements": "Room Requirements",
+      "blockTemplates": "Block Templates"
+    }
   },
   "rooms": {
     "title": "Rooms",

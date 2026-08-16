@@ -40,6 +40,7 @@ function Courses() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [editingCourse, setEditingCourse] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
 
   const [roomRequirements, setRoomRequirements] = useState([]);
   const [requirementsError, setRequirementsError] = useState(null);
@@ -193,6 +194,7 @@ function Courses() {
     setFieldErrors({});
     setError(null);
     setShowForm(true);
+    setActiveTab('details');
     setShowRequirementForm(false);
     setEditingRequirement(null);
     setRoomRequirements([]);
@@ -216,6 +218,7 @@ function Courses() {
   const handleCancel = () => {
     setShowForm(false);
     setEditingCourse(null);
+    setActiveTab('details');
     setFieldErrors({});
     setError(null);
     setRoomRequirements([]);
@@ -395,6 +398,7 @@ function Courses() {
                 setFieldErrors({});
                 setError(null);
                 setShowForm(true);
+                setActiveTab('details');
                 setRoomRequirements([]);
                 setShowRequirementForm(false);
                 setEditingRequirement(null);
@@ -413,97 +417,125 @@ function Courses() {
 
       {showForm && (
         <div className="card">
-          <h3>{editingCourse ? t('courses.editCourse') : t('courses.newCourse')}</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>{t('courses.fields.id')}</label>
-              <input
-                type="text"
-                name="id"
-                defaultValue={editingCourse?.id || ''}
-                maxLength={5}
-                required
-                disabled={!!editingCourse}
-              />
-              {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
+          {editingCourse && (
+            <div className="tabs">
+              <button
+                type="button"
+                className={`tab ${activeTab === 'details' ? 'active' : ''}`}
+                onClick={() => setActiveTab('details')}
+              >
+                {t('courses.tabs.details')}
+              </button>
+              <button
+                type="button"
+                className={`tab ${activeTab === 'roomRequirements' ? 'active' : ''}`}
+                onClick={() => setActiveTab('roomRequirements')}
+              >
+                {t('courses.tabs.roomRequirements')} ({roomRequirements.length})
+              </button>
+              <button
+                type="button"
+                className={`tab ${activeTab === 'blockTemplates' ? 'active' : ''}`}
+                onClick={() => setActiveTab('blockTemplates')}
+              >
+                {t('courses.tabs.blockTemplates')} ({blockTemplates.length})
+              </button>
             </div>
-            <div className="form-group">
-              <label>{t('courses.fields.name')}</label>
-              <input type="text" name="name" defaultValue={editingCourse?.name || ''} required />
-              {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
-            </div>
-            <div className="form-group">
-              <label>{t('courses.fields.abbreviation')}</label>
-              <input
-                type="text"
-                name="abbreviation"
-                defaultValue={editingCourse?.abbreviation || ''}
-                maxLength={100}
-                required
-              />
-              {fieldErrors.abbreviation && <div className="error">{fieldErrors.abbreviation}</div>}
-            </div>
-            <div className="form-group">
-              <label>{t('courses.fields.semester')}</label>
-              <select name="semester" defaultValue={editingCourse?.semester || 1}>
-                {SEMESTERS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              {fieldErrors.semester && <div className="error">{fieldErrors.semester}</div>}
-            </div>
-            <div className="form-group">
-              <label>{t('courses.fields.component')}</label>
-              <input
-                type="text"
-                name="component"
-                list="component-options"
-                defaultValue={editingCourse?.component || ''}
-                maxLength={20}
-                required
-                placeholder={t('courses.componentPlaceholder')}
-              />
-              <datalist id="component-options">
-                {components.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-              {fieldErrors.component && <div className="error">{fieldErrors.component}</div>}
-            </div>
-            <div className="form-group">
-              <label>{t('courses.fields.roomRequirement')}</label>
-              <select name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'estándar'}>
-                {ROOM_TYPES.map((type) => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-              {roomRequirements.length > 0 && (
-                <div style={{ color: '#c0392b', fontSize: '12px', marginTop: '4px' }}>
-                  {t('courses.roomRequirements.formNote')}
-                </div>
-              )}
-            </div>
-            <div className="form-group">
-              <label>{t('courses.fields.requiredHoursPerWeek')}</label>
-              <input type="number" name="requiredHoursPerWeek" defaultValue={editingCourse?.requiredHoursPerWeek || 1} required />
-            </div>
-            <div className="form-group">
-              <label>{t('courses.fields.active')}</label>
-              <select name="active" defaultValue={editingCourse?.active?.toString() || 'true'}>
-                <option value="true">{t('common.yes')}</option>
-                <option value="false">{t('common.no')}</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn btn-primary">{t('common.save')}</button>
-              <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
-            </div>
-          </form>
-        </div>
-      )}
+          )}
 
-      {showForm && editingCourse && (
-        <div className="card">
+          {(!editingCourse || activeTab === 'details') && (
+            <>
+              <h3>{editingCourse ? t('courses.editCourse') : t('courses.newCourse')}</h3>
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label>{t('courses.fields.id')}</label>
+                  <input
+                    type="text"
+                    name="id"
+                    defaultValue={editingCourse?.id || ''}
+                    maxLength={5}
+                    required
+                    disabled={!!editingCourse}
+                  />
+                  {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.name')}</label>
+                  <input type="text" name="name" defaultValue={editingCourse?.name || ''} required />
+                  {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.abbreviation')}</label>
+                  <input
+                    type="text"
+                    name="abbreviation"
+                    defaultValue={editingCourse?.abbreviation || ''}
+                    maxLength={100}
+                    required
+                  />
+                  {fieldErrors.abbreviation && <div className="error">{fieldErrors.abbreviation}</div>}
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.semester')}</label>
+                  <select name="semester" defaultValue={editingCourse?.semester || 1}>
+                    {SEMESTERS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  {fieldErrors.semester && <div className="error">{fieldErrors.semester}</div>}
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.component')}</label>
+                  <input
+                    type="text"
+                    name="component"
+                    list="component-options"
+                    defaultValue={editingCourse?.component || ''}
+                    maxLength={20}
+                    required
+                    placeholder={t('courses.componentPlaceholder')}
+                  />
+                  <datalist id="component-options">
+                    {components.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                  {fieldErrors.component && <div className="error">{fieldErrors.component}</div>}
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.roomRequirement')}</label>
+                  <select name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'estándar'}>
+                    {ROOM_TYPES.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                  {roomRequirements.length > 0 && (
+                    <div style={{ color: '#c0392b', fontSize: '12px', marginTop: '4px' }}>
+                      {t('courses.roomRequirements.formNote')}
+                    </div>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.requiredHoursPerWeek')}</label>
+                  <input type="number" name="requiredHoursPerWeek" defaultValue={editingCourse?.requiredHoursPerWeek || 1} required />
+                </div>
+                <div className="form-group">
+                  <label>{t('courses.fields.active')}</label>
+                  <select name="active" defaultValue={editingCourse?.active?.toString() || 'true'}>
+                    <option value="true">{t('common.yes')}</option>
+                    <option value="false">{t('common.no')}</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" className="btn btn-primary">{t('common.save')}</button>
+                  <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
+                </div>
+              </form>
+            </>
+          )}
+
+          {editingCourse && activeTab === 'roomRequirements' && (
+            <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>{t('courses.roomRequirements.title')}</h3>
             <WriteOnly>
@@ -601,11 +633,11 @@ function Courses() {
               )}
             </tbody>
           </table>
-        </div>
-      )}
+            </>
+          )}
 
-      {showForm && editingCourse && (
-        <div className="card">
+          {editingCourse && activeTab === 'blockTemplates' && (
+            <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>{t('courses.blockTemplates.title')}</h3>
             <WriteOnly>
@@ -756,6 +788,8 @@ function Courses() {
               )}
             </tbody>
           </table>
+            </>
+          )}
         </div>
       )}
 

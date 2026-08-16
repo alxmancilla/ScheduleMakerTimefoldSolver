@@ -196,7 +196,12 @@
     },
     "savedMessage": "Materia guardada",
     "deletedMessage": "Materia eliminada",
-    "searchPlaceholder": "Buscar por ID o nombre..."
+    "searchPlaceholder": "Buscar por ID o nombre...",
+    "tabs": {
+      "details": "Detalles",
+      "roomRequirements": "Requisitos de Aula",
+      "blockTemplates": "Plantillas de Bloque"
+    }
   },
   "rooms": {
     "title": "Aulas",
