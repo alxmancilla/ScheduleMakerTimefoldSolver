@@ -82,7 +82,8 @@ public class ConstraintConsistencyTest {
                                 "Minimize teacher idle gaps (availability-aware)",
                                 "Minimize group idle gaps",
                                 "Prefer block's specified room",
-                                "Non-standard rooms should finish by 2pm"));
+                                "Non-standard rooms should finish by 2pm",
+                                "Room capacity should fit group size"));
 
                 // Assert all expected soft constraints are present
                 for (String expected : expectedSoftConstraints) {
@@ -128,12 +129,13 @@ public class ConstraintConsistencyTest {
                 int softCount = BlockScheduleAnalyzer
                                 .analyzeSoftConstraintViolations(dummySchedule).size();
 
-                // Expected counts (as of 2026-08-11)
+                // Expected counts (as of 2026-08-15: added "Room capacity should fit
+                // group size", SOFT weight 4)
                 assertEquals("Expected 9 HARD constraints", 9, hardCount);
-                assertEquals("Expected 7 SOFT constraints", 7, softCount);
+                assertEquals("Expected 8 SOFT constraints", 8, softCount);
 
-                // Total should be 16 (9 hard + 7 soft)
-                assertEquals("Total constraint count mismatch", 16, hardCount + softCount);
+                // Total should be 17 (9 hard + 8 soft)
+                assertEquals("Total constraint count mismatch", 17, hardCount + softCount);
         }
 
         /**

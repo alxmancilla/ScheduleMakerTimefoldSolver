@@ -17,10 +17,19 @@ public class Room {
     // estándar room deliberately does NOT satisfy a laboratorio requirement.
     private final Set<String> capabilities;
 
+    // Optional seating capacity. Null when unknown/not tracked, in which case
+    // the room-capacity soft constraint is skipped for this room.
+    private final Integer capacity;
+
     public Room(String name, String building, String type) {
+        this(name, building, type, null);
+    }
+
+    public Room(String name, String building, String type, Integer capacity) {
         this.name = name;
         this.building = building;
         this.type = type;
+        this.capacity = capacity;
         this.capabilities = capabilitiesFor(type);
     }
 
@@ -46,6 +55,10 @@ public class Room {
 
     public String getType() {
         return type;
+    }
+
+    public Integer getCapacity() {
+        return capacity;
     }
 
     public boolean satisfiesRequirement(String requirement) {

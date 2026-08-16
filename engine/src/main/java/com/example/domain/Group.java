@@ -11,15 +11,24 @@ public class Group {
     // assignments for this group should use this room.
     private final Room preferredRoom;
 
+    // Optional student headcount. Null when unknown/not tracked, in which case
+    // the room-capacity soft constraint is skipped for this group.
+    private final Integer studentCount;
+
     public Group(String id, String name, Set<String> courseNames) {
         this(id, name, courseNames, null);
     }
 
     public Group(String id, String name, Set<String> courseNames, Room preferredRoom) {
+        this(id, name, courseNames, preferredRoom, null);
+    }
+
+    public Group(String id, String name, Set<String> courseNames, Room preferredRoom, Integer studentCount) {
         this.id = id;
         this.name = name;
         this.courseNames = courseNames;
         this.preferredRoom = preferredRoom;
+        this.studentCount = studentCount;
     }
 
     public String getId() {
@@ -36,6 +45,10 @@ public class Group {
 
     public Room getPreferredRoom() {
         return preferredRoom;
+    }
+
+    public Integer getStudentCount() {
+        return studentCount;
     }
 
     @Override

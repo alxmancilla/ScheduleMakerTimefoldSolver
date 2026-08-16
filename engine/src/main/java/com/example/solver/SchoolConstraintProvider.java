@@ -51,6 +51,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 nonStandardRoomsShouldFinishBy2pm(constraintFactory), // SOFT (weight 10): Prefer non-standard rooms to
                                                                       // finish by 2pm
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
+                roomCapacityShouldFitGroupSize(constraintFactory), // SOFT (weight 4): group shouldn't exceed room capacity
                 minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
                 preferBlockSpecifiedRoom(constraintFactory), // SOFT (weight 3): prefer block's specified room (CC
                                                              // distribution)
@@ -447,6 +448,30 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 })
                 .penalize(HardSoftScore.ofSoft(2))
                 .asConstraint("Prefer group's preferred room");
+    }
+
+    private Constraint roomCapacityShouldFitGroupSize(ConstraintFactory constraintFactory) {
+        // SOFT: Warn when a group's headcount exceeds its assigned room's capacity.
+        // Only applies when BOTH room.capacity and group.studentCount are known;
+        // either being unset means "not tracked", so the check is skipped rather
+        // than assumed to pass or fail.
+        // WEIGHT: 4 (meaningful operational concern, but must never block
+        // feasibility since this data may be incomplete for existing rooms/groups)
+        return constraintFactory
+                .forEach(CourseBlockAssignment.class)
+                .filter(assignment -> {
+                    if (assignment.getRoom() == null || assignment.getGroup() == null) {
+                        return false;
+                    }
+                    Integer capacity = assignment.getRoom().getCapacity();
+                    Integer studentCount = assignment.getGroup().getStudentCount();
+                    if (capacity == null || studentCount == null) {
+                        return false;
+                    }
+                    return studentCount > capacity;
+                })
+                .penalize(HardSoftScore.ofSoft(4))
+                .asConstraint("Room capacity should fit group size");
     }
 
     private Constraint minimizeTeacherBuildingChanges(ConstraintFactory constraintFactory) {

@@ -187,7 +187,7 @@ public class DataLoader {
      */
     private List<Room> loadRooms(Connection conn) throws SQLException {
         List<Room> rooms = new ArrayList<>();
-        String sql = "SELECT name, building, type FROM room";
+        String sql = "SELECT name, building, type, capacity FROM room";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -196,8 +196,9 @@ public class DataLoader {
                 String name = rs.getString("name");
                 String building = rs.getString("building");
                 String type = rs.getString("type");
+                Integer capacity = rs.getObject("capacity", Integer.class);
 
-                rooms.add(new Room(name, building, type));
+                rooms.add(new Room(name, building, type, capacity));
             }
         }
 
@@ -211,7 +212,7 @@ public class DataLoader {
         Map<String, Group> groupMap = new HashMap<>();
 
         // Load basic group info
-        String sql = "SELECT id, name, preferred_room_name FROM student_group";
+        String sql = "SELECT id, name, preferred_room_name, student_count FROM student_group";
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
 
@@ -219,6 +220,7 @@ public class DataLoader {
                 String id = rs.getString("id");
                 String name = rs.getString("name");
                 String preferredRoomName = rs.getString("preferred_room_name");
+                Integer studentCount = rs.getObject("student_count", Integer.class);
 
                 // Find preferred room
                 Room preferredRoom = null;
@@ -230,7 +232,7 @@ public class DataLoader {
                 }
 
                 // Create group with empty course set (will be populated below)
-                Group group = new Group(id, name, new HashSet<>(), preferredRoom);
+                Group group = new Group(id, name, new HashSet<>(), preferredRoom, studentCount);
                 groupMap.put(id, group);
             }
         }

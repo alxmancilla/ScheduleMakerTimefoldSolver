@@ -540,6 +540,24 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Prefer group's preferred room", preferredRoomViolations);
 
+        // Room capacity should fit group size (SOFT, weight 4) - only applies when
+        // both room.capacity and group.studentCount are known; mirrors
+        // SchoolConstraintProvider.roomCapacityShouldFitGroupSize exactly
+        // (including that pinned assignments are NOT excluded, unlike most other
+        // room-related soft constraints - overcrowding is worth flagging even when
+        // the assignment itself can't be moved by the solver).
+        int roomCapacityViolations = 0;
+        for (CourseBlockAssignment a : list) {
+            if (a.getRoom() != null && a.getGroup() != null) {
+                Integer capacity = a.getRoom().getCapacity();
+                Integer studentCount = a.getGroup().getStudentCount();
+                if (capacity != null && studentCount != null && studentCount > capacity) {
+                    roomCapacityViolations++;
+                }
+            }
+        }
+        result.put("Room capacity should fit group size", roomCapacityViolations);
+
         // Minimize teacher building changes (SOFT, weight 1)
         int buildingChanges = 0;
         for (int i = 0; i < list.size(); i++) {
