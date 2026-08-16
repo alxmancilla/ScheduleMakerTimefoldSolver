@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getRooms, createRoom, updateRoom, deleteRoom } from '../api';
 import WriteOnly from '../auth/WriteOnly';
+import { useToast } from '../ui/ToastContext';
+import { useConfirm } from '../ui/ConfirmContext';
 
 // The `room` table enforces a CHECK constraint restricting `type` to exactly
 // these values (see database/schema_block_scheduling*.sql). Keep in sync with
@@ -17,11 +19,14 @@ const ROOM_TYPES = [
 
 function Rooms() {
   const { t } = useTranslation();
+  const showToast = useToast();
+  const confirmAction = useConfirm();
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingRoom, setEditingRoom] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadRooms();
@@ -58,6 +63,7 @@ function Rooms() {
       setShowForm(false);
       setEditingRoom(null);
       loadRooms();
+      showToast(t('rooms.savedMessage'));
     } catch (err) {
       setError(t('rooms.saveFailedPrefix') + err.message);
     }
@@ -69,12 +75,13 @@ function Rooms() {
   };
 
   const handleDelete = async (name) => {
-    if (!confirm(t('rooms.confirmDelete'))) return;
+    if (!(await confirmAction(t('rooms.confirmDelete')))) return;
     try {
       await deleteRoom(name);
       loadRooms();
+      showToast(t('rooms.deletedMessage'));
     } catch (err) {
-      setError(t('rooms.deleteFailedPrefix') + err.message);
+      setError(err.response?.data?.message || t('rooms.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -129,6 +136,14 @@ function Rooms() {
       )}
 
       <div className="card">
+        <div className="search-box">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('rooms.searchPlaceholder')}
+          />
+        </div>
         <table>
           <thead>
             <tr>
@@ -139,7 +154,14 @@ function Rooms() {
             </tr>
           </thead>
           <tbody>
-            {rooms.map(room => (
+            {rooms.filter((room) => {
+              const query = searchQuery.trim().toLowerCase();
+              if (!query) return true;
+              return (
+                room.name?.toLowerCase().includes(query) ||
+                room.building?.toLowerCase().includes(query)
+              );
+            }).map(room => (
               <tr key={room.name}>
                 <td>{room.name}</td>
                 <td>{room.building}</td>

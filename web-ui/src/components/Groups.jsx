@@ -1,20 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getGroups, createGroup, updateGroup, deleteGroup, getRooms } from '../api';
+import {
+  getGroups, createGroup, updateGroup, deleteGroup, getRooms, getCourses,
+  getGroupCourses, addGroupCourse, removeGroupCourse,
+} from '../api';
 import WriteOnly from '../auth/WriteOnly';
+import { useToast } from '../ui/ToastContext';
+import { useConfirm } from '../ui/ConfirmContext';
 
 function Groups() {
   const { t } = useTranslation();
+  const showToast = useToast();
+  const confirmAction = useConfirm();
   const [groups, setGroups] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [allCourses, setAllCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [groupCourses, setGroupCourses] = useState([]);
+  const [coursesError, setCoursesError] = useState(null);
+  const [courseToAdd, setCourseToAdd] = useState('');
 
   useEffect(() => {
     loadGroups();
     loadRooms();
+    loadAllCourses();
   }, []);
 
   const loadRooms = async () => {
@@ -23,6 +37,25 @@ function Groups() {
       setRooms(response.data);
     } catch (err) {
       // Non-critical: the dropdown just won't have options.
+    }
+  };
+
+  const loadAllCourses = async () => {
+    try {
+      const response = await getCourses();
+      setAllCourses(response.data);
+    } catch (err) {
+      // Non-critical: the "add course" dropdown just won't have options.
+    }
+  };
+
+  const loadGroupCourses = async (groupId) => {
+    try {
+      const response = await getGroupCourses(groupId);
+      setGroupCourses(response.data);
+      setCoursesError(null);
+    } catch (err) {
+      setCoursesError(t('groups.courses.loadFailedPrefix') + err.message);
     }
   };
 
@@ -57,6 +90,7 @@ function Groups() {
       setShowForm(false);
       setEditingGroup(null);
       loadGroups();
+      showToast(t('groups.savedMessage'));
     } catch (err) {
       setError(t('groups.saveFailedPrefix') + err.message);
     }
@@ -65,21 +99,52 @@ function Groups() {
   const handleEdit = (group) => {
     setEditingGroup(group);
     setShowForm(true);
+    setCoursesError(null);
+    setCourseToAdd('');
+    loadGroupCourses(group.id);
   };
 
   const handleDelete = async (id) => {
-    if (!confirm(t('groups.confirmDelete'))) return;
+    if (!(await confirmAction(t('groups.confirmDelete')))) return;
     try {
       await deleteGroup(id);
       loadGroups();
+      showToast(t('groups.deletedMessage'));
     } catch (err) {
-      setError(t('groups.deleteFailedPrefix') + err.message);
+      setError(err.response?.data?.message || t('groups.deleteFailedPrefix') + err.message);
     }
   };
 
   const handleCancel = () => {
     setShowForm(false);
     setEditingGroup(null);
+    setGroupCourses([]);
+    setCoursesError(null);
+    setCourseToAdd('');
+  };
+
+  const handleAddGroupCourse = async () => {
+    if (!courseToAdd) return;
+    setCoursesError(null);
+    try {
+      await addGroupCourse(editingGroup.id, courseToAdd);
+      setCourseToAdd('');
+      loadGroupCourses(editingGroup.id);
+      showToast(t('groups.courses.addedMessage'));
+    } catch (err) {
+      setCoursesError(err.response?.data?.message || t('groups.courses.addFailedPrefix') + err.message);
+    }
+  };
+
+  const handleRemoveGroupCourse = async (courseName) => {
+    if (!(await confirmAction(t('groups.courses.confirmRemove')))) return;
+    try {
+      await removeGroupCourse(editingGroup.id, courseName);
+      loadGroupCourses(editingGroup.id);
+      showToast(t('groups.courses.removedMessage'));
+    } catch (err) {
+      setCoursesError(err.response?.data?.message || t('groups.courses.removeFailedPrefix') + err.message);
+    }
   };
 
   if (loading) return <div className="loading">{t('groups.loading')}</div>;
@@ -90,7 +155,16 @@ function Groups() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>{t('groups.title')}</h2>
           <WriteOnly>
-            <button className="btn btn-success" onClick={() => setShowForm(true)}>
+            <button
+              className="btn btn-success"
+              onClick={() => {
+                setEditingGroup(null);
+                setShowForm(true);
+                setGroupCourses([]);
+                setCoursesError(null);
+                setCourseToAdd('');
+              }}
+            >
               {t('groups.addGroup')}
             </button>
           </WriteOnly>
@@ -128,7 +202,69 @@ function Groups() {
         </div>
       )}
 
+      {showForm && editingGroup && (
+        <div className="card">
+          <h3>{t('groups.courses.title')}</h3>
+          <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+            {t('groups.courses.description')}
+          </p>
+          {coursesError && <div className="error">{coursesError}</div>}
+
+          <WriteOnly>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '12px', marginBottom: '12px' }}>
+              <select value={courseToAdd} onChange={(e) => setCourseToAdd(e.target.value)} style={{ flex: 1 }}>
+                <option value="">{t('groups.courses.selectPlaceholder')}</option>
+                {allCourses
+                  .filter((c) => !groupCourses.some((gc) => gc.courseName === c.name))
+                  .map((c) => (
+                    <option key={c.id} value={c.name}>{c.id} - {c.name}</option>
+                  ))}
+              </select>
+              <button type="button" className="btn btn-success" onClick={handleAddGroupCourse} disabled={!courseToAdd}>
+                {t('groups.courses.addCourse')}
+              </button>
+            </div>
+          </WriteOnly>
+
+          <table>
+            <thead>
+              <tr>
+                <th>{t('groups.courses.table.course')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupCourses.map((gc) => (
+                <tr key={gc.courseName}>
+                  <td>{gc.courseName}</td>
+                  <td>
+                    <WriteOnly>
+                      <button className="btn btn-danger" onClick={() => handleRemoveGroupCourse(gc.courseName)}>
+                        {t('common.delete')}
+                      </button>
+                    </WriteOnly>
+                  </td>
+                </tr>
+              ))}
+              {groupCourses.length === 0 && (
+                <tr>
+                  <td colSpan={2} style={{ color: '#7f8c8d' }}>{t('groups.courses.none')}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card">
+        <div className="search-box">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('groups.searchPlaceholder')}
+          />
+        </div>
         <table>
           <thead>
             <tr>
@@ -139,7 +275,14 @@ function Groups() {
             </tr>
           </thead>
           <tbody>
-            {groups.map(group => (
+            {groups.filter((group) => {
+              const query = searchQuery.trim().toLowerCase();
+              if (!query) return true;
+              return (
+                group.id?.toLowerCase().includes(query) ||
+                group.name?.toLowerCase().includes(query)
+              );
+            }).map(group => (
               <tr key={group.id}>
                 <td>{group.id}</td>
                 <td>{group.name}</td>

@@ -5,6 +5,8 @@ import {
   runEngine, getEngineStatus, generateBlocks,
   listAdminReports, downloadAdminReport,
 } from '../api';
+import { useToast } from '../ui/ToastContext';
+import { useConfirm } from '../ui/ConfirmContext';
 
 const ENGINE_POLL_MS = 3000;
 
@@ -22,6 +24,8 @@ const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 
 function Settings() {
   const { t } = useTranslation();
+  const showToast = useToast();
+  const confirmAction = useConfirm();
   const dayLabel = (value) => t(`common.days.${DAY_LABELS.find((d) => d.value === value)?.key || 'mon'}`);
 
   const [timeslots, setTimeslots] = useState([]);
@@ -192,6 +196,7 @@ function Settings() {
       }
       handleCancel();
       loadTimeslots();
+      showToast(t('settings.timeslots.savedMessage'));
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors) {
@@ -202,14 +207,15 @@ function Settings() {
   };
 
   const handleDelete = async (timeslot) => {
-    if (!confirm(t('settings.timeslots.confirmDelete', {
+    if (!(await confirmAction(t('settings.timeslots.confirmDelete', {
       day: dayLabel(timeslot.dayOfWeek),
       start: timeslot.startHour,
       end: timeslot.startHour + timeslot.lengthHours,
-    }))) return;
+    })))) return;
     try {
       await deleteTimeslot(timeslot.id);
       loadTimeslots();
+      showToast(t('settings.timeslots.deletedMessage'));
     } catch (err) {
       setError(err.response?.data?.message || t('settings.timeslots.deleteFailedPrefix') + err.message);
     }

@@ -23,7 +23,8 @@
       "wednesday": "Miércoles",
       "thursday": "Jueves",
       "friday": "Viernes"
-    }
+    },
+    "confirm": "Confirmar"
   },
   "nav": {
     "schedule": "Horario",
@@ -87,7 +88,10 @@
       "wed": "Mié",
       "thu": "Jue",
       "fri": "Vie"
-    }
+    },
+    "savedMessage": "Maestro guardado",
+    "deletedMessage": "Maestro eliminado",
+    "searchPlaceholder": "Buscar por nombre..."
   },
   "courses": {
     "title": "Cursos",
@@ -110,6 +114,71 @@
       "active": "Activo:"
     },
     "componentPlaceholder": "p. ej. BASICAS, TPROG, TEM",
+    "roomRequirements": {
+      "title": "Requisitos de Aula (dobles)",
+      "description": "Para cursos que necesitan dividir sus horas entre varios tipos de aula (p. ej. 4h en centro de cómputo + 1h en aula estándar). Deje vacío para usar solo el Requisito de Aula único de arriba.",
+      "formNote": "Ignorado — hay requisitos de aula dobles configurados abajo que tienen prioridad sobre este campo.",
+      "dualBadge": "doble",
+      "addRequirement": "+ Agregar Requisito",
+      "editRequirement": "Editar Requisito",
+      "newRequirement": "Nuevo Requisito",
+      "loadFailedPrefix": "Error al cargar los requisitos de aula: ",
+      "saveFailedPrefix": "Error al guardar el requisito de aula: ",
+      "deleteFailedPrefix": "Error al eliminar el requisito de aula: ",
+      "confirmDelete": "¿Está seguro de que desea eliminar este requisito de aula?",
+      "fields": {
+        "roomType": "Tipo de Aula:",
+        "hoursRequired": "Horas Requeridas:",
+        "priority": "Prioridad:",
+        "preferredRoom": "Aula Preferida (opcional):"
+      },
+      "table": {
+        "roomType": "Tipo de Aula",
+        "hoursRequired": "Horas",
+        "priority": "Prioridad",
+        "preferredRoom": "Aula Preferida"
+      },
+      "none": "Sin requisitos de aula dobles — este curso usa solo el Requisito de Aula único de arriba.",
+      "savedMessage": "Requisito de aula guardado",
+      "deletedMessage": "Requisito de aula eliminado"
+    },
+    "blockTemplates": {
+      "title": "Plantillas de Bloques (personalizadas)",
+      "description": "Bloques explícitos y definidos manualmente para este curso, en lugar de dejar que la descomposición genérica los determine. Deje Grupo vacío para aplicar a todos los grupos que cursan esta materia. La plantilla propia de un grupo para un índice de bloque dado tiene prioridad sobre la de \"todos los grupos\".",
+      "addTemplate": "+ Agregar Plantilla",
+      "editTemplate": "Editar Plantilla",
+      "newTemplate": "Nueva Plantilla",
+      "loadFailedPrefix": "Error al cargar las plantillas de bloques: ",
+      "saveFailedPrefix": "Error al guardar la plantilla de bloque: ",
+      "deleteFailedPrefix": "Error al eliminar la plantilla de bloque: ",
+      "confirmDelete": "¿Está seguro de que desea eliminar esta plantilla de bloque?",
+      "fields": {
+        "group": "Grupo (opcional):",
+        "blockIndex": "Índice de Bloque:",
+        "blockLength": "Duración del Bloque (horas):",
+        "roomType": "Tipo de Aula (opcional):",
+        "preferredRoom": "Aula Preferida (opcional):",
+        "preferredDay": "Día Preferido (opcional):",
+        "pinAssignment": "Fijar Asignación",
+        "preferredTimeslot": "Horario Preferido (opcional):"
+      },
+      "pinHint": "Las plantillas fijadas requieren un horario preferido.",
+      "pinnedRequiresTimeslotError": "Una plantilla fijada debe especificar un horario preferido",
+      "table": {
+        "group": "Grupo",
+        "blockIndex": "Índice",
+        "blockLength": "Duración",
+        "roomType": "Tipo de Aula",
+        "preferredRoom": "Aula Preferida",
+        "preferredDay": "Día",
+        "pinned": "Fijado",
+        "timeslot": "Horario"
+      },
+      "allGroups": "Todos los Grupos",
+      "none": "Sin plantillas de bloques — este curso usa la descomposición genérica de arriba.",
+      "savedMessage": "Plantilla de bloque guardada",
+      "deletedMessage": "Plantilla de bloque eliminada"
+    },
     "table": {
       "id": "ID",
       "name": "Nombre",
@@ -117,7 +186,10 @@
       "roomReq": "Req. Aula",
       "hoursWeek": "Horas/Sem",
       "active": "Activo"
-    }
+    },
+    "savedMessage": "Materia guardada",
+    "deletedMessage": "Materia eliminada",
+    "searchPlaceholder": "Buscar por ID o nombre..."
   },
   "rooms": {
     "title": "Aulas",
@@ -138,7 +210,10 @@
       "name": "Nombre",
       "building": "Edificio",
       "type": "Tipo"
-    }
+    },
+    "savedMessage": "Aula guardada",
+    "deletedMessage": "Aula eliminada",
+    "searchPlaceholder": "Buscar por nombre o edificio..."
   },
   "groups": {
     "title": "Grupos de Estudiantes",
@@ -159,7 +234,26 @@
       "id": "ID",
       "name": "Nombre",
       "preferredRoom": "Aula Preferida"
-    }
+    },
+    "courses": {
+      "title": "Cursos",
+      "description": "Qué cursos toma este grupo (usado por \"Generar Bloques\"). Antes solo se podía definir reimportando el archivo Excel.",
+      "addCourse": "Agregar",
+      "selectPlaceholder": "-- Seleccione un curso --",
+      "loadFailedPrefix": "Error al cargar los cursos de este grupo: ",
+      "addFailedPrefix": "Error al agregar curso: ",
+      "removeFailedPrefix": "Error al quitar curso: ",
+      "confirmRemove": "¿Quitar este curso del grupo? (Los bloques de horario ya generados no se ven afectados, solo las futuras ejecuciones de \"Generar Bloques\".)",
+      "table": {
+        "course": "Curso"
+      },
+      "none": "Este grupo aún no tiene cursos.",
+      "addedMessage": "Materia añadida al grupo",
+      "removedMessage": "Materia eliminada del grupo"
+    },
+    "savedMessage": "Grupo guardado",
+    "deletedMessage": "Grupo eliminado",
+    "searchPlaceholder": "Buscar por ID o nombre..."
   },
   "assignments": {
     "title": "Asignaciones de Bloques de Curso",
@@ -205,7 +299,9 @@
       "schedule": "Horario",
       "room": "Aula",
       "pinned": "Fijada"
-    }
+    },
+    "savedMessage": "Asignación guardada",
+    "deletedMessage": "Asignación eliminada"
   },
   "reports": {
     "title": "Reportes",
@@ -297,7 +393,9 @@
         "end": "Fin",
         "length": "Duración (h)"
       },
-      "none": "No hay horarios definidos"
+      "none": "No hay horarios definidos",
+      "savedMessage": "Horario guardado",
+      "deletedMessage": "Horario eliminado"
     }
   },
   "users": {
@@ -330,7 +428,10 @@
       "created": "Creado"
     },
     "you": " (usted)",
-    "noUsers": "No se encontraron usuarios"
+    "noUsers": "No se encontraron usuarios",
+    "savedMessage": "Usuario guardado",
+    "deletedMessage": "Usuario eliminado",
+    "passwordResetMessage": "Contraseña restablecida"
   },
   "schedule": {
     "title": "Vista del Horario",

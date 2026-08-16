@@ -68,6 +68,35 @@ export const updateCourse = (id, course) => api.put(`/courses/${id}`, course);
 export const deleteCourse = (id) => api.delete(`/courses/${id}`);
 export const searchCourses = (query) => api.get(`/courses/search?query=${query}`);
 export const getActiveCourses = () => api.get('/courses/active');
+export const getCourseComponents = () => api.get('/courses/components');
+export const getCourseIdsWithRoomRequirements = () => api.get('/courses/with-room-requirements');
+
+// Course room requirements (dual room requirements: a course's hours split
+// across multiple room types, e.g. 4h in a computer center + 1h standard)
+export const getCourseRoomRequirements = (courseId) => api.get(`/courses/${courseId}/room-requirements`);
+export const createCourseRoomRequirement = (courseId, requirement) =>
+  api.post(`/courses/${courseId}/room-requirements`, requirement);
+export const updateCourseRoomRequirement = (courseId, id, requirement) =>
+  api.put(`/courses/${courseId}/room-requirements/${id}`, requirement);
+export const deleteCourseRoomRequirement = (courseId, id) =>
+  api.delete(`/courses/${courseId}/room-requirements/${id}`);
+
+// Course block templates (explicit, hand-authored block decomposition for a
+// course - optionally scoped to one group, or every group when groupId is null)
+export const getCourseBlockTemplates = (courseId) => api.get(`/courses/${courseId}/block-templates`);
+export const createCourseBlockTemplate = (courseId, template) =>
+  api.post(`/courses/${courseId}/block-templates`, template);
+export const updateCourseBlockTemplate = (courseId, id, template) =>
+  api.put(`/courses/${courseId}/block-templates/${id}`, template);
+export const deleteCourseBlockTemplate = (courseId, id) =>
+  api.delete(`/courses/${courseId}/block-templates/${id}`);
+
+// Group courses (which courses a group takes - group_course, keyed by course name)
+export const getGroupCourses = (groupId) => api.get(`/groups/${groupId}/courses`);
+export const addGroupCourse = (groupId, courseName) =>
+  api.post(`/groups/${groupId}/courses`, { courseName });
+export const removeGroupCourse = (groupId, courseName) =>
+  api.delete(`/groups/${groupId}/courses/${encodeURIComponent(courseName)}`);
 
 // Rooms
 export const getRooms = () => api.get('/rooms');

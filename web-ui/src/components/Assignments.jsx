@@ -5,6 +5,8 @@ import {
   getGroups, getCourses, getTeachers, getRooms, listTimeslots,
 } from '../api';
 import WriteOnly from '../auth/WriteOnly';
+import { useToast } from '../ui/ToastContext';
+import { useConfirm } from '../ui/ConfirmContext';
 
 // The `room` table enforces a CHECK constraint restricting `type` (and, by
 // convention, course_block_assignment.satisfies_room_type) to exactly these
@@ -24,6 +26,8 @@ const DAY_KEYS = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 7
 
 function Assignments() {
   const { t } = useTranslation();
+  const showToast = useToast();
+  const confirmAction = useConfirm();
   const [assignments, setAssignments] = useState([]);
   const [groups, setGroups] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -112,6 +116,7 @@ function Assignments() {
       }
       handleCancel();
       loadAssignments();
+      showToast(t('assignments.savedMessage'));
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors) {
@@ -136,12 +141,13 @@ function Assignments() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm(t('assignments.confirmDelete'))) return;
+    if (!(await confirmAction(t('assignments.confirmDelete')))) return;
     try {
       await deleteAssignment(id);
       loadAssignments();
+      showToast(t('assignments.deletedMessage'));
     } catch (err) {
-      setError(t('assignments.deleteFailedPrefix') + err.message);
+      setError(err.response?.data?.message || t('assignments.deleteFailedPrefix') + err.message);
     }
   };
 

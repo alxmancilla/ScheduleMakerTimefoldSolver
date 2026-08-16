@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getUsers, createUser, updateUser, resetUserPassword, deleteUser } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import { useToast } from '../ui/ToastContext';
+import { useConfirm } from '../ui/ConfirmContext';
 
 const ROLES = ['ADMIN', 'WRITER', 'READER'];
 // Each language's own native name, shown regardless of the current UI language
@@ -16,6 +18,8 @@ const formatTimestamp = (value) => (value ? value.replace('T', ' ').split('.')[0
 function Users() {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
+  const showToast = useToast();
+  const confirmAction = useConfirm();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -86,6 +90,7 @@ function Users() {
       }
       handleCancel();
       loadUsers();
+      showToast(t('users.savedMessage'));
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors) {
@@ -96,10 +101,11 @@ function Users() {
   };
 
   const handleDelete = async (u) => {
-    if (!confirm(t('users.confirmDelete', { username: u.username }))) return;
+    if (!(await confirmAction(t('users.confirmDelete', { username: u.username })))) return;
     try {
       await deleteUser(u.username);
       loadUsers();
+      showToast(t('users.deletedMessage'));
     } catch (err) {
       setError(err.response?.data?.message || t('users.deleteFailedPrefix') + err.message);
     }
@@ -123,6 +129,7 @@ function Users() {
     try {
       await resetUserPassword(resettingUsername, newPassword);
       handleCancelReset();
+      showToast(t('users.passwordResetMessage'));
     } catch (err) {
       setResetError(err.response?.data?.errors?.newPassword || err.response?.data?.message || t('users.resetFailedPrefix') + err.message);
     }

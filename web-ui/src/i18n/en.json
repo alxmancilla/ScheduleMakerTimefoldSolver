@@ -23,7 +23,8 @@
       "wednesday": "Wednesday",
       "thursday": "Thursday",
       "friday": "Friday"
-    }
+    },
+    "confirm": "Confirm"
   },
   "nav": {
     "schedule": "Schedule",
@@ -87,7 +88,10 @@
       "wed": "Wed",
       "thu": "Thu",
       "fri": "Fri"
-    }
+    },
+    "savedMessage": "Teacher saved",
+    "deletedMessage": "Teacher deleted",
+    "searchPlaceholder": "Search by name..."
   },
   "courses": {
     "title": "Courses",
@@ -110,6 +114,71 @@
       "active": "Active:"
     },
     "componentPlaceholder": "e.g. BASICAS, TPROG, TEM",
+    "roomRequirements": {
+      "title": "Room Requirements (dual)",
+      "description": "For courses that need hours split across multiple room types (e.g. 4h in a computer center + 1h in a standard room). Leave empty to just use the single Room Requirement above.",
+      "formNote": "Ignored — dual room requirements are configured below and take precedence over this field.",
+      "dualBadge": "dual",
+      "addRequirement": "+ Add Requirement",
+      "editRequirement": "Edit Requirement",
+      "newRequirement": "New Requirement",
+      "loadFailedPrefix": "Failed to load room requirements: ",
+      "saveFailedPrefix": "Failed to save room requirement: ",
+      "deleteFailedPrefix": "Failed to delete room requirement: ",
+      "confirmDelete": "Are you sure you want to delete this room requirement?",
+      "fields": {
+        "roomType": "Room Type:",
+        "hoursRequired": "Hours Required:",
+        "priority": "Priority:",
+        "preferredRoom": "Preferred Room (optional):"
+      },
+      "table": {
+        "roomType": "Room Type",
+        "hoursRequired": "Hours",
+        "priority": "Priority",
+        "preferredRoom": "Preferred Room"
+      },
+      "none": "No dual room requirements — this course just uses the single Room Requirement above.",
+      "savedMessage": "Room requirement saved",
+      "deletedMessage": "Room requirement deleted"
+    },
+    "blockTemplates": {
+      "title": "Block Templates (custom)",
+      "description": "Explicit, hand-authored blocks for this course instead of letting the generic decomposition derive them. Leave Group empty to apply to every group taking this course. A group's own template for a given block index overrides the \"all groups\" one.",
+      "addTemplate": "+ Add Template",
+      "editTemplate": "Edit Template",
+      "newTemplate": "New Template",
+      "loadFailedPrefix": "Failed to load block templates: ",
+      "saveFailedPrefix": "Failed to save block template: ",
+      "deleteFailedPrefix": "Failed to delete block template: ",
+      "confirmDelete": "Are you sure you want to delete this block template?",
+      "fields": {
+        "group": "Group (optional):",
+        "blockIndex": "Block Index:",
+        "blockLength": "Block Length (hours):",
+        "roomType": "Room Type (optional):",
+        "preferredRoom": "Preferred Room (optional):",
+        "preferredDay": "Preferred Day (optional):",
+        "pinAssignment": "Pin Assignment",
+        "preferredTimeslot": "Preferred Timeslot (optional):"
+      },
+      "pinHint": "Pinned templates require a preferred timeslot.",
+      "pinnedRequiresTimeslotError": "A pinned template must specify a preferred timeslot",
+      "table": {
+        "group": "Group",
+        "blockIndex": "Index",
+        "blockLength": "Length",
+        "roomType": "Room Type",
+        "preferredRoom": "Preferred Room",
+        "preferredDay": "Day",
+        "pinned": "Pinned",
+        "timeslot": "Timeslot"
+      },
+      "allGroups": "All Groups",
+      "none": "No block templates — this course uses the generic decomposition above.",
+      "savedMessage": "Block template saved",
+      "deletedMessage": "Block template deleted"
+    },
     "table": {
       "id": "ID",
       "name": "Name",
@@ -117,7 +186,10 @@
       "roomReq": "Room Req.",
       "hoursWeek": "Hours/Week",
       "active": "Active"
-    }
+    },
+    "savedMessage": "Course saved",
+    "deletedMessage": "Course deleted",
+    "searchPlaceholder": "Search by ID or name..."
   },
   "rooms": {
     "title": "Rooms",
@@ -138,7 +210,10 @@
       "name": "Name",
       "building": "Building",
       "type": "Type"
-    }
+    },
+    "savedMessage": "Room saved",
+    "deletedMessage": "Room deleted",
+    "searchPlaceholder": "Search by name or building..."
   },
   "groups": {
     "title": "Student Groups",
@@ -159,7 +234,26 @@
       "id": "ID",
       "name": "Name",
       "preferredRoom": "Preferred Room"
-    }
+    },
+    "courses": {
+      "title": "Courses",
+      "description": "Which courses this group takes (drives \"Generate Blocks\"). Previously only settable by re-importing the Excel file.",
+      "addCourse": "Add",
+      "selectPlaceholder": "-- Select a course --",
+      "loadFailedPrefix": "Failed to load this group's courses: ",
+      "addFailedPrefix": "Failed to add course: ",
+      "removeFailedPrefix": "Failed to remove course: ",
+      "confirmRemove": "Remove this course from the group? (Existing schedule blocks are not affected, only future \"Generate Blocks\" runs.)",
+      "table": {
+        "course": "Course"
+      },
+      "none": "This group has no courses yet.",
+      "addedMessage": "Course added to group",
+      "removedMessage": "Course removed from group"
+    },
+    "savedMessage": "Group saved",
+    "deletedMessage": "Group deleted",
+    "searchPlaceholder": "Search by ID or name..."
   },
   "assignments": {
     "title": "Course Block Assignments",
@@ -205,7 +299,9 @@
       "schedule": "Schedule",
       "room": "Room",
       "pinned": "Pinned"
-    }
+    },
+    "savedMessage": "Assignment saved",
+    "deletedMessage": "Assignment deleted"
   },
   "reports": {
     "title": "Reports",
@@ -297,7 +393,9 @@
         "end": "End",
         "length": "Length (h)"
       },
-      "none": "No timeslots defined"
+      "none": "No timeslots defined",
+      "savedMessage": "Timeslot saved",
+      "deletedMessage": "Timeslot deleted"
     }
   },
   "users": {
@@ -330,7 +428,10 @@
       "created": "Created"
     },
     "you": " (you)",
-    "noUsers": "No users found"
+    "noUsers": "No users found",
+    "savedMessage": "User saved",
+    "deletedMessage": "User deleted",
+    "passwordResetMessage": "Password reset"
   },
   "schedule": {
     "title": "Schedule View",

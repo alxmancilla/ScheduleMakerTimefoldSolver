@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses } from '../api';
 import WriteOnly from '../auth/WriteOnly';
+import { useToast } from '../ui/ToastContext';
+import { useConfirm } from '../ui/ConfirmContext';
 
 const MIN_CHARS_FOR_SUGGESTIONS = 2;
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -18,6 +20,8 @@ const EMPTY_FORM = { id: '', name: '', lastName: '', maxHoursPerWeek: 40 };
 
 function Teachers() {
   const { t } = useTranslation();
+  const showToast = useToast();
+  const confirmAction = useConfirm();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,6 +35,7 @@ function Teachers() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const qualBoxRef = useRef(null);
   const [availability, setAvailability] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadTeachers();
@@ -153,6 +158,7 @@ function Teachers() {
       }
       handleCancel();
       loadTeachers();
+      showToast(t('teachers.savedMessage'));
     } catch (err) {
       const data = err.response?.data;
       if (data?.errors) {
@@ -188,12 +194,13 @@ function Teachers() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm(t('teachers.confirmDelete'))) return;
+    if (!(await confirmAction(t('teachers.confirmDelete')))) return;
     try {
       await deleteTeacher(id);
       loadTeachers();
+      showToast(t('teachers.deletedMessage'));
     } catch (err) {
-      setError(t('teachers.deleteFailedPrefix') + err.message);
+      setError(err.response?.data?.message || t('teachers.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -418,6 +425,14 @@ function Teachers() {
       )}
 
       <div className="card">
+        <div className="search-box">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('teachers.searchPlaceholder')}
+          />
+        </div>
         <table>
           <thead>
             <tr>
@@ -430,7 +445,15 @@ function Teachers() {
             </tr>
           </thead>
           <tbody>
-            {teachers.map(teacher => (
+            {teachers.filter((teacher) => {
+              const query = searchQuery.trim().toLowerCase();
+              if (!query) return true;
+              return (
+                teacher.name?.toLowerCase().includes(query) ||
+                teacher.lastName?.toLowerCase().includes(query) ||
+                teacher.id?.toLowerCase().includes(query)
+              );
+            }).map(teacher => (
               <tr key={teacher.id}>
                 <td>{teacher.id}</td>
                 <td>{teacher.name}</td>
