@@ -165,9 +165,11 @@ CREATE TABLE room (
     name VARCHAR(100) PRIMARY KEY,
     building VARCHAR(50) NOT NULL,
     type VARCHAR(50) NOT NULL,
+    capacity INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT check_room_type CHECK (type IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica', 'centro de cómputo', 'laboratorio'))
+    CONSTRAINT check_room_type CHECK (type IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica', 'centro de cómputo', 'laboratorio')),
+    CONSTRAINT check_room_capacity CHECK (capacity IS NULL OR capacity > 0)
 );
 
 CREATE INDEX idx_room_building ON room(building);
@@ -177,6 +179,7 @@ COMMENT ON TABLE room IS 'Physical classrooms and laboratory spaces';
 COMMENT ON COLUMN room.name IS 'Unique room identifier/name';
 COMMENT ON COLUMN room.building IS 'Building identifier where room is located';
 COMMENT ON COLUMN room.type IS 'Room type: estándar, taller, taller electromecánica, taller electrónica, centro de cómputo, or laboratorio';
+COMMENT ON COLUMN room.capacity IS 'Optional seating capacity. When set alongside student_group.student_count, a soft constraint warns if an assigned group exceeds it.';
 
 -- ============================================================================
 -- STUDENT GROUPS TABLE
@@ -186,9 +189,11 @@ CREATE TABLE student_group (
     id VARCHAR(100) PRIMARY KEY,
     name VARCHAR(200) NOT NULL UNIQUE,
     preferred_room_name VARCHAR(100),
+    student_count INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_student_group_room FOREIGN KEY (preferred_room_name) REFERENCES room(name) ON DELETE SET NULL
+    CONSTRAINT fk_student_group_room FOREIGN KEY (preferred_room_name) REFERENCES room(name) ON DELETE SET NULL,
+    CONSTRAINT check_student_group_student_count CHECK (student_count IS NULL OR student_count > 0)
 );
 
 CREATE INDEX idx_student_group_name ON student_group(name);
@@ -198,6 +203,7 @@ COMMENT ON TABLE student_group IS 'Student groups that attend courses together';
 COMMENT ON COLUMN student_group.id IS 'Unique group identifier (e.g., 2AARH, 4APIA)';
 COMMENT ON COLUMN student_group.name IS 'Full group name';
 COMMENT ON COLUMN student_group.preferred_room_name IS 'Optional pre-assigned room for this group (soft preference)';
+COMMENT ON COLUMN student_group.student_count IS 'Optional headcount. When set alongside room.capacity, a soft constraint warns if this group is placed in a room too small for it.';
 
 -- ============================================================================
 -- GROUP COURSES TABLE
@@ -699,6 +705,42 @@ CREATE INDEX IF NOT EXISTS idx_cba_preferred_room ON course_block_assignment(pre
 
 COMMENT ON COLUMN course_block_assignment.satisfies_room_type IS 'Which room requirement this assignment satisfies (for dual-requirement courses)';
 COMMENT ON COLUMN course_block_assignment.preferred_room_name IS 'Preferred room for this assignment (soft constraint)';
+
+-- ============================================================================
+-- SCHOOL TERM TABLE
+-- ============================================================================
+-- Singleton row holding the current term/period label shown in the UI (e.g.
+-- "Fall 2026"). Purely organizational metadata; never read by the solver.
+CREATE TABLE IF NOT EXISTS school_term (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    label VARCHAR(100) NOT NULL DEFAULT '',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO school_term (id, label) VALUES (1, '') ON CONFLICT (id) DO NOTHING;
+
+COMMENT ON TABLE school_term IS 'Singleton row holding the current term/period label shown in the UI. Not used by the solver.';
+COMMENT ON COLUMN school_term.label IS 'Free-text term label, editable by ADMIN in Settings.';
+
+-- ============================================================================
+-- SCHEDULE AUDIT LOG TABLE
+-- ============================================================================
+-- Records who made which write request (POST/PUT/DELETE) and when. Written
+-- automatically by a Spring MVC interceptor, not by individual controllers.
+CREATE TABLE IF NOT EXISTS schedule_audit_log (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    http_method VARCHAR(10) NOT NULL,
+    path VARCHAR(500) NOT NULL,
+    status_code INTEGER NOT NULL,
+    occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_audit_log_occurred_at ON schedule_audit_log(occurred_at DESC);
+
+COMMENT ON TABLE schedule_audit_log IS 'Write requests (POST/PUT/DELETE) to /api/**, logged automatically by a servlet interceptor for basic accountability.';
+COMMENT ON COLUMN schedule_audit_log.username IS 'Authenticated username that made the request.';
+COMMENT ON COLUMN schedule_audit_log.status_code IS 'HTTP response status; only 2xx (successful) requests are logged.';
 
 -- ============================================================================
 -- END OF SCHEMA
