@@ -20,6 +20,9 @@ public class StudentGroupEntity {
     @Column(name = "preferred_room_name", length = 100)
     private String preferredRoomName;
 
+    @Column(name = "student_count")
+    private Integer studentCount;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -73,6 +76,14 @@ public class StudentGroupEntity {
 
     public void setPreferredRoomName(String preferredRoomName) {
         this.preferredRoomName = preferredRoomName;
+    }
+
+    public Integer getStudentCount() {
+        return studentCount;
+    }
+
+    public void setStudentCount(Integer studentCount) {
+        this.studentCount = studentCount;
     }
 
     public LocalDateTime getCreatedAt() {

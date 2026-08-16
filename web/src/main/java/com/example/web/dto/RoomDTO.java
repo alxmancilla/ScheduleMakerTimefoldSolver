@@ -27,6 +27,11 @@ public class RoomDTO {
     @Size(max = 100, message = "Room type must not exceed 100 characters")
     private String type;
 
+    /** Optional seating capacity; when set alongside a group's studentCount, a
+     * soft constraint warns if the group exceeds it. */
+    @Min(value = 1, message = "Capacity must be at least 1")
+    private Integer capacity;
+
     public RoomDTO() {
     }
 
@@ -54,5 +59,13 @@ public class RoomDTO {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public Integer getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(Integer capacity) {
+        this.capacity = capacity;
     }
 }

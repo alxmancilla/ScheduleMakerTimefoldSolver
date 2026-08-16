@@ -48,6 +48,7 @@ public class RoomController {
             throw new IllegalArgumentException("Room with name '" + request.getName() + "' already exists");
         }
         RoomEntity room = new RoomEntity(request.getName(), request.getBuilding(), request.getType());
+        room.setCapacity(request.getCapacity());
         return roomRepository.save(room);
     }
 
@@ -57,6 +58,7 @@ public class RoomController {
                 .orElseThrow(() -> new ResourceNotFoundException("Room", name));
         room.setBuilding(request.getBuilding());
         room.setType(request.getType());
+        room.setCapacity(request.getCapacity());
         return roomRepository.save(room);
     }
 

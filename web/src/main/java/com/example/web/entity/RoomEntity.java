@@ -16,7 +16,10 @@ public class RoomEntity {
     
     @Column(name = "type", length = 100)
     private String type;
-    
+
+    @Column(name = "capacity")
+    private Integer capacity;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
@@ -67,6 +70,14 @@ public class RoomEntity {
     
     public void setType(String type) {
         this.type = type;
+    }
+
+    public Integer getCapacity() {
+        return capacity;
+    }
+
+    public void setCapacity(Integer capacity) {
+        this.capacity = capacity;
     }
     
     public LocalDateTime getCreatedAt() {

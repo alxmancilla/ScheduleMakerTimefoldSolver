@@ -48,6 +48,7 @@ public class StudentGroupController {
         }
         StudentGroupEntity group = new StudentGroupEntity(request.getId(), request.getName());
         group.setPreferredRoomName(request.getPreferredRoomName());
+        group.setStudentCount(request.getStudentCount());
         return groupRepository.save(group);
     }
 
@@ -57,6 +58,7 @@ public class StudentGroupController {
                 .orElseThrow(() -> new ResourceNotFoundException("Group", id));
         group.setName(request.getName());
         group.setPreferredRoomName(request.getPreferredRoomName());
+        group.setStudentCount(request.getStudentCount());
         return groupRepository.save(group);
     }
 
