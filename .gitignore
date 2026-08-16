@@ -25,6 +25,8 @@ web-ui/.env.*.local
 
 # Datasets
 database/datasets/
+# pg_dump backups taken before destructive local DB operations
+database/backups/
 database/migrations/*
 # Track the RBAC schema migration (app_user table) and the semester-to-integer
 # migration even though ad-hoc local migrations under this directory stay ignored.
