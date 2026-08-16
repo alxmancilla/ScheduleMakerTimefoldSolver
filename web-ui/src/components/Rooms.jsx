@@ -4,18 +4,8 @@ import { getRooms, createRoom, updateRoom, deleteRoom } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-
-// The `room` table enforces a CHECK constraint restricting `type` to exactly
-// these values (see database/schema_block_scheduling*.sql). Keep in sync with
-// that constraint and with the same list used in Courses.jsx/Assignments.jsx.
-const ROOM_TYPES = [
-  'estándar',
-  'laboratorio',
-  'taller',
-  'taller electromecánica',
-  'taller electrónica',
-  'centro de cómputo',
-];
+import { ROOM_TYPES } from '../constants';
+import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 function Rooms() {
   const { t } = useTranslation();
@@ -90,6 +80,16 @@ function Rooms() {
     setEditingRoom(null);
   };
 
+  const filteredRooms = rooms.filter((room) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      room.name?.toLowerCase().includes(query) ||
+      room.building?.toLowerCase().includes(query)
+    );
+  });
+  const { page, setPage, pageCount, pageItems, totalItems } = usePagination(filteredRooms);
+
   if (loading) return <div className="loading">{t('rooms.loading')}</div>;
 
   return (
@@ -154,14 +154,7 @@ function Rooms() {
             </tr>
           </thead>
           <tbody>
-            {rooms.filter((room) => {
-              const query = searchQuery.trim().toLowerCase();
-              if (!query) return true;
-              return (
-                room.name?.toLowerCase().includes(query) ||
-                room.building?.toLowerCase().includes(query)
-              );
-            }).map(room => (
+            {pageItems.map(room => (
               <tr key={room.name}>
                 <td>{room.name}</td>
                 <td>{room.building}</td>
@@ -180,6 +173,7 @@ function Rooms() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   );

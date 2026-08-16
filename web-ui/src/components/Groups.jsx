@@ -7,6 +7,7 @@ import {
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
+import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 function Groups() {
   const { t } = useTranslation();
@@ -147,6 +148,16 @@ function Groups() {
     }
   };
 
+  const filteredGroups = groups.filter((group) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      group.id?.toLowerCase().includes(query) ||
+      group.name?.toLowerCase().includes(query)
+    );
+  });
+  const { page, setPage, pageCount, pageItems, totalItems } = usePagination(filteredGroups);
+
   if (loading) return <div className="loading">{t('groups.loading')}</div>;
 
   return (
@@ -275,14 +286,7 @@ function Groups() {
             </tr>
           </thead>
           <tbody>
-            {groups.filter((group) => {
-              const query = searchQuery.trim().toLowerCase();
-              if (!query) return true;
-              return (
-                group.id?.toLowerCase().includes(query) ||
-                group.name?.toLowerCase().includes(query)
-              );
-            }).map(group => (
+            {pageItems.map(group => (
               <tr key={group.id}>
                 <td>{group.id}</td>
                 <td>{group.name}</td>
@@ -301,6 +305,7 @@ function Groups() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   );

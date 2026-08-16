@@ -24,7 +24,13 @@
       "thursday": "Jueves",
       "friday": "Viernes"
     },
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "pagination": {
+      "showing": "Mostrando {{start}}-{{end}} de {{total}}",
+      "previous": "< Anterior",
+      "next": "Siguiente >",
+      "pageOf": "Página {{page}} de {{pageCount}}"
+    }
   },
   "nav": {
     "schedule": "Horario",
@@ -35,6 +41,7 @@
     "assignments": "Asignaciones",
     "reports": "Reportes",
     "import": "Importar",
+    "admin": "Administración",
     "settings": "Configuración",
     "users": "Usuarios",
     "logout": "Cerrar sesión",

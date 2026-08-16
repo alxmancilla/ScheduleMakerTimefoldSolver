@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Schedule from './components/Schedule';
 import Teachers from './components/Teachers';
@@ -20,6 +20,53 @@ import WriteOnly from './auth/WriteOnly';
 import { useAuth } from './auth/AuthContext';
 
 const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
+
+const ADMIN_ROUTES = ['/settings', '/users'];
+
+function AdminNavDropdown() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const isActive = ADMIN_ROUTES.includes(location.pathname);
+
+  return (
+    <div
+      className="nav-dropdown"
+      ref={ref}
+      onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
+    >
+      <button
+        type="button"
+        className={`nav-dropdown-toggle ${isActive ? 'active' : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        {t('nav.admin')} ▾
+      </button>
+      {open && (
+        <div className="nav-dropdown-menu">
+          <NavLink to="/settings" className={navLinkClass} onClick={() => setOpen(false)}>
+            {t('nav.settings')}
+          </NavLink>
+          <NavLink to="/users" className={navLinkClass} onClick={() => setOpen(false)}>
+            {t('nav.users')}
+          </NavLink>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Layout() {
   const { user, logout, changeLanguage } = useAuth();
@@ -48,8 +95,7 @@ function Layout() {
               <NavLink to="/import" className={navLinkClass}>{t('nav.import')}</NavLink>
             </WriteOnly>
             <AdminOnly>
-              <NavLink to="/settings" className={navLinkClass}>{t('nav.settings')}</NavLink>
-              <NavLink to="/users" className={navLinkClass}>{t('nav.users')}</NavLink>
+              <AdminNavDropdown />
             </AdminOnly>
           </nav>
           {user && (

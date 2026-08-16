@@ -10,18 +10,8 @@ import {
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-
-// The `room` table enforces a CHECK constraint restricting `type` to exactly
-// these values (see database/schema_block_scheduling*.sql). Keep in sync with
-// that constraint and with CLAUDE.md's room type list.
-const ROOM_TYPES = [
-  'estándar',
-  'laboratorio',
-  'taller',
-  'taller electromecánica',
-  'taller electrónica',
-  'centro de cómputo',
-];
+import { ROOM_TYPES } from '../constants';
+import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 // The `course` table enforces `CHECK (semester BETWEEN 1 AND 12)`.
 const SEMESTERS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -379,6 +369,16 @@ function Courses() {
       setTemplatesError(err.response?.data?.message || t('courses.blockTemplates.deleteFailedPrefix') + err.message);
     }
   };
+
+  const filteredCourses = courses.filter((course) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      course.id?.toLowerCase().includes(query) ||
+      course.name?.toLowerCase().includes(query)
+    );
+  });
+  const { page, setPage, pageCount, pageItems, totalItems } = usePagination(filteredCourses);
 
   if (loading) return <div className="loading">{t('courses.loading')}</div>;
 
@@ -781,14 +781,7 @@ function Courses() {
             </tr>
           </thead>
           <tbody>
-            {courses.filter((course) => {
-              const query = searchQuery.trim().toLowerCase();
-              if (!query) return true;
-              return (
-                course.id?.toLowerCase().includes(query) ||
-                course.name?.toLowerCase().includes(query)
-              );
-            }).map(course => (
+            {pageItems.map(course => (
               <tr key={course.id}>
                 <td>{course.id}</td>
                 <td>{course.name}</td>
@@ -827,6 +820,7 @@ function Courses() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   );

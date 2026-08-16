@@ -7,18 +7,8 @@ import {
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-
-// The `room` table enforces a CHECK constraint restricting `type` (and, by
-// convention, course_block_assignment.satisfies_room_type) to exactly these
-// values. Keep in sync with database/schema_block_scheduling*.sql.
-const ROOM_TYPES = [
-  'estándar',
-  'laboratorio',
-  'taller',
-  'taller electromecánica',
-  'taller electrónica',
-  'centro de cómputo',
-];
+import { ROOM_TYPES } from '../constants';
+import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const BLOCK_LENGTHS = [1, 2, 3, 4];
 
@@ -178,6 +168,7 @@ function Assignments() {
     if (filter === 'pinned') return a.pinned === true;
     return true;
   });
+  const { page, setPage, pageCount, pageItems, totalItems } = usePagination(filteredAssignments);
 
   if (loading) return <div className="loading">{t('assignments.loading')}</div>;
 
@@ -336,7 +327,7 @@ function Assignments() {
             </tr>
           </thead>
           <tbody>
-            {filteredAssignments.map(assignment => (
+            {pageItems.map(assignment => (
               <tr key={assignment.id}>
                 <td>{assignment.id}</td>
                 <td>{groupDisplay(assignment.groupId)}</td>
@@ -360,6 +351,7 @@ function Assignments() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   );

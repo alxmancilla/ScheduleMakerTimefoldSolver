@@ -4,6 +4,7 @@ import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses } 
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
+import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const MIN_CHARS_FOR_SUGGESTIONS = 2;
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -209,6 +210,17 @@ function Teachers() {
     setEditingTeacher(null);
     resetForm();
   };
+
+  const filteredTeachers = teachers.filter((teacher) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      teacher.name?.toLowerCase().includes(query) ||
+      teacher.lastName?.toLowerCase().includes(query) ||
+      teacher.id?.toLowerCase().includes(query)
+    );
+  });
+  const { page, setPage, pageCount, pageItems, totalItems } = usePagination(filteredTeachers);
 
   if (loading) return <div className="loading">{t('teachers.loading')}</div>;
 
@@ -445,15 +457,7 @@ function Teachers() {
             </tr>
           </thead>
           <tbody>
-            {teachers.filter((teacher) => {
-              const query = searchQuery.trim().toLowerCase();
-              if (!query) return true;
-              return (
-                teacher.name?.toLowerCase().includes(query) ||
-                teacher.lastName?.toLowerCase().includes(query) ||
-                teacher.id?.toLowerCase().includes(query)
-              );
-            }).map(teacher => (
+            {pageItems.map(teacher => (
               <tr key={teacher.id}>
                 <td>{teacher.id}</td>
                 <td>{teacher.name}</td>
@@ -474,6 +478,7 @@ function Teachers() {
             ))}
           </tbody>
         </table>
+        <Pagination page={page} pageCount={pageCount} totalItems={totalItems} pageSize={DEFAULT_PAGE_SIZE} onPageChange={setPage} />
       </div>
     </div>
   );
