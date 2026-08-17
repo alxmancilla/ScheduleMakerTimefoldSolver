@@ -11,7 +11,6 @@ function Schedule() {
   const [schedule, setSchedule] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -122,24 +121,7 @@ function Schedule() {
   return (
     <div>
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2>{t('schedule.title')}</h2>
-          <div>
-            <button
-              className={`btn ${viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setViewMode('grid')}
-              style={{ marginRight: '10px' }}
-            >
-              {t('schedule.gridView')}
-            </button>
-            <button
-              className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setViewMode('list')}
-            >
-              {t('schedule.listView')}
-            </button>
-          </div>
-        </div>
+        <h2>{t('schedule.title')}</h2>
 
         {/* Filters */}
         <div style={{ marginTop: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -191,118 +173,79 @@ function Schedule() {
         </p>
       </div>
 
-      {viewMode === 'grid' ? (
-        <div className="card" style={{ overflowX: 'auto' }}>
-          <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '80px', border: '1px solid #ddd', padding: '8px' }}>{t('schedule.hour')}</th>
-                {DAYS.map((day, idx) => (
-                  <th key={idx} style={{ border: '1px solid #ddd', padding: '8px' }}>{day}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {HOURS.map(hour => (
-                <tr key={hour}>
-                  <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{hour}:00</td>
-                  {DAYS.map((day, dayIdx) => {
-                    const dayOfWeek = dayIdx + 1;
-                    const entriesStartingHere = getEntriesStartingAt(dayOfWeek, hour);
-
-                    // Check if this cell is covered by a block starting in a previous hour
-                    const allEntries = getEntriesForDayAndHour(dayOfWeek, hour);
-                    const isCoveredByPreviousBlock = allEntries.some(entry => entry.startHour < hour);
-
-                    // Skip rendering this cell if it's covered by a rowspan from above
-                    if (isCoveredByPreviousBlock && entriesStartingHere.length === 0) {
-                      return null;
-                    }
-
-                    return (
-                      <td
-                        key={dayIdx}
-                        rowSpan={entriesStartingHere.length > 0 && entriesStartingHere[0].lengthHours > 1 ? entriesStartingHere[0].lengthHours : 1}
-                        style={{
-                          verticalAlign: 'top',
-                          padding: '0',
-                          border: '1px solid #ddd',
-                          height: '60px'
-                        }}
-                      >
-                        {entriesStartingHere.map((entry, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              backgroundColor: entry.pinned ? '#ffe6e6' : '#e8f4f8',
-                              border: '2px solid ' + (entry.pinned ? '#ffcccc' : '#b3d9e6'),
-                              borderRadius: '4px',
-                              padding: '8px',
-                              margin: '4px',
-                              fontSize: '12px',
-                              height: 'calc(100% - 8px)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box'
-                            }}
-                          >
-                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{entry.courseName}</div>
-                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.groupName}</div>
-                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.teacherName}</div>
-                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.roomName}</div>
-                            <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
-                              {entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)
-                            </div>
-                            {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 {t('schedule.pinnedLabel')}</div>}
-                          </div>
-                        ))}
-                      </td>
-                    );
-                  })}
-                </tr>
+      <div className="card" style={{ overflowX: 'auto' }}>
+        <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '80px', border: '1px solid #ddd', padding: '8px' }}>{t('schedule.hour')}</th>
+              {DAYS.map((day, idx) => (
+                <th key={idx} style={{ border: '1px solid #ddd', padding: '8px' }}>{day}</th>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="card">
-          <table>
-            <thead>
-              <tr>
-                <th>{t('schedule.list.day')}</th>
-                <th>{t('schedule.list.time')}</th>
-                <th>{t('schedule.list.course')}</th>
-                <th>{t('schedule.list.group')}</th>
-                <th>{t('schedule.list.teacher')}</th>
-                <th>{t('schedule.list.room')}</th>
-                <th>{t('schedule.list.pinned')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {HOURS.map(hour => (
+              <tr key={hour}>
+                <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{hour}:00</td>
+                {DAYS.map((day, dayIdx) => {
+                  const dayOfWeek = dayIdx + 1;
+                  const entriesStartingHere = getEntriesStartingAt(dayOfWeek, hour);
+
+                  // Check if this cell is covered by a block starting in a previous hour
+                  const allEntries = getEntriesForDayAndHour(dayOfWeek, hour);
+                  const isCoveredByPreviousBlock = allEntries.some(entry => entry.startHour < hour);
+
+                  // Skip rendering this cell if it's covered by a rowspan from above
+                  if (isCoveredByPreviousBlock && entriesStartingHere.length === 0) {
+                    return null;
+                  }
+
+                  return (
+                    <td
+                      key={dayIdx}
+                      rowSpan={entriesStartingHere.length > 0 && entriesStartingHere[0].lengthHours > 1 ? entriesStartingHere[0].lengthHours : 1}
+                      style={{
+                        verticalAlign: 'top',
+                        padding: '0',
+                        border: '1px solid #ddd',
+                        height: '60px'
+                      }}
+                    >
+                      {entriesStartingHere.map((entry, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            backgroundColor: entry.pinned ? '#ffe6e6' : '#e8f4f8',
+                            border: '2px solid ' + (entry.pinned ? '#ffcccc' : '#b3d9e6'),
+                            borderRadius: '4px',
+                            padding: '8px',
+                            margin: '4px',
+                            fontSize: '12px',
+                            height: 'calc(100% - 8px)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{entry.courseName}</div>
+                          <div style={{ fontSize: '11px', color: '#555' }}>{entry.groupName}</div>
+                          <div style={{ fontSize: '11px', color: '#555' }}>{entry.teacherName}</div>
+                          <div style={{ fontSize: '11px', color: '#555' }}>{entry.roomName}</div>
+                          <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+                            {entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)
+                          </div>
+                          {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 {t('schedule.pinnedLabel')}</div>}
+                        </div>
+                      ))}
+                    </td>
+                  );
+                })}
               </tr>
-            </thead>
-            <tbody>
-              {filteredEntries.length > 0 ? (
-                filteredEntries.map((entry, idx) => (
-                  <tr key={idx}>
-                    <td>{DAYS[entry.dayOfWeek - 1]}</td>
-                    <td>{entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)</td>
-                    <td>{entry.courseName}</td>
-                    <td>{entry.groupName}</td>
-                    <td>{entry.teacherName}</td>
-                    <td>{entry.roomName}</td>
-                    <td>{entry.pinned ? '📌' : ''}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: '#7f8c8d' }}>
-                    {t('schedule.noAssignments')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
