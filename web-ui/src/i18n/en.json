@@ -203,7 +203,8 @@
       "details": "Details",
       "roomRequirements": "Room Requirements",
       "blockTemplates": "Block Templates"
-    }
+    },
+    "precedenceNote": "How this course’s blocks are decided: Block Templates take priority over Room Requirements, which take priority over the legacy Room Requirement field on the Details tab. Only the highest-priority source with data for a given block is used."
   },
   "rooms": {
     "title": "Rooms",

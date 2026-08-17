@@ -203,7 +203,8 @@
       "details": "Detalles",
       "roomRequirements": "Requisitos de Aula",
       "blockTemplates": "Plantillas de Bloque"
-    }
+    },
+    "precedenceNote": "Cómo se determinan los bloques de esta materia: las Plantillas de Bloque tienen prioridad sobre los Requisitos de Aula, que a su vez tienen prioridad sobre el campo de Requisito de Aula heredado en la pestaña Detalles. Solo se usa la fuente de mayor prioridad que tenga datos para un bloque dado."
   },
   "rooms": {
     "title": "Aulas",

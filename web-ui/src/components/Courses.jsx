@@ -443,6 +443,10 @@ function Courses() {
             </div>
           )}
 
+          {editingCourse && (
+            <div className="info-note">{t('courses.precedenceNote')}</div>
+          )}
+
           {(!editingCourse || activeTab === 'details') && (
             <>
               <h3>{editingCourse ? t('courses.editCourse') : t('courses.newCourse')}</h3>
