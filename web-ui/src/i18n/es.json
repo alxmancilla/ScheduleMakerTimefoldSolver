@@ -34,6 +34,7 @@
   },
   "nav": {
     "schedule": "Horario",
+    "setup": "Datos",
     "teachers": "Maestros",
     "courses": "Cursos",
     "rooms": "Aulas",

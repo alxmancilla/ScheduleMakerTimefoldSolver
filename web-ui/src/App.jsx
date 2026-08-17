@@ -23,11 +23,25 @@ import { getTerm, TERM_UPDATED_EVENT } from './api';
 
 const navLinkClass = ({ isActive }) => (isActive ? 'active' : '');
 
-const ADMIN_ROUTES = ['/settings', '/users'];
+const SETUP_ITEMS = [
+  { path: '/teachers', labelKey: 'nav.teachers' },
+  { path: '/courses', labelKey: 'nav.courses' },
+  { path: '/rooms', labelKey: 'nav.rooms' },
+  { path: '/groups', labelKey: 'nav.groups' },
+];
+const ADMIN_ITEMS = [
+  { path: '/settings', labelKey: 'nav.settings' },
+  { path: '/users', labelKey: 'nav.users' },
+];
 
-function AdminNavDropdown() {
-  const { t } = useTranslation();
-  const location = useLocation();
+/**
+ * Shared dropdown shell (toggle button + click-outside/Escape-to-close menu)
+ * used for the Setup, Admin, and Profile nav dropdowns. `children` is a
+ * render-prop so menu items can close the dropdown after they're clicked.
+ * `activeLabel`, when set, shows which child page is current (e.g.
+ * "Setup · Rooms") so the toggle stays meaningful once the menu is closed.
+ */
+function NavDropdown({ label, active, activeLabel, menuStyle, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -39,8 +53,6 @@ function AdminNavDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isActive = ADMIN_ROUTES.includes(location.pathname);
-
   return (
     <div
       className="nav-dropdown"
@@ -49,24 +61,104 @@ function AdminNavDropdown() {
     >
       <button
         type="button"
-        className={`nav-dropdown-toggle ${isActive ? 'active' : ''}`}
+        className={`nav-dropdown-toggle ${active ? 'active' : ''}`}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
       >
-        {t('nav.admin')} ▾
+        {label}
+        {activeLabel && <span className="nav-dropdown-sublabel"> · {activeLabel}</span>}
+        <span className="nav-dropdown-caret"> ▾</span>
       </button>
       {open && (
-        <div className="nav-dropdown-menu">
-          <NavLink to="/settings" className={navLinkClass} onClick={() => setOpen(false)}>
-            {t('nav.settings')}
-          </NavLink>
-          <NavLink to="/users" className={navLinkClass} onClick={() => setOpen(false)}>
-            {t('nav.users')}
-          </NavLink>
+        <div className="nav-dropdown-menu" style={menuStyle}>
+          {children(() => setOpen(false))}
         </div>
       )}
     </div>
+  );
+}
+
+function SetupNavDropdown() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const activeItem = SETUP_ITEMS.find((item) => item.path === location.pathname);
+
+  return (
+    <NavDropdown
+      label={t('nav.setup')}
+      active={!!activeItem}
+      activeLabel={activeItem ? t(activeItem.labelKey) : null}
+    >
+      {(close) => (
+        <>
+          {SETUP_ITEMS.map((item) => (
+            <NavLink key={item.path} to={item.path} className={navLinkClass} onClick={close}>
+              {t(item.labelKey)}
+            </NavLink>
+          ))}
+        </>
+      )}
+    </NavDropdown>
+  );
+}
+
+function AdminNavDropdown() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const activeItem = ADMIN_ITEMS.find((item) => item.path === location.pathname);
+
+  return (
+    <NavDropdown
+      label={t('nav.admin')}
+      active={!!activeItem}
+      activeLabel={activeItem ? t(activeItem.labelKey) : null}
+    >
+      {(close) => (
+        <>
+          {ADMIN_ITEMS.map((item) => (
+            <NavLink key={item.path} to={item.path} className={navLinkClass} onClick={close}>
+              {t(item.labelKey)}
+            </NavLink>
+          ))}
+        </>
+      )}
+    </NavDropdown>
+  );
+}
+
+/** Consolidates username/role, language switcher, and logout into one dropdown. */
+function ProfileNavDropdown({ user, language, onChangeLanguage, onLogout }) {
+  const { t } = useTranslation();
+
+  return (
+    <NavDropdown label={`${user.username} (${user.role})`} active={false} menuStyle={{ right: 0, left: 'auto' }}>
+      {(close) => (
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '160px' }}>
+          <div>
+            <label htmlFor="language-select" style={{ display: 'block', fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+              {t('nav.language')}
+            </label>
+            <select
+              id="language-select"
+              value={language}
+              onChange={(e) => onChangeLanguage(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="en">EN</option>
+              <option value="es">ES</option>
+            </select>
+          </div>
+          <button
+            className="btn btn-secondary"
+            onClick={() => { close(); onLogout(); }}
+            style={{ width: '100%' }}
+          >
+            {t('nav.logout')}
+          </button>
+        </div>
+      )}
+    </NavDropdown>
   );
 }
 
@@ -121,12 +213,9 @@ function Layout() {
             ) : (
               <>
                 <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
-                <NavLink to="/teachers" className={navLinkClass}>{t('nav.teachers')}</NavLink>
-                <NavLink to="/courses" className={navLinkClass}>{t('nav.courses')}</NavLink>
-                <NavLink to="/rooms" className={navLinkClass}>{t('nav.rooms')}</NavLink>
-                <NavLink to="/groups" className={navLinkClass}>{t('nav.groups')}</NavLink>
                 <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
                 <NavLink to="/reports" className={navLinkClass}>{t('nav.reports')}</NavLink>
+                <SetupNavDropdown />
                 <WriteOnly>
                   <NavLink to="/import" className={navLinkClass}>{t('nav.import')}</NavLink>
                 </WriteOnly>
@@ -137,18 +226,13 @@ function Layout() {
             )}
           </nav>
           {user && (
-            <div className="user-box" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label htmlFor="language-select" style={{ display: 'none' }}>{t('nav.language')}</label>
-              <select
-                id="language-select"
-                value={i18n.language}
-                onChange={(e) => changeLanguage(e.target.value)}
-              >
-                <option value="en">EN</option>
-                <option value="es">ES</option>
-              </select>
-              <span>{user.username} ({user.role})</span>
-              <button className="btn btn-secondary" onClick={handleLogout}>{t('nav.logout')}</button>
+            <div className="user-box">
+              <ProfileNavDropdown
+                user={user}
+                language={i18n.language}
+                onChangeLanguage={changeLanguage}
+                onLogout={handleLogout}
+              />
             </div>
           )}
         </div>
