@@ -171,6 +171,9 @@ export const importExcel = (file) => {
   });
 };
 
+// Excel export (any authenticated role) - the same sheet/column layout importExcel expects
+export const exportExcel = () => api.get('/import/excel', { responseType: 'blob' });
+
 // Admin: Timeslots
 export const getTimeslots = () => api.get('/admin/timeslots');
 export const getTimeslot = (id) => api.get(`/admin/timeslots/${id}`);

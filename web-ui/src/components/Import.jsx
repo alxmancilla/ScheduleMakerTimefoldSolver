@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { importExcel } from '../api';
+import { importExcel, exportExcel } from '../api';
 
 function Import() {
   const { t } = useTranslation();
@@ -9,6 +9,33 @@ function Import() {
   const [importError, setImportError] = useState(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
+
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const response = await exportExcel();
+      const blobUrl = URL.createObjectURL(new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+      const disposition = response.headers['content-disposition'];
+      const match = disposition && disposition.match(/filename="(.+)"/);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = match ? match[1] : 'schedule-export.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch (err) {
+      setExportError(err.response?.data?.message || t('importExcel.exportFailedPrefix') + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleImportExcel = async () => {
     if (!importFile) return;
@@ -34,6 +61,22 @@ function Import() {
 
   return (
     <div>
+      <div className="card">
+        <h2>{t('importExcel.exportTitle')}</h2>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          {t('importExcel.exportDescription')}
+        </p>
+        <button
+          className="btn btn-secondary"
+          onClick={handleExportExcel}
+          disabled={exporting}
+          style={{ marginTop: '10px' }}
+        >
+          {exporting ? t('importExcel.exporting') : `⇩ ${t('importExcel.exportButton')}`}
+        </button>
+        {exportError && <div className="error" style={{ marginTop: '10px' }}>{exportError}</div>}
+      </div>
+
       <div className="card">
         <h2>{t('importExcel.title')}</h2>
         <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>

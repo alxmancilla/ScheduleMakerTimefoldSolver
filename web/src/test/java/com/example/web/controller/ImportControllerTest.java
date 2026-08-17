@@ -1,5 +1,6 @@
 package com.example.web.controller;
 
+import com.example.web.service.ExcelExportService;
 import com.example.web.service.ExcelImportService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -7,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,7 +17,10 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,6 +40,9 @@ public class ImportControllerTest {
 
     @MockBean
     private ExcelImportService excelImportService;
+
+    @MockBean
+    private ExcelExportService excelExportService;
 
     @Test
     public void importExcel_success_returns200() throws Exception {
@@ -71,5 +79,19 @@ public class ImportControllerTest {
         mockMvc.perform(multipart("/api/import/excel").file(file))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("No file")));
+    }
+
+    @Test
+    public void exportExcel_returnsWorkbookAsAttachment() throws Exception {
+        byte[] fakeWorkbookBytes = new byte[] { 1, 2, 3, 4 };
+        when(excelExportService.exportToExcel()).thenReturn(fakeWorkbookBytes);
+
+        mockMvc.perform(get("/api/import/excel"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString("attachment; filename=\"schedule-export-")))
+                .andExpect(content().bytes(fakeWorkbookBytes));
     }
 }

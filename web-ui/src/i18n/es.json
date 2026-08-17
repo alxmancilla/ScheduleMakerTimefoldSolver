@@ -353,7 +353,12 @@
     "importButton": "Importar Excel",
     "failedPrefix": "Error al importar el archivo: ",
     "importedSummary": "Importado: {{teachers}} maestros, {{courses}} cursos, {{rooms}} aulas, {{groups}} grupos, {{groupCourses}} vínculos grupo-curso.",
-    "rejected": "Importación rechazada — no se escribió nada. Corrija estos errores y vuelva a cargar:"
+    "rejected": "Importación rechazada — no se escribió nada. Corrija estos errores y vuelva a cargar:",
+    "exportTitle": "Exportar Excel",
+    "exportDescription": "Descarga los datos actuales de Maestros, Cursos, Aulas, Grupos y Group_Courses como un libro .xlsx en el formato exacto que espera Importar Excel, para un ciclo completo de exportar -> editar -> reimportar. No incluye los horarios ni el calendario resuelto.",
+    "exportButton": "Exportar Excel",
+    "exporting": "Exportando...",
+    "exportFailedPrefix": "Error al exportar: "
   },
   "settings": {
     "title": "Configuración",

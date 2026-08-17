@@ -353,7 +353,12 @@
     "importButton": "Import Excel",
     "failedPrefix": "Failed to import file: ",
     "importedSummary": "Imported: {{teachers}} teachers, {{courses}} courses, {{rooms}} rooms, {{groups}} groups, {{groupCourses}} group-course links.",
-    "rejected": "Import rejected — nothing was written. Fix these and re-upload:"
+    "rejected": "Import rejected — nothing was written. Fix these and re-upload:",
+    "exportTitle": "Export Excel",
+    "exportDescription": "Downloads the current Teachers, Courses, Rooms, Groups, and Group_Courses data as an .xlsx workbook in the exact format Import Excel expects, for a full export -> edit -> re-import round trip. Does not include timeslots or the solved schedule.",
+    "exportButton": "Export Excel",
+    "exporting": "Exporting...",
+    "exportFailedPrefix": "Failed to export: "
   },
   "settings": {
     "title": "Settings",
