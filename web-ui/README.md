@@ -1,11 +1,19 @@
 # Schedule Maker Web UI
 
-A React-based web interface for viewing and editing school schedules, teachers, courses, rooms, student groups, and course block assignments.
+A React + Vite single-page app for managing the full scheduling problem — teachers, courses
+(including dual room requirements and custom block templates), rooms, student groups, and
+course block assignments — plus admin functions (users, timeslots, current-term label, audit
+log, admin-triggered solver runs, Excel import/export, PDF reports), all through the Spring
+Boot REST API in [`../web`](../web). See the root [README.md](../README.md) for backend
+setup, architecture, and the full feature/constraint list, and
+[WEB_UI_SETUP.md](../WEB_UI_SETUP.md) for the full REST API endpoint reference and RBAC table.
 
 ## Prerequisites
 
-- **Node.js 18+** and **npm** installed
-- **Backend API** running on `http://localhost:8080`
+- **Node.js 18+** and **npm**
+- **Backend API** running on `http://localhost:8080` — `mvn -pl web spring-boot:run` from the
+  repository root (see the root README's [Web UI](../README.md#web-ui) section for first-time
+  setup, including seeding the initial admin account)
 
 ## Quick Start
 
@@ -21,14 +29,17 @@ npm install
 npm run dev
 ```
 
-The application will start on **http://localhost:3000** (or **http://localhost:5173** depending on Vite configuration).
+Opens on **http://localhost:3000** by default (Vite tries the next available port if 3000 is
+taken, and prints whichever port it used).
 
-### 3. Open in Browser
+### 3. Open in Browser and Log In
 
-Navigate to:
 ```
 http://localhost:3000
 ```
+
+Log in with an account created via the backend's admin bootstrap or `Users` tab (see root
+README).
 
 ## Available Scripts
 
@@ -38,42 +49,76 @@ http://localhost:3000
 
 ## Features
 
-### Schedule View
-- **Grid View**: Visual calendar-style schedule showing all assignments by day and hour
-- **List View**: Tabular view of all assignments
-- **Color Coding**: Pinned assignments highlighted in red
-- **Statistics**: Total, assigned, and unassigned counts
+### Navigation
 
-### Entity Management (CRUD)
+- Top-level nav ordered by frequency of use: Schedule, Assignments, Reports, a "Setup"
+  dropdown (Teachers/Courses/Rooms/Groups), Import/Export (`WRITER`/`ADMIN`), and an Admin
+  dropdown (Settings/Users, `ADMIN` only). Each dropdown shows which child page is active even
+  while closed (e.g. "Setup · Rooms").
+- Username, language switcher, and logout are consolidated into a single profile dropdown.
+- `TEACHER` accounts see only "My Schedule" — every other nav item and route is hidden client-
+  side and blocked server-side.
+
+### Schedule View
+
+- **Grid view**: calendar-style schedule by day and hour, with group/teacher filters and
+  pinned-assignment highlighting. (The old flat List view was removed — it duplicated the
+  same data with no filtering/sorting advantage.)
+- **My Schedule** (`TEACHER` role): the same grid, scoped server-side to the logged-in
+  teacher via `GET /api/schedule/view/me`.
+
+### Entity Management (CRUD, search, pagination)
 
 #### Teachers
-- View all teachers with max hours per week
-- Create, edit, and delete teachers
-- Search teachers by name
+- Qualifications, per-day availability, `maxHoursPerWeek`, and a live workload column
+  (assigned hours vs. weekly max, computed client-side)
 
 #### Courses
-- View all courses with details
-- Create, edit, and delete courses
-- Filter by active/inactive status
-- Configure: name, semester, room requirement, hours per week
+- Legacy single `roomRequirement` field, plus per-course **Room Requirements** (dual room-
+  type/hour splits, e.g. 4h lab + 4h standard) and **Block Templates** (explicit, hand-
+  authored block decomposition, optionally scoped to one group) — shown as count-badged tabs
+  alongside Details, with an inline note on the block-template > room-requirement > legacy-
+  field precedence
 
 #### Rooms
-- View all rooms with building and type
-- Create, edit, and delete rooms
-- Filter by room type or building
-- Room types: estándar, laboratorio, taller, centro de cómputo, etc.
+- Type, building, and an optional `capacity` (paired with a group's `studentCount` for a soft
+  room-capacity-vs-group-size constraint)
 
 #### Student Groups
-- View all student groups
-- Create, edit, and delete groups
-- Configure preferred room for each group
-- Search groups by name
+- Preferred room, optional `studentCount`, and a Group-Courses card managing which courses
+  each group takes
 
 #### Course Block Assignments
-- View all course block assignments
-- Create, edit, and delete assignments
-- Filter by: All, Assigned, Unassigned, Pinned
-- Configure: group, course, block length, teacher, timeslot, room, pinned status
+- Group, course, block length, teacher, timeslot, room, pinned status; filter by All /
+  Assigned / Unassigned / Pinned
+
+### Reports
+- `WRITER`/`ADMIN`-triggered PDF generation, versioned by run (past runs aren't overwritten);
+  any authenticated role (except `TEACHER`) can browse and download past runs
+
+### Import / Export
+- **Import**: upload an `.xlsx` workbook to upsert Teachers/Courses/Rooms/Groups/
+  Group_Courses (`WRITER`/`ADMIN`)
+- **Export**: download the current data in the exact same layout Import expects, for a full
+  export → edit → re-import round trip (any role except `TEACHER`)
+
+### Settings (`ADMIN`)
+- Timeslot management, grouped by day
+- Current-term label (a free-text string like "Fall 2026", shown in the header for every role)
+- Write-activity audit log viewer (who/what/when for every successful write)
+- Admin-triggered solver run and block generation, with a compliance-snapshot PDF viewer
+
+### Users (`ADMIN`)
+- CRUD for application users and roles (`READER`/`WRITER`/`ADMIN`/`TEACHER`), with a linked-
+  teacher picker for `TEACHER` accounts, plus last-admin and self-delete guards
+
+### Cross-cutting
+- Full English/Spanish localization (`react-i18next`), with a per-user preferred-language
+  setting persisted server-side
+- Toast notifications on save/delete, and a styled, promise-based confirm dialog replacing
+  native `window.confirm()`
+- Client-side search and pagination on every list view
+- A loading spinner (one shared `.loading` CSS class, used everywhere)
 
 ## API Configuration
 
@@ -109,40 +154,41 @@ needed locally.
 ```
 web-ui/
 ├── src/
-│   ├── components/          # React components
-│   │   ├── Schedule.jsx     # Schedule viewer (grid/list views)
-│   │   ├── Teachers.jsx     # Teacher management
-│   │   ├── Courses.jsx      # Course management
-│   │   ├── Rooms.jsx        # Room management
-│   │   ├── Groups.jsx       # Student group management
-│   │   └── Assignments.jsx  # Assignment management
-│   ├── api.js               # API service (Axios)
-│   ├── App.jsx              # Main app with routing
-│   ├── main.jsx             # React entry point
-│   └── index.css            # Global styles
-├── index.html               # HTML template
-├── vite.config.js           # Vite configuration
-├── package.json             # Dependencies
-└── README.md                # This file
+│   ├── components/            # One component per tab/route
+│   │   ├── Schedule.jsx       # Schedule viewer (grid view only)
+│   │   ├── MySchedule.jsx     # TEACHER-role self-service schedule view
+│   │   ├── Teachers.jsx       # Teacher management + workload column
+│   │   ├── Courses.jsx        # Course management (Details/Room Requirements/Block Templates tabs)
+│   │   ├── Rooms.jsx          # Room management
+│   │   ├── Groups.jsx         # Student group management + Group-Courses
+│   │   ├── Assignments.jsx    # Course block assignment management
+│   │   ├── Reports.jsx        # PDF report generation/download
+│   │   ├── Import.jsx         # Excel import + export
+│   │   ├── Settings.jsx       # Admin: timeslots, term, audit log, solver runs
+│   │   ├── Users.jsx          # Admin: application user CRUD
+│   │   └── Login.jsx          # Login form
+│   ├── auth/                  # AuthContext, ProtectedRoute/AdminRoute/WriteRoute, AdminOnly/WriteOnly
+│   ├── ui/                    # Shared ToastContext, ConfirmContext, Pagination
+│   ├── i18n/                  # en.json / es.json (react-i18next)
+│   ├── api.js                 # API service (Axios)
+│   ├── App.jsx                # Routing + nav (Setup/Admin/Profile dropdowns)
+│   ├── main.jsx                # React entry point
+│   └── index.css              # Global styles
+├── index.html                 # HTML template
+├── vite.config.js             # Vite configuration (dev proxy, port 3000)
+├── package.json                # Dependencies
+└── README.md                  # This file
 ```
 
 ## Troubleshooting
 
-### Port 8000 Already in Use
+### Backend Port (8080) Already in Use
 
-If port 8000 is already in use, kill the process:
-
-```bash
-kill -9 $(lsof -t -i:8080)
-```
-or
 ```bash
 lsof -ti:8080 | xargs kill -9
 ```
 
-### Port 3000 Already in Use
-
-If port 3000 is already in use, kill the process:
+### Frontend Port (3000) Already in Use
 
 ```bash
 lsof -ti:3000 | xargs kill -9
@@ -170,10 +216,11 @@ export default defineConfig({
 mvn -pl web spring-boot:run
 ```
 
-Verify backend is running:
+Verify it's up (requires a token — see [WEB_UI_SETUP.md](../WEB_UI_SETUP.md) for the login
+command):
 
 ```bash
-curl http://localhost:8080/api/teachers
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/teachers
 ```
 
 ### Dependencies Installation Issues
@@ -199,17 +246,13 @@ The development server supports hot module replacement (HMR). Changes to React c
 
 ### API Testing
 
-You can test API endpoints directly using curl:
+You can test API endpoints directly using curl (requires a bearer token — see
+[WEB_UI_SETUP.md](../WEB_UI_SETUP.md)):
 
 ```bash
-# Get all teachers
-curl http://localhost:8080/api/teachers
-
-# Get schedule view
-curl http://localhost:8080/api/schedule/view
-
-# Get all courses
-curl http://localhost:8080/api/courses
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/teachers
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/schedule/view
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/courses
 ```
 
 ### Browser DevTools
@@ -221,11 +264,11 @@ Use browser developer tools to:
 
 ## Next Steps
 
-1. **Start the backend** (see main project README)
+1. **Start the backend** — see the root [README.md](../README.md#web-ui)
 2. **Install dependencies**: `npm install`
 3. **Start the frontend**: `npm run dev`
 4. **Open browser**: http://localhost:3000
 5. **View and edit** schedules and entities
 
-For more information about the backend API, see `WEB_UI_SETUP.md` in the project root.
-
+For the full REST API reference and RBAC table, see [WEB_UI_SETUP.md](../WEB_UI_SETUP.md) in
+the project root.
