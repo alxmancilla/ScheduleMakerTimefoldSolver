@@ -17,6 +17,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * Excel import/export of base problem data (Teachers, Courses, Rooms,
@@ -28,9 +32,13 @@ import java.time.LocalDate;
  * create/edit other domain data. READERs still cannot (POST requires
  * WRITER/ADMIN).
  *
- * Export is a read, so it follows the general GET rule instead (any
- * authenticated role) - there's no reason to restrict downloading a snapshot
- * of data you can already view in the UI.
+ * Export is a read, so it follows the general GET rule instead (READER,
+ * WRITER, or ADMIN - not TEACHER, which is excluded from that rule) - there's
+ * no reason to further restrict downloading a snapshot of data those roles
+ * can already view in the UI. Import already tolerates a workbook with only
+ * some sheets present (ExcelImportService skips whatever's missing), so the
+ * per-entity "Export Teachers/Courses/Rooms/Groups" buttons in the UI reuse
+ * this same POST endpoint unchanged - only export needs an entity filter.
  */
 @RestController
 @RequestMapping("/api/import")
@@ -54,12 +62,31 @@ public class ImportController {
     }
 
     @GetMapping("/excel")
-    public ResponseEntity<byte[]> exportExcel() throws IOException {
-        byte[] workbook = excelExportService.exportToExcel();
-        String filename = "schedule-export-" + LocalDate.now() + ".xlsx";
+    public ResponseEntity<byte[]> exportExcel(@RequestParam(required = false) String entities) throws IOException {
+        Set<String> entitySet = parseEntities(entities);
+        byte[] workbook = excelExportService.exportToExcel(entitySet);
+        String suffix = entitySet == null ? "" : "-" + String.join("-", new TreeSet<>(entitySet));
+        String filename = "schedule-export" + suffix + "-" + LocalDate.now() + ".xlsx";
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .body(workbook);
+    }
+
+    /** Comma-separated entity names (e.g. "teachers,rooms"); null/blank means "export everything". */
+    private Set<String> parseEntities(String entities) {
+        if (entities == null || entities.isBlank()) {
+            return null;
+        }
+        Set<String> parsed = Arrays.stream(entities.split(","))
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+        if (!ExcelExportService.VALID_ENTITIES.containsAll(parsed)) {
+            throw new IllegalArgumentException(
+                    "Unknown value in 'entities' - valid values: " + String.join(", ", new TreeSet<>(ExcelExportService.VALID_ENTITIES)));
+        }
+        return parsed;
     }
 }

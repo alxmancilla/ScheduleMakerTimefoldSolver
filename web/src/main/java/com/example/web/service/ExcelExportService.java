@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -34,9 +35,18 @@ import java.util.stream.Collectors;
  * Excel - the old engine-module DatabaseToExcelExporter's Timeslots sheet
  * queried a "timeslot" table that no longer exists (superseded by
  * block_timeslot), so it isn't ported here.
+ *
+ * The full export bundles all sheets; callers that only want one entity (the
+ * per-tab "Export" buttons in the UI) pass a subset of {@link #VALID_ENTITIES}
+ * to {@link #exportToExcel(Set)}. "groups" bundles the Group_Courses sheet
+ * too, since group-course membership is managed from the Groups tab, not a
+ * tab of its own. This works as a round trip with no import-side changes:
+ * ExcelImportService already skips any sheet that isn't present.
  */
 @Service
 public class ExcelExportService {
+
+    public static final Set<String> VALID_ENTITIES = Set.of("teachers", "courses", "rooms", "groups");
 
     @Autowired
     private TeacherRepository teacherRepository;
@@ -48,12 +58,29 @@ public class ExcelExportService {
     private StudentGroupRepository studentGroupRepository;
 
     public byte[] exportToExcel() throws IOException {
+        return exportToExcel(null);
+    }
+
+    /**
+     * @param entities which sheets to include (values from {@link #VALID_ENTITIES}); null or
+     *                 empty exports everything, matching the previous no-arg behavior.
+     */
+    public byte[] exportToExcel(Set<String> entities) throws IOException {
+        boolean all = entities == null || entities.isEmpty();
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            exportTeachers(wb);
-            exportCourses(wb);
-            exportRooms(wb);
-            exportGroups(wb);
-            exportGroupCourses(wb);
+            if (all || entities.contains("teachers")) {
+                exportTeachers(wb);
+            }
+            if (all || entities.contains("courses")) {
+                exportCourses(wb);
+            }
+            if (all || entities.contains("rooms")) {
+                exportRooms(wb);
+            }
+            if (all || entities.contains("groups")) {
+                exportGroups(wb);
+                exportGroupCourses(wb);
+            }
             wb.write(out);
             return out.toByteArray();
         }

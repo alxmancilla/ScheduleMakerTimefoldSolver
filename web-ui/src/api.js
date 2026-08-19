@@ -171,8 +171,14 @@ export const importExcel = (file) => {
   });
 };
 
-// Excel export (any authenticated role) - the same sheet/column layout importExcel expects
-export const exportExcel = () => api.get('/import/excel', { responseType: 'blob' });
+// Excel export (READER/WRITER/ADMIN - not TEACHER) - the same sheet/column layout importExcel
+// expects. entities: optional array of 'teachers' | 'courses' | 'rooms' | 'groups' to export
+// just those sheets ('groups' includes Group_Courses); omit for everything.
+export const exportExcel = (entities) =>
+  api.get('/import/excel', {
+    responseType: 'blob',
+    params: entities && entities.length ? { entities: entities.join(',') } : undefined,
+  });
 
 // Admin: Timeslots
 export const getTimeslots = () => api.get('/admin/timeslots');

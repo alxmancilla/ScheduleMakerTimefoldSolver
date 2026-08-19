@@ -16,6 +16,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -92,8 +93,15 @@ public class ImportSecurityTest {
     @Test
     @WithMockUser(roles = "READER")
     public void export_readerCanAccess() throws Exception {
-        when(excelExportService.exportToExcel()).thenReturn(new byte[] { 1, 2, 3 });
+        when(excelExportService.exportToExcel(isNull())).thenReturn(new byte[] { 1, 2, 3 });
         mockMvc.perform(get("/api/import/excel"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "TEACHER")
+    public void export_teacherIsForbidden() throws Exception {
+        mockMvc.perform(get("/api/import/excel"))
+                .andExpect(status().isForbidden());
     }
 }

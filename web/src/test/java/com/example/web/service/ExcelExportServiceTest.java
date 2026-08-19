@@ -23,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -64,6 +65,34 @@ public class ExcelExportServiceTest {
             for (String name : List.of("Teachers", "Courses", "Rooms", "Groups", "Group_Courses")) {
                 assertTrue("missing sheet " + name, wb.getSheet(name) != null);
             }
+        }
+    }
+
+    @Test
+    public void exportToExcel_withEntityFilter_includesOnlyThoseSheets() throws IOException {
+        byte[] bytes = exportService.exportToExcel(Set.of("teachers", "rooms"));
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
+            assertEquals(2, wb.getNumberOfSheets());
+            assertTrue(wb.getSheet("Teachers") != null);
+            assertTrue(wb.getSheet("Rooms") != null);
+        }
+    }
+
+    @Test
+    public void exportToExcel_groupsEntity_bundlesGroupCoursesSheet() throws IOException {
+        byte[] bytes = exportService.exportToExcel(Set.of("groups"));
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
+            assertEquals(2, wb.getNumberOfSheets());
+            assertTrue(wb.getSheet("Groups") != null);
+            assertTrue(wb.getSheet("Group_Courses") != null);
+        }
+    }
+
+    @Test
+    public void exportToExcel_emptyEntitySet_exportsEverything() throws IOException {
+        byte[] bytes = exportService.exportToExcel(Set.of());
+        try (Workbook wb = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
+            assertEquals(5, wb.getNumberOfSheets());
         }
     }
 

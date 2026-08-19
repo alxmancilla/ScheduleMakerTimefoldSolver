@@ -2,6 +2,16 @@ import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { importExcel, exportExcel } from '../api';
 
+// entities: null exports every sheet; otherwise the single-entity filter passed to
+// GET /api/import/excel?entities=... ('groups' bundles Group_Courses server-side).
+const EXPORT_OPTIONS = [
+  { key: 'all', entities: null, labelKey: 'importExcel.exportAll' },
+  { key: 'teachers', entities: ['teachers'], labelKey: 'importExcel.exportTeachers' },
+  { key: 'courses', entities: ['courses'], labelKey: 'importExcel.exportCourses' },
+  { key: 'rooms', entities: ['rooms'], labelKey: 'importExcel.exportRooms' },
+  { key: 'groups', entities: ['groups'], labelKey: 'importExcel.exportGroups' },
+];
+
 function Import() {
   const { t } = useTranslation();
   const [importFile, setImportFile] = useState(null);
@@ -10,14 +20,14 @@ function Import() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
 
-  const [exporting, setExporting] = useState(false);
+  const [exportingKey, setExportingKey] = useState(null);
   const [exportError, setExportError] = useState(null);
 
-  const handleExportExcel = async () => {
-    setExporting(true);
+  const handleExportExcel = async (option) => {
+    setExportingKey(option.key);
     setExportError(null);
     try {
-      const response = await exportExcel();
+      const response = await exportExcel(option.entities);
       const blobUrl = URL.createObjectURL(new Blob([response.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       }));
@@ -33,7 +43,7 @@ function Import() {
     } catch (err) {
       setExportError(err.response?.data?.message || t('importExcel.exportFailedPrefix') + err.message);
     } finally {
-      setExporting(false);
+      setExportingKey(null);
     }
   };
 
@@ -66,14 +76,18 @@ function Import() {
         <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
           {t('importExcel.exportDescription')}
         </p>
-        <button
-          className="btn btn-secondary"
-          onClick={handleExportExcel}
-          disabled={exporting}
-          style={{ marginTop: '10px' }}
-        >
-          {exporting ? t('importExcel.exporting') : `⇩ ${t('importExcel.exportButton')}`}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+          {EXPORT_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              className="btn btn-secondary"
+              onClick={() => handleExportExcel(option)}
+              disabled={exportingKey !== null}
+            >
+              {exportingKey === option.key ? t('importExcel.exporting') : `⇩ ${t(option.labelKey)}`}
+            </button>
+          ))}
+        </div>
         {exportError && <div className="error" style={{ marginTop: '10px' }}>{exportError}</div>}
       </div>
 

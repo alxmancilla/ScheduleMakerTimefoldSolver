@@ -14,8 +14,11 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -84,7 +87,7 @@ public class ImportControllerTest {
     @Test
     public void exportExcel_returnsWorkbookAsAttachment() throws Exception {
         byte[] fakeWorkbookBytes = new byte[] { 1, 2, 3, 4 };
-        when(excelExportService.exportToExcel()).thenReturn(fakeWorkbookBytes);
+        when(excelExportService.exportToExcel(isNull())).thenReturn(fakeWorkbookBytes);
 
         mockMvc.perform(get("/api/import/excel"))
                 .andExpect(status().isOk())
@@ -93,5 +96,24 @@ public class ImportControllerTest {
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
                         org.hamcrest.Matchers.containsString("attachment; filename=\"schedule-export-")))
                 .andExpect(content().bytes(fakeWorkbookBytes));
+    }
+
+    @Test
+    public void exportExcel_withEntitiesParam_passesParsedSetAndSuffixesFilename() throws Exception {
+        byte[] fakeWorkbookBytes = new byte[] { 5, 6 };
+        when(excelExportService.exportToExcel(eq(Set.of("teachers", "rooms")))).thenReturn(fakeWorkbookBytes);
+
+        mockMvc.perform(get("/api/import/excel").param("entities", "Teachers, rooms"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString("schedule-export-rooms-teachers-")))
+                .andExpect(content().bytes(fakeWorkbookBytes));
+    }
+
+    @Test
+    public void exportExcel_withUnknownEntity_returns400() throws Exception {
+        mockMvc.perform(get("/api/import/excel").param("entities", "assignments"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", org.hamcrest.Matchers.containsString("Unknown value")));
     }
 }
