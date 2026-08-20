@@ -119,6 +119,53 @@ code {
   font-size: 11px;
 }
 
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.nav-toggle:hover {
+  background-color: #34495e;
+}
+
+/*
+ * Below this width the nav/profile no longer fit comfortably on one row, so
+ * they collapse behind a hamburger toggle instead of wrapping messily.
+ */
+@media (max-width: 860px) {
+  .nav-toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .nav,
+  .user-box {
+    display: none;
+    width: 100%;
+  }
+
+  .nav.mobile-open,
+  .user-box.mobile-open {
+    display: flex;
+  }
+
+  .nav.mobile-open {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-box.mobile-open {
+    justify-content: flex-end;
+  }
+}
+
 .nav-dropdown-menu {
   position: absolute;
   top: 100%;

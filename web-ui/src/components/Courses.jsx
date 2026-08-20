@@ -418,9 +418,13 @@ function Courses() {
       {showForm && (
         <div className="card">
           {editingCourse && (
-            <div className="tabs">
+            <div className="tabs" role="tablist">
               <button
                 type="button"
+                id="courses-tab-details"
+                role="tab"
+                aria-selected={activeTab === 'details'}
+                aria-controls="courses-panel-details"
                 className={`tab ${activeTab === 'details' ? 'active' : ''}`}
                 onClick={() => setActiveTab('details')}
               >
@@ -428,6 +432,10 @@ function Courses() {
               </button>
               <button
                 type="button"
+                id="courses-tab-roomRequirements"
+                role="tab"
+                aria-selected={activeTab === 'roomRequirements'}
+                aria-controls="courses-panel-roomRequirements"
                 className={`tab ${activeTab === 'roomRequirements' ? 'active' : ''}`}
                 onClick={() => setActiveTab('roomRequirements')}
               >
@@ -435,6 +443,10 @@ function Courses() {
               </button>
               <button
                 type="button"
+                id="courses-tab-blockTemplates"
+                role="tab"
+                aria-selected={activeTab === 'blockTemplates'}
+                aria-controls="courses-panel-blockTemplates"
                 className={`tab ${activeTab === 'blockTemplates' ? 'active' : ''}`}
                 onClick={() => setActiveTab('blockTemplates')}
               >
@@ -448,7 +460,11 @@ function Courses() {
           )}
 
           {(!editingCourse || activeTab === 'details') && (
-            <>
+            <div
+              {...(editingCourse
+                ? { role: 'tabpanel', id: 'courses-panel-details', 'aria-labelledby': 'courses-tab-details' }
+                : {})}
+            >
               <h3>{editingCourse ? t('courses.editCourse') : t('courses.newCourse')}</h3>
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
@@ -535,11 +551,11 @@ function Courses() {
                   <button type="button" className="btn btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
                 </div>
               </form>
-            </>
+            </div>
           )}
 
           {editingCourse && activeTab === 'roomRequirements' && (
-            <>
+            <div role="tabpanel" id="courses-panel-roomRequirements" aria-labelledby="courses-tab-roomRequirements">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>{t('courses.roomRequirements.title')}</h3>
             <WriteOnly>
@@ -637,11 +653,11 @@ function Courses() {
               )}
             </tbody>
           </table>
-            </>
+            </div>
           )}
 
           {editingCourse && activeTab === 'blockTemplates' && (
-            <>
+            <div role="tabpanel" id="courses-panel-blockTemplates" aria-labelledby="courses-tab-blockTemplates">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3>{t('courses.blockTemplates.title')}</h3>
             <WriteOnly>
@@ -792,7 +808,7 @@ function Courses() {
               )}
             </tbody>
           </table>
-            </>
+            </div>
           )}
         </div>
       )}

@@ -47,7 +47,8 @@
     "users": "Users",
     "logout": "Logout",
     "language": "Language",
-    "mySchedule": "My Schedule"
+    "mySchedule": "My Schedule",
+    "toggleMenu": "Toggle menu"
   },
   "login": {
     "title": "Sign in",

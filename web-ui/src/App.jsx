@@ -65,6 +65,7 @@ function NavDropdown({ label, active, activeLabel, menuStyle, children }) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="true"
         aria-expanded={open}
+        aria-current={active ? 'page' : undefined}
       >
         {label}
         {activeLabel && <span className="nav-dropdown-sublabel"> · {activeLabel}</span>}
@@ -171,8 +172,11 @@ function Home() {
 function Layout() {
   const { user, logout, changeLanguage } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, i18n } = useTranslation();
   const [termLabel, setTermLabel] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const headerRef = useRef(null);
 
   useEffect(() => {
     const loadTerm = () => {
@@ -192,6 +196,21 @@ function Layout() {
     return () => window.removeEventListener(TERM_UPDATED_EVENT, loadTerm);
   }, []);
 
+  // Collapse the mobile nav drawer whenever the route changes, so following a
+  // link (including one inside a dropdown) closes it instead of leaving it
+  // open over the new page.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (headerRef.current && !headerRef.current.contains(e.target)) setMobileNavOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
@@ -199,7 +218,7 @@ function Layout() {
 
   return (
     <div className="app">
-      <header className="header">
+      <header className="header" ref={headerRef}>
         <div className="container">
           <Link to="/" className="header-home-link">
             <h1>
@@ -207,7 +226,18 @@ function Layout() {
               {termLabel && <span className="header-term-label"> · {termLabel}</span>}
             </h1>
           </Link>
-          <nav className="nav">
+          {user && (
+            <button
+              type="button"
+              className="nav-toggle"
+              onClick={() => setMobileNavOpen((o) => !o)}
+              aria-label={t('nav.toggleMenu')}
+              aria-expanded={mobileNavOpen}
+            >
+              ☰
+            </button>
+          )}
+          <nav className={`nav ${mobileNavOpen ? 'mobile-open' : ''}`}>
             {user?.role === 'TEACHER' ? (
               <NavLink to="/" className={navLinkClass}>{t('nav.mySchedule')}</NavLink>
             ) : (
@@ -226,7 +256,7 @@ function Layout() {
             )}
           </nav>
           {user && (
-            <div className="user-box">
+            <div className={`user-box ${mobileNavOpen ? 'mobile-open' : ''}`}>
               <ProfileNavDropdown
                 user={user}
                 language={i18n.language}

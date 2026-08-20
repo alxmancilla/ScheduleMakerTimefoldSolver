@@ -47,7 +47,8 @@
     "users": "Usuarios",
     "logout": "Cerrar sesión",
     "language": "Idioma",
-    "mySchedule": "Mi Horario"
+    "mySchedule": "Mi Horario",
+    "toggleMenu": "Alternar menú"
   },
   "login": {
     "title": "Iniciar sesión",
