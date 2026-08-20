@@ -24,6 +24,15 @@ const START_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
 const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 
+const SETTINGS_TABS = [
+  { key: 'term', labelKey: 'settings.term.title' },
+  { key: 'solver', labelKey: 'settings.solver.title' },
+  { key: 'complianceSnapshots', labelKey: 'settings.complianceSnapshots.title' },
+  { key: 'generateBlocks', labelKey: 'settings.generateBlocks.title' },
+  { key: 'timeslots', labelKey: 'settings.timeslots.title' },
+  { key: 'auditLog', labelKey: 'settings.auditLog.title' },
+];
+
 function Settings() {
   const { t } = useTranslation();
   const showToast = useToast();
@@ -52,6 +61,8 @@ function Settings() {
 
   const [auditLog, setAuditLog] = useState([]);
   const [auditLogError, setAuditLogError] = useState(null);
+
+  const [activeTab, setActiveTab] = useState('term');
 
   useEffect(() => {
     loadTimeslots();
@@ -281,6 +292,25 @@ function Settings() {
         <p style={{ color: '#7f8c8d', fontSize: '14px' }}>{t('settings.description')}</p>
       </div>
 
+      <div className="tabs" role="tablist">
+        {SETTINGS_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            id={`settings-tab-${tab.key}`}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            aria-controls={`settings-panel-${tab.key}`}
+            className={`tab ${activeTab === tab.key ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {t(tab.labelKey)}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'term' && (
+      <div role="tabpanel" id="settings-panel-term" aria-labelledby="settings-tab-term">
       <div className="card">
         <h3>{t('settings.term.title')}</h3>
         <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
@@ -303,7 +333,11 @@ function Settings() {
           </button>
         </form>
       </div>
+      </div>
+      )}
 
+      {activeTab === 'solver' && (
+      <div role="tabpanel" id="settings-panel-solver" aria-labelledby="settings-tab-solver">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>{t('settings.solver.title')}</h3>
@@ -347,7 +381,11 @@ function Settings() {
           </div>
         )}
       </div>
+      </div>
+      )}
 
+      {activeTab === 'complianceSnapshots' && (
+      <div role="tabpanel" id="settings-panel-complianceSnapshots" aria-labelledby="settings-tab-complianceSnapshots">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>{t('settings.complianceSnapshots.title')}</h3>
@@ -394,7 +432,11 @@ function Settings() {
           </table>
         )}
       </div>
+      </div>
+      )}
 
+      {activeTab === 'generateBlocks' && (
+      <div role="tabpanel" id="settings-panel-generateBlocks" aria-labelledby="settings-tab-generateBlocks">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>{t('settings.generateBlocks.title')}</h3>
@@ -428,7 +470,11 @@ function Settings() {
           </div>
         )}
       </div>
+      </div>
+      )}
 
+      {activeTab === 'timeslots' && (
+      <div role="tabpanel" id="settings-panel-timeslots" aria-labelledby="settings-tab-timeslots">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>{t('settings.timeslots.title')}</h3>
@@ -530,7 +576,11 @@ function Settings() {
           );
         })
       )}
+      </div>
+      )}
 
+      {activeTab === 'auditLog' && (
+      <div role="tabpanel" id="settings-panel-auditLog" aria-labelledby="settings-tab-auditLog">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>{t('settings.auditLog.title')}</h3>
@@ -577,6 +627,8 @@ function Settings() {
           </>
         )}
       </div>
+      </div>
+      )}
     </div>
   );
 }
