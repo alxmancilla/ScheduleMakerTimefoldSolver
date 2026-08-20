@@ -324,7 +324,11 @@
       "pinned": "Fijada"
     },
     "savedMessage": "Asignación guardada",
-    "deletedMessage": "Asignación eliminada"
+    "deletedMessage": "Asignación eliminada",
+    "searchPlaceholder": "Buscar por grupo, materia, maestro o aula...",
+    "preferredRoomHint": "Por defecto usa el aula preferida del grupo seleccionado, si tiene una; elija otra aula para anularlo.",
+    "roomFilteredHint": "Mostrando solo aulas que satisfacen \"{{type}}\".",
+    "satisfiesRoomTypeHint": "Por defecto usa el requisito de aula del curso seleccionado, si tiene uno; elija otro tipo para anularlo."
   },
   "reports": {
     "title": "Reportes",

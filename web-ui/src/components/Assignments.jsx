@@ -30,6 +30,39 @@ function Assignments() {
   const [editingAssignment, setEditingAssignment] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all', 'assigned', 'unassigned', 'pinned'
+  const [searchQuery, setSearchQuery] = useState('');
+  // Controlled (unlike the rest of the form, which reads from FormData on submit) so
+  // selecting a group can suggest that group's preferred room, a course can suggest its
+  // own room requirement, and Room/Preferred Room can be filtered by - and cleared when
+  // they no longer match - Satisfies Room Type.
+  const [groupId, setGroupId] = useState('');
+  const [courseId, setCourseId] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [satisfiesRoomType, setSatisfiesRoomType] = useState('');
+  const [preferredRoomName, setPreferredRoomName] = useState('');
+
+  // Mirrors Room.satisfiesRequirement() (engine domain model): a room satisfies a
+  // requirement of its own type, and a laboratorio additionally satisfies estándar
+  // (it's equipped with desks/board too), but never the reverse.
+  const roomMatchesType = (room, requiredType) => {
+    if (!requiredType) return true;
+    if (!room) return false;
+    return room.type === requiredType || (room.type === 'laboratorio' && requiredType === 'estándar');
+  };
+  const roomsMatchingType = (requiredType) => rooms.filter((r) => roomMatchesType(r, requiredType));
+
+  /**
+   * Sets Satisfies Room Type and clears Room/Preferred Room if they no longer match it -
+   * shared by the field's own onChange and by the Course auto-suggestion below, so a
+   * course-derived type change clears stale room selections exactly like a manual one does.
+   */
+  const applySatisfiesRoomType = (newType) => {
+    setSatisfiesRoomType(newType);
+    const currentRoom = rooms.find((r) => r.name === roomName);
+    if (!roomMatchesType(currentRoom, newType)) setRoomName('');
+    const currentPreferred = rooms.find((r) => r.name === preferredRoomName);
+    if (!roomMatchesType(currentPreferred, newType)) setPreferredRoomName('');
+  };
 
   const timeslotLabel = (ts) => {
     const dayLabel = t(`common.days.${DAY_KEYS[ts.dayOfWeek] || 'mon'}`);
@@ -69,6 +102,23 @@ function Assignments() {
     }
   };
 
+  /**
+   * {groupId}_{courseId}_{index} - the same convention BlockGenerationService uses when it
+   * generates blocks, so manually-created rows stay consistent with generated ones. Scans for
+   * the first free index rather than just using the current count, in case an earlier block for
+   * this (group, course) pair was deleted, leaving a gap.
+   */
+  const nextAssignmentId = (groupId, courseId) => {
+    const existingIds = new Set(assignments.map((a) => a.id));
+    let index = 0;
+    let id;
+    do {
+      id = `${groupId}_${courseId}_${index}`;
+      index++;
+    } while (existingIds.has(id));
+    return id;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFieldErrors({});
@@ -100,8 +150,9 @@ function Assignments() {
         // On update the ID comes from the path; the backend ignores it in the body.
         await updateAssignment(editingAssignment.id, assignment);
       } else {
-        // On create the client supplies the ID (validated against ^[A-Za-z0-9_-]+$).
-        assignment.id = formData.get('id');
+        // Auto-generated, matching BlockGenerationService's own {groupId}_{courseId}_{index}
+        // convention, instead of asking the user to invent a unique ID by hand.
+        assignment.id = nextAssignmentId(assignment.groupId, assignment.courseId);
         await createAssignment(assignment);
       }
       handleCancel();
@@ -118,6 +169,11 @@ function Assignments() {
 
   const handleEdit = (assignment) => {
     setEditingAssignment(assignment);
+    setGroupId(assignment.groupId || '');
+    setCourseId(assignment.courseId || '');
+    setRoomName(assignment.roomName || '');
+    setSatisfiesRoomType(assignment.satisfiesRoomType || '');
+    setPreferredRoomName(assignment.preferredRoomName || '');
     setFieldErrors({});
     setError(null);
     setShowForm(true);
@@ -125,6 +181,11 @@ function Assignments() {
 
   const handleAdd = () => {
     setEditingAssignment(null);
+    setGroupId('');
+    setCourseId('');
+    setRoomName('');
+    setSatisfiesRoomType('');
+    setPreferredRoomName('');
     setFieldErrors({});
     setError(null);
     setShowForm(true);
@@ -163,10 +224,20 @@ function Assignments() {
   };
 
   const filteredAssignments = assignments.filter(a => {
-    if (filter === 'assigned') return a.blockTimeslotId != null;
-    if (filter === 'unassigned') return a.blockTimeslotId == null;
-    if (filter === 'pinned') return a.pinned === true;
-    return true;
+    if (filter === 'assigned' && a.blockTimeslotId == null) return false;
+    if (filter === 'unassigned' && a.blockTimeslotId != null) return false;
+    if (filter === 'pinned' && a.pinned !== true) return false;
+
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      a.groupId?.toLowerCase().includes(query) ||
+      groupDisplay(a.groupId)?.toLowerCase().includes(query) ||
+      a.courseId?.toLowerCase().includes(query) ||
+      courseDisplay(a.courseId)?.toLowerCase().includes(query) ||
+      teacherDisplay(a.teacherId)?.toLowerCase().includes(query) ||
+      a.roomName?.toLowerCase().includes(query)
+    );
   });
   const { page, setPage, pageCount, pageItems, totalItems } = usePagination(filteredAssignments);
 
@@ -206,17 +277,30 @@ function Assignments() {
         <div className="card">
           <h3>{editingAssignment ? t('assignments.editAssignment') : t('assignments.newAssignment')}</h3>
           <form onSubmit={handleSubmit}>
-            {!editingAssignment && (
-              <div className="form-group">
-                <label>{t('assignments.fields.id')}</label>
-                <input type="text" name="id" pattern="[A-Za-z0-9_-]+"
-                  title={t('assignments.fields.idPatternTitle')} required />
-                {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
-              </div>
-            )}
+            {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
             <div className="form-group">
               <label>{t('assignments.fields.group')}</label>
-              <select name="groupId" defaultValue={editingAssignment?.groupId || ''} required>
+              <select
+                name="groupId"
+                value={groupId}
+                onChange={(e) => {
+                  const newGroupId = e.target.value;
+                  setGroupId(newGroupId);
+                  // Suggest the group's own preferred room, but only when the field is still
+                  // empty (never clobber a value the user or the loaded assignment already
+                  // set) and only when it actually matches Satisfies Room Type if that's
+                  // already set - e.g. don't suggest a group's regular classroom onto a block
+                  // that's already marked as requiring a laboratorio.
+                  if (!preferredRoomName) {
+                    const group = groups.find((g) => g.id === newGroupId);
+                    const candidateRoom = rooms.find((r) => r.name === group?.preferredRoomName);
+                    if (group?.preferredRoomName && roomMatchesType(candidateRoom, satisfiesRoomType)) {
+                      setPreferredRoomName(group.preferredRoomName);
+                    }
+                  }
+                }}
+                required
+              >
                 <option value="" disabled>{t('assignments.fields.groupPlaceholder')}</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>{g.id} - {g.name}</option>
@@ -226,7 +310,21 @@ function Assignments() {
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.course')}</label>
-              <select name="courseId" defaultValue={editingAssignment?.courseId || ''} required>
+              <select
+                name="courseId"
+                value={courseId}
+                onChange={(e) => {
+                  const newCourseId = e.target.value;
+                  setCourseId(newCourseId);
+                  // Suggest the course's own default room requirement, but only when the
+                  // field is still empty - never clobber a value already set.
+                  if (!satisfiesRoomType) {
+                    const course = courses.find((c) => c.id === newCourseId);
+                    if (course?.roomRequirement) applySatisfiesRoomType(course.roomRequirement);
+                  }
+                }}
+                required
+              >
                 <option value="" disabled>{t('assignments.fields.coursePlaceholder')}</option>
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
@@ -264,34 +362,53 @@ function Assignments() {
               {fieldErrors.blockTimeslotId && <div className="error">{fieldErrors.blockTimeslotId}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.room')}</label>
-              <select name="roomName" defaultValue={editingAssignment?.roomName || ''}>
+              <label>{t('assignments.fields.preferredRoom')}</label>
+              <select
+                name="preferredRoomName"
+                value={preferredRoomName}
+                onChange={(e) => setPreferredRoomName(e.target.value)}
+              >
                 <option value="">{t('common.noneOption')}</option>
-                {rooms.map((r) => (
+                {roomsMatchingType(satisfiesRoomType).map((r) => (
                   <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
                 ))}
               </select>
-              {fieldErrors.roomName && <div className="error">{fieldErrors.roomName}</div>}
+              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                {t('assignments.preferredRoomHint')}
+              </div>
+              {fieldErrors.preferredRoomName && <div className="error">{fieldErrors.preferredRoomName}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.satisfiesRoomType')}</label>
-              <select name="satisfiesRoomType" defaultValue={editingAssignment?.satisfiesRoomType || ''}>
+              <select
+                name="satisfiesRoomType"
+                value={satisfiesRoomType}
+                onChange={(e) => applySatisfiesRoomType(e.target.value)}
+              >
                 <option value="">{t('common.noneOption')}</option>
                 {ROOM_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
+              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                {t('assignments.satisfiesRoomTypeHint')}
+              </div>
               {fieldErrors.satisfiesRoomType && <div className="error">{fieldErrors.satisfiesRoomType}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.preferredRoom')}</label>
-              <select name="preferredRoomName" defaultValue={editingAssignment?.preferredRoomName || ''}>
+              <label>{t('assignments.fields.room')}</label>
+              <select name="roomName" value={roomName} onChange={(e) => setRoomName(e.target.value)}>
                 <option value="">{t('common.noneOption')}</option>
-                {rooms.map((r) => (
+                {roomsMatchingType(satisfiesRoomType).map((r) => (
                   <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
                 ))}
               </select>
-              {fieldErrors.preferredRoomName && <div className="error">{fieldErrors.preferredRoomName}</div>}
+              {satisfiesRoomType && (
+                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                  {t('assignments.roomFilteredHint', { type: satisfiesRoomType })}
+                </div>
+              )}
+              {fieldErrors.roomName && <div className="error">{fieldErrors.roomName}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.pin')}</label>
@@ -312,6 +429,14 @@ function Assignments() {
       )}
 
       <div className="card" style={{ overflowX: 'auto' }}>
+        <div className="search-box">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t('assignments.searchPlaceholder')}
+          />
+        </div>
         <table>
           <thead>
             <tr>

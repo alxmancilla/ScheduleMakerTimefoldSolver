@@ -324,7 +324,11 @@
       "pinned": "Pinned"
     },
     "savedMessage": "Assignment saved",
-    "deletedMessage": "Assignment deleted"
+    "deletedMessage": "Assignment deleted",
+    "searchPlaceholder": "Search by group, course, teacher, or room...",
+    "preferredRoomHint": "Defaults to the selected group's preferred room, if it has one; pick a different room to override.",
+    "roomFilteredHint": "Showing only rooms that satisfy \"{{type}}\".",
+    "satisfiesRoomTypeHint": "Defaults to the selected course's room requirement, if it has one; pick a different type to override."
   },
   "reports": {
     "title": "Reports",
