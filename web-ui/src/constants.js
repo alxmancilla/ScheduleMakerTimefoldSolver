@@ -9,3 +9,6 @@ export const ROOM_TYPES = [
   'taller electrónica',
   'centro de cómputo',
 ];
+
+/** Zero-padded HH:00, e.g. formatHour(7) -> "07:00", formatHour(14) -> "14:00". */
+export const formatHour = (hour) => `${String(hour).padStart(2, '0')}:00`;

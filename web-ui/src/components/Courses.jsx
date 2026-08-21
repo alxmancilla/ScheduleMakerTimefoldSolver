@@ -10,7 +10,7 @@ import {
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-import { ROOM_TYPES } from '../constants';
+import { ROOM_TYPES, formatHour } from '../constants';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 // The `course` table enforces `CHECK (semester BETWEEN 1 AND 12)`.
@@ -57,7 +57,7 @@ function Courses() {
 
   const timeslotLabel = (ts) => {
     const dayLabel = t(`common.days.${DAY_KEYS[ts.dayOfWeek] || 'mon'}`);
-    return `${dayLabel} ${ts.startHour}:00-${ts.startHour + ts.lengthHours}:00`;
+    return `${dayLabel} ${formatHour(ts.startHour)}-${formatHour(ts.startHour + ts.lengthHours)}`;
   };
 
   const timeslotDisplay = (timeslotId) => {

@@ -9,6 +9,7 @@ import {
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
+import { formatHour } from '../constants';
 
 const ENGINE_POLL_MS = 3000;
 
@@ -503,7 +504,7 @@ function Settings() {
               <label>{t('settings.timeslots.fields.startHour')}</label>
               <select name="startHour" value={form.startHour} onChange={handleField}>
                 {START_HOURS.map((h) => (
-                  <option key={h} value={h}>{h}:00</option>
+                  <option key={h} value={h}>{formatHour(h)}</option>
                 ))}
               </select>
               {fieldErrors.startHour && <div className="error">{fieldErrors.startHour}</div>}
@@ -520,7 +521,7 @@ function Settings() {
             <div className="form-group">
               <label>{t('settings.timeslots.fields.endsAt')}</label>
               <span style={{ color: exceedsDayBounds ? '#c0392b' : undefined }}>
-                {endHour}:00{exceedsDayBounds ? t('settings.timeslots.exceedsDayBounds') : ''}
+                {formatHour(endHour)}{exceedsDayBounds ? t('settings.timeslots.exceedsDayBounds') : ''}
               </span>
               {fieldErrors.withinDayBounds && <div className="error">{fieldErrors.withinDayBounds}</div>}
             </div>
@@ -557,8 +558,8 @@ function Settings() {
                 <tbody>
                   {dayTimeslots.map((timeslot) => (
                     <tr key={timeslot.id}>
-                      <td>{timeslot.startHour}:00</td>
-                      <td>{timeslot.startHour + timeslot.lengthHours}:00</td>
+                      <td>{formatHour(timeslot.startHour)}</td>
+                      <td>{formatHour(timeslot.startHour + timeslot.lengthHours)}</td>
                       <td>{timeslot.lengthHours}</td>
                       <td>
                         <button className="btn btn-primary" onClick={() => handleEdit(timeslot)} style={{ marginRight: '5px' }}>

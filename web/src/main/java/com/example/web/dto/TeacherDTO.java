@@ -109,9 +109,12 @@ public class TeacherDTO {
         @Max(value = 5, message = "Day of week must be between 1 (Monday) and 5 (Friday)")
         private Integer dayOfWeek;
 
+        // 14 (not 15): the school day runs 7:00-15:00, and availability represents the start
+        // hour of a 1-hour slot a block could occupy - a block starting at 14 (the latest
+        // possible) still only occupies the 14:00-15:00 hour, so 15 itself is never checked.
         @NotNull(message = "Hour is required")
-        @Min(value = 7, message = "Hour must be between 7 and 15")
-        @Max(value = 15, message = "Hour must be between 7 and 15")
+        @Min(value = 7, message = "Hour must be between 7 and 14")
+        @Max(value = 14, message = "Hour must be between 7 and 14")
         private Integer hour;
 
         public AvailabilityDTO() {

@@ -7,7 +7,7 @@ import {
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-import { ROOM_TYPES } from '../constants';
+import { ROOM_TYPES, formatHour } from '../constants';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const BLOCK_LENGTHS = [1, 2, 3, 4];
@@ -66,7 +66,7 @@ function Assignments() {
 
   const timeslotLabel = (ts) => {
     const dayLabel = t(`common.days.${DAY_KEYS[ts.dayOfWeek] || 'mon'}`);
-    return `${dayLabel} ${ts.startHour}:00-${ts.startHour + ts.lengthHours}:00 (${ts.lengthHours}h)`;
+    return `${dayLabel} ${formatHour(ts.startHour)}-${formatHour(ts.startHour + ts.lengthHours)} (${ts.lengthHours}h)`;
   };
 
   useEffect(() => {

@@ -5,6 +5,7 @@ import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
+import { formatHour } from '../constants';
 
 const MIN_CHARS_FOR_SUGGESTIONS = 2;
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -16,7 +17,10 @@ const DAY_LABELS = [
   { value: 4, dayKey: 'thu' },
   { value: 5, dayKey: 'fri' },
 ];
-const AVAILABILITY_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
+// 14, not 15: the school day runs 7:00-15:00, and a block starting at 14 (the latest
+// possible) only occupies the 14:00-15:00 hour - "available at 15" is never checked by
+// the solver (Teacher.isAvailableForBlock loops hour < endHour, so 15 is never reached).
+const AVAILABILITY_HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
 const EMPTY_FORM = { id: '', name: '', lastName: '', maxHoursPerWeek: 40 };
 
 function Teachers() {
@@ -409,7 +413,7 @@ function Teachers() {
               <table style={{ borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    <th style={{ padding: '4px 8px' }}></th>
+                    <th style={{ padding: '4px 8px' }}>{t('schedule.hour')}</th>
                     {DAY_LABELS.map((day) => (
                       <th key={day.value} style={{ padding: '4px 8px', textAlign: 'center' }}>{t(`teachers.days.${day.dayKey}`)}</th>
                     ))}
@@ -418,7 +422,7 @@ function Teachers() {
                 <tbody>
                   {AVAILABILITY_HOURS.map((hour) => (
                     <tr key={hour}>
-                      <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{hour}:00</td>
+                      <td style={{ padding: '4px 8px', fontWeight: 'bold' }}>{formatHour(hour)}-{formatHour(hour + 1)}</td>
                       {DAY_LABELS.map((day) => {
                         const active = availability.has(availabilityKey(day.value, hour));
                         const dayLabel = t(`teachers.days.${day.dayKey}`);
@@ -435,7 +439,7 @@ function Teachers() {
                                 borderRadius: '4px',
                                 cursor: 'pointer',
                               }}
-                              aria-label={`${dayLabel} ${hour}:00 ${active ? t('teachers.available') : t('teachers.unavailable')}`}
+                              aria-label={`${dayLabel} ${formatHour(hour)}-${formatHour(hour + 1)} ${active ? t('teachers.available') : t('teachers.unavailable')}`}
                             >
                               {active ? '✓' : ''}
                             </button>

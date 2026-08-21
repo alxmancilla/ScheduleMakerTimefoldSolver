@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getMyScheduleView } from '../api';
+import { formatHour } from '../constants';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
@@ -80,7 +81,7 @@ function MySchedule() {
             <tbody>
               {HOURS.map((hour) => (
                 <tr key={hour}>
-                  <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{hour}:00</td>
+                  <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{formatHour(hour)}-{formatHour(hour + 1)}</td>
                   {DAYS.map((day, dayIdx) => {
                     const dayOfWeek = dayIdx + 1;
                     const entriesStartingHere = getEntriesStartingAt(dayOfWeek, hour);
@@ -118,7 +119,7 @@ function MySchedule() {
                             <div style={{ fontSize: '11px', color: '#555' }}>{entry.groupName}</div>
                             <div style={{ fontSize: '11px', color: '#555' }}>{entry.roomName}</div>
                             <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
-                              {entry.startHour}:00 - {entry.startHour + entry.lengthHours}:00 ({entry.lengthHours}h)
+                              {formatHour(entry.startHour)} - {formatHour(entry.startHour + entry.lengthHours)} ({entry.lengthHours}h)
                             </div>
                             {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 {t('schedule.pinnedLabel')}</div>}
                           </div>
