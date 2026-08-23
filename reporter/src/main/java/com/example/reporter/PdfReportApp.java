@@ -7,8 +7,12 @@ import com.example.util.PdfReporter;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.sql.Types;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +53,11 @@ public class PdfReportApp {
         // see school_term's own docs), so it's always the current value regardless
         // of which run the schedule content above came from.
         String termLabel = loadCurrentTermLabel(jdbcUrl, username, password);
+
+        // When solved (schedule_run.created_at) the run backing this report's content
+        // actually is - reportRunId if one was explicitly requested, otherwise the
+        // same latest run DataLoader just resolved above.
+        LocalDateTime scheduleRunTimestamp = loadScheduleRunTimestamp(jdbcUrl, username, password, reportRunId);
 
         // Report chrome language ("es" or anything else -> "en"); unset defaults to
         // English, same as before this existed. This only covers PdfReporter's own
@@ -95,16 +104,17 @@ public class PdfReportApp {
         String reportTarget = System.getenv().getOrDefault("REPORT_TARGET", "all");
         if ("violations".equalsIgnoreCase(reportTarget)) {
             PdfReporter.generateBlockViolationsPdf(schedule, violations, softViolations,
-                    base + "-incumplimientos.pdf", locale);
+                    base + "-incumplimientos.pdf", scheduleRunTimestamp, locale);
             System.out.println("PDF report written to:");
             System.out.println("  - " + base + "-incumplimientos.pdf");
         } else if ("schedules".equalsIgnoreCase(reportTarget)) {
-            PdfReporter.generateBlockSchedulePdfs(schedule, base, termLabel, locale);
+            PdfReporter.generateBlockSchedulePdfs(schedule, base, termLabel, scheduleRunTimestamp, locale);
             System.out.println("PDF reports written to:");
             System.out.println("  - " + base + "-por-maestro.pdf");
             System.out.println("  - " + base + "-por-grupo.pdf");
         } else {
-            PdfReporter.generateBlockReports(schedule, violations, softViolations, base, termLabel, locale);
+            PdfReporter.generateBlockReports(schedule, violations, softViolations, base, termLabel,
+                    scheduleRunTimestamp, locale);
             System.out.println("PDF reports written to:");
             System.out.println("  - " + base + "-incumplimientos.pdf");
             System.out.println("  - " + base + "-por-maestro.pdf");
@@ -124,6 +134,35 @@ public class PdfReportApp {
             }
         } catch (Exception e) {
             System.out.println("Note: could not load the current term label for the report cover page: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * When the schedule_run backing this report's content was actually solved -
+     * that specific run if scheduleRunId is non-null, otherwise the latest run
+     * (same COALESCE-to-MAX(id) resolution DataLoader's default path uses).
+     * Null if no schedule_run exists yet or the lookup fails.
+     */
+    private static LocalDateTime loadScheduleRunTimestamp(String jdbcUrl, String username, String password,
+            Integer scheduleRunId) {
+        String sql = "SELECT created_at FROM schedule_run WHERE id = COALESCE(?, (SELECT MAX(id) FROM schedule_run))";
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
+            if (scheduleRunId != null) {
+                stmt.setInt(1, scheduleRunId);
+            } else {
+                stmt.setNull(1, Types.INTEGER);
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Timestamp ts = rs.getTimestamp("created_at");
+                    return ts != null ? ts.toLocalDateTime() : null;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println(
+                    "Note: could not load the schedule run timestamp for the report cover page: " + e.getMessage());
         }
         return null;
     }
