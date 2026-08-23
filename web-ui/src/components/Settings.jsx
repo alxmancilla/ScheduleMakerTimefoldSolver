@@ -479,7 +479,7 @@ function Settings() {
     <div>
       <div className="card">
         <h2>{t('settings.title')}</h2>
-        <p style={{ color: '#7f8c8d', fontSize: '14px' }}>{t('settings.description')}</p>
+        <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>{t('settings.description')}</p>
       </div>
 
       <div className="tabs" role="tablist">
@@ -503,10 +503,10 @@ function Settings() {
       <div role="tabpanel" id="settings-panel-term" aria-labelledby="settings-tab-term">
       <div className="card">
         <h3>{t('settings.term.title')}</h3>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.term.description')}
         </p>
-        {termError && <div className="error">{termError}</div>}
+        {termError && <div className="error" role="alert">{termError}</div>}
         <form onSubmit={handleSaveTerm} style={{ display: 'flex', gap: '10px', marginTop: '10px', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ marginBottom: 0, flex: 1, maxWidth: '320px' }}>
             <label>{t('settings.term.fields.label')}</label>
@@ -539,7 +539,7 @@ function Settings() {
             {engineStatus?.state === 'RUNNING' ? t('settings.solver.running') : `▶ ${t('settings.solver.startEngine')}`}
           </button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.solver.description')}
         </p>
         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '12px' }}>
@@ -570,10 +570,10 @@ function Settings() {
             />
           </div>
         </div>
-        <p style={{ marginTop: '6px', color: '#7f8c8d', fontSize: '12px' }}>
+        <p style={{ marginTop: '6px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
           {t('settings.solver.limitsDescription')}
         </p>
-        {engineError && <div className="error">{engineError}</div>}
+        {engineError && <div className="error" role="alert">{engineError}</div>}
         {engineStatus && (
           <div style={{ marginTop: '10px' }}>
             <div style={{ display: 'flex', gap: '20px', fontSize: '13px', flexWrap: 'wrap' }}>
@@ -612,12 +612,12 @@ function Settings() {
           <h3>{t('settings.complianceSnapshots.title')}</h3>
           <button className="btn btn-secondary" onClick={loadAdminReports}>↻ {t('settings.complianceSnapshots.refresh')}</button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.complianceSnapshots.description')}
         </p>
-        {adminReportsError && <div className="error">{adminReportsError}</div>}
+        {adminReportsError && <div className="error" role="alert">{adminReportsError}</div>}
         {adminReports.length === 0 && !adminReportsError && (
-          <p style={{ color: '#7f8c8d', fontSize: '13px' }}>{t('settings.complianceSnapshots.none')}</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>{t('settings.complianceSnapshots.none')}</p>
         )}
         {adminReports.length > 0 && (
           <table style={{ marginTop: '8px' }}>
@@ -669,10 +669,10 @@ function Settings() {
             {generatingBlocks ? t('settings.generateBlocks.generating') : `⚙ ${t('settings.generateBlocks.button')}`}
           </button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.generateBlocks.description')}
         </p>
-        {blockGenError && <div className="error">{blockGenError}</div>}
+        {blockGenError && <div className="error" role="alert">{blockGenError}</div>}
         {blockGenResult && (
           <div style={{ marginTop: '10px', fontSize: '13px' }}>
             <div style={{ color: '#2e7d32' }}>
@@ -682,7 +682,7 @@ function Settings() {
               })}
             </div>
             {blockGenResult.warnings.length > 0 && (
-              <ul style={{ marginTop: '6px', color: '#c0392b' }}>
+              <ul style={{ marginTop: '6px', color: 'var(--color-danger-dark)' }}>
                 {blockGenResult.warnings.map((w, i) => (
                   <li key={i}>{w}</li>
                 ))}
@@ -704,10 +704,10 @@ function Settings() {
               : t('settings.generateBlocks.clearTimeslots.button')}
           </button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.generateBlocks.clearTimeslots.description')}
         </p>
-        {clearTimeslotsError && <div className="error">{clearTimeslotsError}</div>}
+        {clearTimeslotsError && <div className="error" role="alert">{clearTimeslotsError}</div>}
         {clearTimeslotsResult && (
           <div style={{ marginTop: '10px', fontSize: '13px', color: '#2e7d32' }}>
             {t('settings.generateBlocks.clearTimeslots.resultSummary', {
@@ -732,10 +732,10 @@ function Settings() {
             {t('settings.blockRules.addRule')}
           </button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.blockRules.description')}
         </p>
-        {blockRulesError && <div className="error">{blockRulesError}</div>}
+        {blockRulesError && <div className="error" role="alert">{blockRulesError}</div>}
       </div>
 
       {showBlockRuleForm && (
@@ -768,7 +768,7 @@ function Settings() {
                   <option key={size} value={size}>{size}</option>
                 ))}
               </select>
-              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                 {t('settings.blockRules.sizeHint')}
               </div>
             </div>
@@ -782,7 +782,7 @@ function Settings() {
                   <option key={size} value={size}>{size}</option>
                 ))}
               </select>
-              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                 {t('settings.blockRules.maxBlocksPerDayHint')}
               </div>
             </div>
@@ -798,7 +798,7 @@ function Settings() {
 
       <div className="card">
         {blockRules.length === 0 ? (
-          <p style={{ color: '#7f8c8d' }}>{t('settings.blockRules.none')}</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('settings.blockRules.none')}</p>
         ) : (
           <table>
             <thead>
@@ -841,10 +841,10 @@ function Settings() {
             {t('settings.calendar.addException')}
           </button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.calendar.description')}
         </p>
-        {calendarExceptionsError && <div className="error">{calendarExceptionsError}</div>}
+        {calendarExceptionsError && <div className="error" role="alert">{calendarExceptionsError}</div>}
       </div>
 
       {showCalendarExceptionForm && (
@@ -909,7 +909,7 @@ function Settings() {
 
       <div className="card">
         {calendarExceptions.length === 0 ? (
-          <p style={{ color: '#7f8c8d' }}>{t('settings.calendar.none')}</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('settings.calendar.none')}</p>
         ) : (
           <table>
             <thead>
@@ -954,7 +954,7 @@ function Settings() {
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
         <div className="card">
@@ -967,7 +967,7 @@ function Settings() {
                   <option key={day.value} value={day.value}>{t(`common.days.${day.key}`)}</option>
                 ))}
               </select>
-              {fieldErrors.dayOfWeek && <div className="error">{fieldErrors.dayOfWeek}</div>}
+              {fieldErrors.dayOfWeek && <div className="error" role="alert">{fieldErrors.dayOfWeek}</div>}
             </div>
             <div className="form-group">
               <label>{t('settings.timeslots.fields.startHour')}</label>
@@ -976,7 +976,7 @@ function Settings() {
                   <option key={h} value={h}>{formatHour(h)}</option>
                 ))}
               </select>
-              {fieldErrors.startHour && <div className="error">{fieldErrors.startHour}</div>}
+              {fieldErrors.startHour && <div className="error" role="alert">{fieldErrors.startHour}</div>}
             </div>
             <div className="form-group">
               <label>{t('settings.timeslots.fields.length')}</label>
@@ -985,14 +985,14 @@ function Settings() {
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
-              {fieldErrors.lengthHours && <div className="error">{fieldErrors.lengthHours}</div>}
+              {fieldErrors.lengthHours && <div className="error" role="alert">{fieldErrors.lengthHours}</div>}
             </div>
             <div className="form-group">
               <label>{t('settings.timeslots.fields.endsAt')}</label>
-              <span style={{ color: exceedsDayBounds ? '#c0392b' : undefined }}>
+              <span style={{ color: exceedsDayBounds ? 'var(--color-danger-dark)' : undefined }}>
                 {formatHour(endHour)}{exceedsDayBounds ? t('settings.timeslots.exceedsDayBounds') : ''}
               </span>
-              {fieldErrors.withinDayBounds && <div className="error">{fieldErrors.withinDayBounds}</div>}
+              {fieldErrors.withinDayBounds && <div className="error" role="alert">{fieldErrors.withinDayBounds}</div>}
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary" disabled={exceedsDayBounds}>{t('common.save')}</button>
@@ -1004,7 +1004,7 @@ function Settings() {
 
       {timeslots.length === 0 ? (
         <div className="card">
-          <p style={{ color: '#7f8c8d' }}>{t('settings.timeslots.none')}</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('settings.timeslots.none')}</p>
         </div>
       ) : (
         DAY_LABELS.map((day) => {
@@ -1014,7 +1014,7 @@ function Settings() {
           if (dayTimeslots.length === 0) return null;
           return (
             <div className="card" key={day.value}>
-              <h4 style={{ marginBottom: '10px', color: '#2c3e50' }}>{t(`common.days.${day.key}`)}</h4>
+              <h4 style={{ marginBottom: '10px', color: 'var(--color-ink)' }}>{t(`common.days.${day.key}`)}</h4>
               <table>
                 <thead>
                   <tr>
@@ -1056,12 +1056,12 @@ function Settings() {
           <h3>{t('settings.auditLog.title')}</h3>
           <button className="btn btn-secondary" onClick={loadAuditLog}>↻ {t('settings.auditLog.refresh')}</button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.auditLog.description')}
         </p>
-        {auditLogError && <div className="error">{auditLogError}</div>}
+        {auditLogError && <div className="error" role="alert">{auditLogError}</div>}
         {auditLog.length === 0 && !auditLogError && (
-          <p style={{ color: '#7f8c8d', fontSize: '13px' }}>{t('settings.auditLog.none')}</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>{t('settings.auditLog.none')}</p>
         )}
         {auditLog.length > 0 && (
           <>

@@ -133,7 +133,7 @@ function Schedule() {
   };
 
   if (loading) return <div className="loading">{t('schedule.loading')}</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (error) return <div className="error" role="alert">{error}</div>;
   if (!schedule) return <div className="loading">{t('schedule.noData')}</div>;
 
   const filteredEntries = getFilteredEntries();
@@ -209,19 +209,19 @@ function Schedule() {
           )}
         </div>
 
-        <p style={{ marginTop: '15px', color: '#7f8c8d' }}>
+        <p style={{ marginTop: '15px', color: 'var(--color-text-secondary)' }}>
           {t('schedule.showing', { filtered: filteredEntries.length, total: schedule.entries.length })}
           {selectedGroupId && t('schedule.groupSuffix', { name: groups.find(g => g.id === selectedGroupId)?.name || selectedGroupId })}
           {selectedTeacherId && t('schedule.teacherSuffix', { name: teachersForGroup.find(t2 => t2.id === selectedTeacherId)?.name || selectedTeacherId })}
         </p>
         {selectedRunId && (
-          <p style={{ marginTop: '6px', color: '#c0392b', fontSize: '13px' }}>
+          <p style={{ marginTop: '6px', color: 'var(--color-danger-dark)', fontSize: '13px' }}>
             {t('schedule.pastRunNotice')}
           </p>
         )}
       </div>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
+      <div className="card table-wrap">
         <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
           <thead>
             <tr>

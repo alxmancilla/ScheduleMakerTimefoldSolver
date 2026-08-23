@@ -274,7 +274,7 @@ function Teachers() {
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
         <div className="card">
@@ -290,17 +290,17 @@ function Teachers() {
                 required
                 disabled={!!editingTeacher}
               />
-              {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
+              {fieldErrors.id && <div className="error" role="alert">{fieldErrors.id}</div>}
             </div>
             <div className="form-group">
               <label>{t('teachers.fields.name')}</label>
               <input type="text" name="name" value={form.name} onChange={handleField} required />
-              {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
+              {fieldErrors.name && <div className="error" role="alert">{fieldErrors.name}</div>}
             </div>
             <div className="form-group">
               <label>{t('teachers.fields.lastName')}</label>
               <input type="text" name="lastName" value={form.lastName} onChange={handleField} required />
-              {fieldErrors.lastName && <div className="error">{fieldErrors.lastName}</div>}
+              {fieldErrors.lastName && <div className="error" role="alert">{fieldErrors.lastName}</div>}
             </div>
             <div className="form-group">
               <label>{t('teachers.fields.maxHoursPerWeek')}</label>
@@ -311,7 +311,7 @@ function Teachers() {
                 onChange={handleField}
                 required
               />
-              {fieldErrors.maxHoursPerWeek && <div className="error">{fieldErrors.maxHoursPerWeek}</div>}
+              {fieldErrors.maxHoursPerWeek && <div className="error" role="alert">{fieldErrors.maxHoursPerWeek}</div>}
             </div>
             <div className="form-group">
               <label>{t('teachers.fields.requiredRoom')}</label>
@@ -321,10 +321,10 @@ function Teachers() {
                   <option key={room.name} value={room.name}>{room.name}</option>
                 ))}
               </select>
-              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                 {t('teachers.requiredRoomHint')}
               </div>
-              {fieldErrors.requiredRoomName && <div className="error">{fieldErrors.requiredRoomName}</div>}
+              {fieldErrors.requiredRoomName && <div className="error" role="alert">{fieldErrors.requiredRoomName}</div>}
             </div>
 
             <div className="form-group">
@@ -421,7 +421,7 @@ function Teachers() {
                   </span>
                 ))}
                 {qualifications.length === 0 && (
-                  <span style={{ color: '#7f8c8d', fontSize: '13px' }}>{t('teachers.noQualifications')}</span>
+                  <span style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>{t('teachers.noQualifications')}</span>
                 )}
               </div>
             </div>
@@ -486,7 +486,7 @@ function Teachers() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card table-wrap">
         <div className="search-box">
           <input
             type="text"
@@ -520,13 +520,13 @@ function Teachers() {
                     const assigned = assignedHoursByTeacher[teacher.id] || 0;
                     const max = teacher.maxHoursPerWeek || 0;
                     const pct = max > 0 ? Math.round((assigned / max) * 100) : 0;
-                    const barColor = pct > 100 ? '#e74c3c' : pct >= 80 ? '#f39c12' : '#27ae60';
+                    const barColor = pct > 100 ? 'var(--color-danger)' : pct >= 80 ? 'var(--color-warning)' : 'var(--color-success)';
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '120px' }}>
-                        <div style={{ flex: 1, background: '#ecf0f1', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                        <div style={{ flex: 1, background: 'var(--color-border-soft)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
                           <div style={{ width: `${Math.min(pct, 100)}%`, background: barColor, height: '100%' }} />
                         </div>
-                        <span style={{ fontSize: '12px', color: '#7f8c8d', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
                           {assigned}/{max}h
                         </span>
                       </div>

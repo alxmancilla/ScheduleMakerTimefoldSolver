@@ -288,18 +288,18 @@ function Assignments() {
             </WriteOnly>
           </div>
         </div>
-        <p style={{ marginTop: '10px', color: '#7f8c8d' }}>
+        <p style={{ marginTop: '10px', color: 'var(--color-text-secondary)' }}>
           {t('assignments.showing', { filtered: filteredAssignments.length, total: assignments.length })}
         </p>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
         <div className="card">
           <h3>{editingAssignment ? t('assignments.editAssignment') : t('assignments.newAssignment')}</h3>
           <form onSubmit={handleSubmit}>
-            {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
+            {fieldErrors.id && <div className="error" role="alert">{fieldErrors.id}</div>}
             <div className="form-group">
               <label>{t('assignments.fields.group')}</label>
               <select
@@ -335,7 +335,7 @@ function Assignments() {
                   <option key={g.id} value={g.id}>{g.id} - {g.name}</option>
                 ))}
               </select>
-              {fieldErrors.groupId && <div className="error">{fieldErrors.groupId}</div>}
+              {fieldErrors.groupId && <div className="error" role="alert">{fieldErrors.groupId}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.course')}</label>
@@ -365,11 +365,11 @@ function Assignments() {
                 ))}
               </select>
               {groupId && (
-                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                   {t('assignments.courseFilteredHint')}
                 </div>
               )}
-              {fieldErrors.courseId && <div className="error">{fieldErrors.courseId}</div>}
+              {fieldErrors.courseId && <div className="error" role="alert">{fieldErrors.courseId}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.blockLength')}</label>
@@ -378,7 +378,7 @@ function Assignments() {
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
-              {fieldErrors.blockLength && <div className="error">{fieldErrors.blockLength}</div>}
+              {fieldErrors.blockLength && <div className="error" role="alert">{fieldErrors.blockLength}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.teacher')}</label>
@@ -389,11 +389,11 @@ function Assignments() {
                 ))}
               </select>
               {courseId && (
-                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                   {t('assignments.teacherFilteredHint')}
                 </div>
               )}
-              {fieldErrors.teacherId && <div className="error">{fieldErrors.teacherId}</div>}
+              {fieldErrors.teacherId && <div className="error" role="alert">{fieldErrors.teacherId}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.blockTimeslot')}</label>
@@ -403,7 +403,7 @@ function Assignments() {
                   <option key={ts.id} value={ts.id}>{timeslotLabel(ts)}</option>
                 ))}
               </select>
-              {fieldErrors.blockTimeslotId && <div className="error">{fieldErrors.blockTimeslotId}</div>}
+              {fieldErrors.blockTimeslotId && <div className="error" role="alert">{fieldErrors.blockTimeslotId}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.preferredRoom')}</label>
@@ -417,10 +417,10 @@ function Assignments() {
                   <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
                 ))}
               </select>
-              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                 {t('assignments.preferredRoomHint')}
               </div>
-              {fieldErrors.preferredRoomHint && <div className="error">{fieldErrors.preferredRoomHint}</div>}
+              {fieldErrors.preferredRoomHint && <div className="error" role="alert">{fieldErrors.preferredRoomHint}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.satisfiesRoomType')}</label>
@@ -434,10 +434,10 @@ function Assignments() {
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                 {t('assignments.satisfiesRoomTypeHint')}
               </div>
-              {fieldErrors.satisfiesRoomType && <div className="error">{fieldErrors.satisfiesRoomType}</div>}
+              {fieldErrors.satisfiesRoomType && <div className="error" role="alert">{fieldErrors.satisfiesRoomType}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.room')}</label>
@@ -448,11 +448,11 @@ function Assignments() {
                 ))}
               </select>
               {satisfiesRoomType && (
-                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                   {t('assignments.roomFilteredHint', { type: satisfiesRoomType })}
                 </div>
               )}
-              {fieldErrors.roomName && <div className="error">{fieldErrors.roomName}</div>}
+              {fieldErrors.roomName && <div className="error" role="alert">{fieldErrors.roomName}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.pin')}</label>
@@ -460,7 +460,7 @@ function Assignments() {
                 <option value="false">{t('common.no')}</option>
                 <option value="true">{t('common.yes')}</option>
               </select>
-              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                 {t('assignments.pinHint')}
               </div>
             </div>
@@ -472,7 +472,7 @@ function Assignments() {
         </div>
       )}
 
-      <div className="card" style={{ overflowX: 'auto' }}>
+      <div className="card table-wrap">
         <div className="search-box">
           <input
             type="text"

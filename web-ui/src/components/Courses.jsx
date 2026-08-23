@@ -413,10 +413,10 @@ function Courses() {
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
-        <div className="card">
+        <div className="card table-wrap">
           {editingCourse && (
             <div className="tabs" role="tablist">
               <button
@@ -477,12 +477,12 @@ function Courses() {
                     required
                     disabled={!!editingCourse}
                   />
-                  {fieldErrors.id && <div className="error">{fieldErrors.id}</div>}
+                  {fieldErrors.id && <div className="error" role="alert">{fieldErrors.id}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('courses.fields.name')}</label>
                   <input type="text" name="name" defaultValue={editingCourse?.name || ''} required />
-                  {fieldErrors.name && <div className="error">{fieldErrors.name}</div>}
+                  {fieldErrors.name && <div className="error" role="alert">{fieldErrors.name}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('courses.fields.abbreviation')}</label>
@@ -493,7 +493,7 @@ function Courses() {
                     maxLength={100}
                     required
                   />
-                  {fieldErrors.abbreviation && <div className="error">{fieldErrors.abbreviation}</div>}
+                  {fieldErrors.abbreviation && <div className="error" role="alert">{fieldErrors.abbreviation}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('courses.fields.semester')}</label>
@@ -502,7 +502,7 @@ function Courses() {
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
-                  {fieldErrors.semester && <div className="error">{fieldErrors.semester}</div>}
+                  {fieldErrors.semester && <div className="error" role="alert">{fieldErrors.semester}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('courses.fields.designation')}</label>
@@ -516,7 +516,7 @@ function Courses() {
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
-                  {fieldErrors.designation && <div className="error">{fieldErrors.designation}</div>}
+                  {fieldErrors.designation && <div className="error" role="alert">{fieldErrors.designation}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('courses.fields.roomRequirement')}</label>
@@ -526,7 +526,7 @@ function Courses() {
                     ))}
                   </select>
                   {roomRequirements.length > 0 && (
-                    <div style={{ color: '#c0392b', fontSize: '12px', marginTop: '4px' }}>
+                    <div style={{ color: 'var(--color-danger-dark)', fontSize: '12px', marginTop: '4px' }}>
                       {t('courses.roomRequirements.formNote')}
                     </div>
                   )}
@@ -560,10 +560,10 @@ function Courses() {
               </button>
             </WriteOnly>
           </div>
-          <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
             {t('courses.roomRequirements.description')}
           </p>
-          {requirementsError && <div className="error">{requirementsError}</div>}
+          {requirementsError && <div className="error" role="alert">{requirementsError}</div>}
 
           {showRequirementForm && (
             <form onSubmit={handleSubmitRequirement} style={{ marginTop: '12px' }}>
@@ -644,7 +644,7 @@ function Courses() {
               ))}
               {roomRequirements.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ color: '#7f8c8d' }}>{t('courses.roomRequirements.none')}</td>
+                  <td colSpan={5} style={{ color: 'var(--color-text-secondary)' }}>{t('courses.roomRequirements.none')}</td>
                 </tr>
               )}
             </tbody>
@@ -662,10 +662,10 @@ function Courses() {
               </button>
             </WriteOnly>
           </div>
-          <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
             {t('courses.blockTemplates.description')}
           </p>
-          {templatesError && <div className="error">{templatesError}</div>}
+          {templatesError && <div className="error" role="alert">{templatesError}</div>}
 
           {showTemplateForm && (
             <form onSubmit={handleSubmitTemplate} style={{ marginTop: '12px' }}>
@@ -749,7 +749,7 @@ function Courses() {
                   />
                   {t('courses.blockTemplates.fields.pinAssignment')}
                 </label>
-                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
                   {t('courses.blockTemplates.pinHint')}
                 </div>
               </div>
@@ -799,7 +799,7 @@ function Courses() {
               ))}
               {blockTemplates.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ color: '#7f8c8d' }}>{t('courses.blockTemplates.none')}</td>
+                  <td colSpan={9} style={{ color: 'var(--color-text-secondary)' }}>{t('courses.blockTemplates.none')}</td>
                 </tr>
               )}
             </tbody>
@@ -809,7 +809,7 @@ function Courses() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card table-wrap">
         <div className="search-box">
           <input
             type="text"
@@ -844,8 +844,8 @@ function Courses() {
                       style={{
                         marginLeft: '6px',
                         fontSize: '11px',
-                        color: '#c0392b',
-                        border: '1px solid #c0392b',
+                        color: 'var(--color-danger-dark)',
+                        border: '1px solid var(--color-danger-dark)',
                         borderRadius: '10px',
                         padding: '1px 6px',
                       }}

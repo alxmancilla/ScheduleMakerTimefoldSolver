@@ -171,12 +171,12 @@ function Users() {
             {t('users.addUser')}
           </button>
         </div>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('users.description')}
         </p>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
         <div className="card">
@@ -192,7 +192,7 @@ function Users() {
                 required
                 disabled={!!editingUser}
               />
-              {fieldErrors.username && <div className="error">{fieldErrors.username}</div>}
+              {fieldErrors.username && <div className="error" role="alert">{fieldErrors.username}</div>}
             </div>
             {!editingUser && (
               <div className="form-group">
@@ -205,7 +205,7 @@ function Users() {
                   required
                   minLength={8}
                 />
-                {fieldErrors.password && <div className="error">{fieldErrors.password}</div>}
+                {fieldErrors.password && <div className="error" role="alert">{fieldErrors.password}</div>}
               </div>
             )}
             <div className="form-group">
@@ -215,7 +215,7 @@ function Users() {
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
-              {fieldErrors.role && <div className="error">{fieldErrors.role}</div>}
+              {fieldErrors.role && <div className="error" role="alert">{fieldErrors.role}</div>}
             </div>
             {form.role === 'TEACHER' && (
               <div className="form-group">
@@ -226,7 +226,7 @@ function Users() {
                     <option key={tch.id} value={tch.id}>{tch.id} - {tch.name} {tch.lastName}</option>
                   ))}
                 </select>
-                {fieldErrors.teacherId && <div className="error">{fieldErrors.teacherId}</div>}
+                {fieldErrors.teacherId && <div className="error" role="alert">{fieldErrors.teacherId}</div>}
               </div>
             )}
             {editingUser && (
@@ -242,7 +242,7 @@ function Users() {
                     />
                     {t('users.fields.enabled')}
                   </label>
-                  {fieldErrors.enabled && <div className="error">{fieldErrors.enabled}</div>}
+                  {fieldErrors.enabled && <div className="error" role="alert">{fieldErrors.enabled}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('users.fields.preferredLanguage')}</label>
@@ -251,7 +251,7 @@ function Users() {
                       <option key={l.value} value={l.value}>{l.label}</option>
                     ))}
                   </select>
-                  {fieldErrors.preferredLanguage && <div className="error">{fieldErrors.preferredLanguage}</div>}
+                  {fieldErrors.preferredLanguage && <div className="error" role="alert">{fieldErrors.preferredLanguage}</div>}
                 </div>
               </>
             )}
@@ -263,7 +263,7 @@ function Users() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card table-wrap">
         <table>
           <thead>
             <tr>
@@ -319,7 +319,7 @@ function Users() {
                         <button type="submit" className="btn btn-primary">{t('common.save')}</button>
                         <button type="button" className="btn btn-secondary" onClick={handleCancelReset}>{t('common.cancel')}</button>
                       </form>
-                      {resetError && <div className="error">{resetError}</div>}
+                      {resetError && <div className="error" role="alert">{resetError}</div>}
                     </td>
                   </tr>
                 )}
@@ -327,7 +327,7 @@ function Users() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ color: '#7f8c8d' }}>{t('users.noUsers')}</td>
+                <td colSpan={7} style={{ color: 'var(--color-text-secondary)' }}>{t('users.noUsers')}</td>
               </tr>
             )}
           </tbody>

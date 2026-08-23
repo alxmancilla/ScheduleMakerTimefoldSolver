@@ -1,3 +1,45 @@
+/*
+ * Design tokens. Previously every one of these was hand-retyped as a raw hex
+ * literal across index.css and ~224 inline style={{}} blocks in components -
+ * fine until a value needed to change everywhere at once (see
+ * --color-text-secondary below, darkened here from the original #7f8c8d to
+ * clear WCAG AA's 4.5:1 contrast on white; #7f8c8d itself was ~3.7:1).
+ * --color-danger-dark and --color-secondary-hover happen to share that same
+ * original #7f8c8d/#c0392b value today but are kept as separate tokens from
+ * --color-text-secondary/--color-danger-text, since a button hover background
+ * and an emphasis-text color don't carry the same contrast requirement as
+ * body text and shouldn't move together just because they started equal.
+ */
+:root {
+  --color-ink: #2c3e50;
+  --color-text-secondary: #5f6b6c;
+  --color-text-on-dark-muted: #bdc3c7;
+  --color-border: #ddd;
+  --color-border-soft: #ecf0f1;
+  --color-surface: #ffffff;
+  --color-page-bg: #f5f5f5;
+
+  --color-header-bg: #2c3e50;
+  --color-header-hover: #34495e;
+  --color-hover-tint: #f0f4f8;
+
+  --color-primary: #3498db;
+  --color-primary-hover: #2980b9;
+  --color-success: #27ae60;
+  --color-success-hover: #229954;
+  --color-danger: #e74c3c;
+  --color-danger-dark: #c0392b;
+  --color-warning: #f39c12;
+  --color-danger-text: #cc0000;
+  --color-danger-bg: #ffeeee;
+  --color-secondary: #95a5a6;
+  --color-secondary-hover: #7f8c8d;
+
+  --color-info-bg: #eaf4fc;
+  --color-info-text: #2c5f8a;
+  --color-table-header-bg: #f8f9fa;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -10,7 +52,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+  background-color: var(--color-page-bg);
 }
 
 code {
@@ -25,7 +67,7 @@ code {
 }
 
 .header {
-  background-color: #2c3e50;
+  background-color: var(--color-header-bg);
   color: white;
   padding: 16px 20px;
   margin-bottom: 30px;
@@ -54,7 +96,7 @@ code {
 .header-term-label {
   font-size: 14px;
   font-weight: normal;
-  color: #bdc3c7;
+  color: var(--color-text-on-dark-muted);
 }
 
 .nav {
@@ -73,7 +115,7 @@ code {
 
 .nav a:hover,
 .nav a.active {
-  background-color: #34495e;
+  background-color: var(--color-header-hover);
 }
 
 .user-box {
@@ -105,11 +147,11 @@ code {
 
 .nav-dropdown-toggle:hover,
 .nav-dropdown-toggle.active {
-  background-color: #34495e;
+  background-color: var(--color-header-hover);
 }
 
 .nav-dropdown-sublabel {
-  color: #bdc3c7;
+  color: var(--color-text-on-dark-muted);
   font-weight: normal;
 }
 
@@ -132,7 +174,7 @@ code {
 }
 
 .nav-toggle:hover {
-  background-color: #34495e;
+  background-color: var(--color-header-hover);
 }
 
 /*
@@ -182,7 +224,7 @@ code {
 }
 
 .nav-dropdown-menu a {
-  color: #2c3e50;
+  color: var(--color-ink);
   text-decoration: none;
   padding: 10px 16px;
   font-size: 14px;
@@ -190,11 +232,11 @@ code {
 
 .nav-dropdown-menu a:hover,
 .nav-dropdown-menu a.active {
-  background-color: #f0f4f8;
+  background-color: var(--color-hover-tint);
 }
 
 .card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
@@ -203,13 +245,13 @@ code {
 
 .card h2 {
   margin-bottom: 15px;
-  color: #2c3e50;
+  color: var(--color-ink);
 }
 
 .tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 2px solid #ecf0f1;
+  border-bottom: 2px solid var(--color-border-soft);
   margin-bottom: 15px;
 }
 
@@ -220,20 +262,26 @@ code {
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
-  color: #7f8c8d;
+  color: var(--color-text-secondary);
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   transition: color 0.2s, border-color 0.2s;
 }
 
 .tab:hover {
-  color: #2c3e50;
+  color: var(--color-ink);
 }
 
 .tab.active {
-  color: #3498db;
-  border-bottom-color: #3498db;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
   font-weight: 600;
+}
+
+/* Wraps a table so a wide grid scrolls inside its own card on narrow
+   viewports instead of forcing the whole page to scroll sideways. */
+.table-wrap {
+  overflow-x: auto;
 }
 
 .btn {
@@ -246,39 +294,39 @@ code {
 }
 
 .btn-primary {
-  background-color: #3498db;
+  background-color: var(--color-primary);
   color: white;
 }
 
 .btn-primary:hover {
-  background-color: #2980b9;
+  background-color: var(--color-primary-hover);
 }
 
 .btn-success {
-  background-color: #27ae60;
+  background-color: var(--color-success);
   color: white;
 }
 
 .btn-success:hover {
-  background-color: #229954;
+  background-color: var(--color-success-hover);
 }
 
 .btn-danger {
-  background-color: #e74c3c;
+  background-color: var(--color-danger);
   color: white;
 }
 
 .btn-danger:hover {
-  background-color: #c0392b;
+  background-color: var(--color-danger-dark);
 }
 
 .btn-secondary {
-  background-color: #95a5a6;
+  background-color: var(--color-secondary);
   color: white;
 }
 
 .btn-secondary:hover {
-  background-color: #7f8c8d;
+  background-color: var(--color-secondary-hover);
 }
 
 table {
@@ -290,17 +338,17 @@ table th,
 table td {
   padding: 12px;
   text-align: left;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--color-border);
 }
 
 table th {
-  background-color: #f8f9fa;
+  background-color: var(--color-table-header-bg);
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--color-ink);
 }
 
 table tr:hover {
-  background-color: #f8f9fa;
+  background-color: var(--color-table-header-bg);
 }
 
 .form-group {
@@ -311,7 +359,7 @@ table tr:hover {
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
-  color: #2c3e50;
+  color: var(--color-ink);
 }
 
 .form-group input,
@@ -319,7 +367,7 @@ table tr:hover {
 .form-group textarea {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 14px;
 }
@@ -328,13 +376,13 @@ table tr:hover {
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: var(--color-primary);
 }
 
 .loading {
   text-align: center;
   padding: 40px;
-  color: #7f8c8d;
+  color: var(--color-text-secondary);
 }
 
 .loading::before {
@@ -343,8 +391,8 @@ table tr:hover {
   width: 32px;
   height: 32px;
   margin: 0 auto 12px;
-  border: 3px solid #ecf0f1;
-  border-top-color: #3498db;
+  border: 3px solid var(--color-border-soft);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: loading-spin 0.8s linear infinite;
 }
@@ -354,16 +402,16 @@ table tr:hover {
 }
 
 .error {
-  background-color: #fee;
-  color: #c00;
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
   padding: 15px;
   border-radius: 4px;
   margin-bottom: 20px;
 }
 
 .info-note {
-  background-color: #eaf4fc;
-  color: #2c5f8a;
+  background-color: var(--color-info-bg);
+  color: var(--color-info-text);
   padding: 10px 14px;
   border-radius: 4px;
   font-size: 13px;
@@ -400,11 +448,11 @@ table tr:hover {
 }
 
 .toast-success {
-  background-color: #27ae60;
+  background-color: var(--color-success);
 }
 
 .toast-error {
-  background-color: #e74c3c;
+  background-color: var(--color-danger);
 }
 
 .toast-close {
@@ -443,7 +491,7 @@ table tr:hover {
 
 .confirm-dialog p {
   margin-bottom: 20px;
-  color: #2c3e50;
+  color: var(--color-ink);
   line-height: 1.4;
 }
 
@@ -464,7 +512,7 @@ table tr:hover {
 }
 
 .pagination-summary {
-  color: #7f8c8d;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 
@@ -475,7 +523,7 @@ table tr:hover {
 }
 
 .pagination-page {
-  color: #2c3e50;
+  color: var(--color-ink);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -489,13 +537,13 @@ table tr:hover {
   width: 100%;
   max-width: 320px;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 4px;
   font-size: 14px;
 }
 
 .search-box input:focus {
   outline: none;
-  border-color: #3498db;
+  border-color: var(--color-primary);
 }
 

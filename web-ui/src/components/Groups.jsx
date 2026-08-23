@@ -285,7 +285,7 @@ function Groups() {
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
         <div className="card">
@@ -321,12 +321,12 @@ function Groups() {
       )}
 
       {showForm && editingGroup && (
-        <div className="card">
+        <div className="card table-wrap">
           <h3>{t('groups.courses.title')}</h3>
-          <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
             {t('groups.courses.description')}
           </p>
-          {coursesError && <div className="error">{coursesError}</div>}
+          {coursesError && <div className="error" role="alert">{coursesError}</div>}
 
           <WriteOnly>
             <div style={{ display: 'flex', gap: '10px', marginTop: '12px', marginBottom: '12px' }}>
@@ -385,7 +385,7 @@ function Groups() {
                                 <option key={qt.id} value={qt.id}>{qt.id} - {qt.name} {qt.lastName}</option>
                               ))}
                             </select>
-                            <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '2px' }}>
+                            <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '2px' }}>
                               {t('groups.courses.noBlocksYetHint')}
                             </div>
                           </>
@@ -430,7 +430,7 @@ function Groups() {
               })}
               {groupCourses.length === 0 && (
                 <tr>
-                  <td colSpan={3} style={{ color: '#7f8c8d' }}>{t('groups.courses.none')}</td>
+                  <td colSpan={3} style={{ color: 'var(--color-text-secondary)' }}>{t('groups.courses.none')}</td>
                 </tr>
               )}
             </tbody>
@@ -438,7 +438,7 @@ function Groups() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card table-wrap">
         <div className="search-box">
           <input
             type="text"

@@ -73,7 +73,7 @@ function Import() {
     <div>
       <div className="card">
         <h2>{t('importExcel.exportTitle')}</h2>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('importExcel.exportDescription')}
         </p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
@@ -88,12 +88,12 @@ function Import() {
             </button>
           ))}
         </div>
-        {exportError && <div className="error" style={{ marginTop: '10px' }}>{exportError}</div>}
+        {exportError && <div className="error" role="alert" style={{ marginTop: '10px' }}>{exportError}</div>}
       </div>
 
       <div className="card">
         <h2>{t('importExcel.title')}</h2>
-        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('importExcel.description')}
         </p>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
@@ -111,7 +111,7 @@ function Import() {
             {importing ? t('importExcel.importing') : `⇪ ${t('importExcel.importButton')}`}
           </button>
         </div>
-        {importError && <div className="error">{importError}</div>}
+        {importError && <div className="error" role="alert">{importError}</div>}
         {importResult && importResult.success && (
           <div style={{ marginTop: '10px', fontSize: '13px', color: '#2e7d32' }}>
             {t('importExcel.importedSummary', {
@@ -125,8 +125,8 @@ function Import() {
         )}
         {importResult && !importResult.success && (
           <div style={{ marginTop: '10px' }}>
-            <div className="error">{t('importExcel.rejected')}</div>
-            <ul style={{ marginTop: '6px', fontSize: '13px', color: '#c0392b' }}>
+            <div className="error" role="alert">{t('importExcel.rejected')}</div>
+            <ul style={{ marginTop: '6px', fontSize: '13px', color: 'var(--color-danger-dark)' }}>
               {importResult.errors.map((e, i) => (
                 <li key={i}>{e}</li>
               ))}

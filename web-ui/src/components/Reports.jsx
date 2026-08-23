@@ -130,12 +130,12 @@ function Reports() {
             </WriteOnly>
           </div>
         </div>
-        <p style={{ marginTop: '10px', color: '#7f8c8d', fontSize: '14px' }}>
+        <p style={{ marginTop: '10px', color: 'var(--color-text-secondary)', fontSize: '14px' }}>
           {t('reports.description')}
         </p>
-        {genError && <div className="error">{genError}</div>}
+        {genError && <div className="error" role="alert">{genError}</div>}
         {status && (
-          <div style={{ marginTop: '10px', fontSize: '13px', color: '#7f8c8d' }}>
+          <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
             {t('reports.lastGeneration')}<strong>{status.state}</strong>
             {status.finishedAt && t('reports.finishedSuffix', { timestamp: formatTimestamp(status.finishedAt) })}
             {status.state === 'RUNNING' && t('reports.runningSuffix')}
@@ -143,7 +143,7 @@ function Reports() {
         )}
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {runs.map((run) => (
         <div className="card" key={run.runId}>
@@ -177,7 +177,7 @@ function Reports() {
               })}
               {run.files.length === 0 && (
                 <tr>
-                  <td colSpan={3} style={{ color: '#7f8c8d' }}>{t('reports.noFilesInRun')}</td>
+                  <td colSpan={3} style={{ color: 'var(--color-text-secondary)' }}>{t('reports.noFilesInRun')}</td>
                 </tr>
               )}
             </tbody>
@@ -187,7 +187,7 @@ function Reports() {
 
       {runs.length === 0 && (
         <div className="card">
-          <p style={{ color: '#7f8c8d' }}>{t('reports.noReportsYet')}</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('reports.noReportsYet')}</p>
         </div>
       )}
     </div>

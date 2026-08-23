@@ -51,7 +51,7 @@ function MySchedule() {
   };
 
   if (loading) return <div className="loading">{t('mySchedule.loading')}</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (error) return <div className="error" role="alert">{error}</div>;
 
   const hasEntries = schedule && schedule.entries.length > 0;
 
@@ -63,12 +63,12 @@ function MySchedule() {
 
       {!hasEntries && (
         <div className="card">
-          <p style={{ color: '#7f8c8d' }}>{t('mySchedule.none')}</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('mySchedule.none')}</p>
         </div>
       )}
 
       {hasEntries && (
-        <div className="card" style={{ overflowX: 'auto' }}>
+        <div className="card table-wrap">
           <table style={{ minWidth: '900px', borderCollapse: 'collapse' }}>
             <thead>
               <tr>

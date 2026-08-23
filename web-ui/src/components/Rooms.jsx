@@ -107,7 +107,7 @@ function Rooms() {
         </div>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error" role="alert">{error}</div>}
 
       {showForm && (
         <div className="card">
@@ -141,7 +141,7 @@ function Rooms() {
         </div>
       )}
 
-      <div className="card">
+      <div className="card table-wrap">
         <div className="search-box">
           <input
             type="text"

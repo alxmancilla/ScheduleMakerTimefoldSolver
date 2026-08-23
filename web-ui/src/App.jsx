@@ -168,7 +168,7 @@ function ProfileNavDropdown({ user, language, onChangeLanguage, onLogout }) {
       {(close) => (
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '160px' }}>
           <div>
-            <label htmlFor="language-select" style={{ display: 'block', fontSize: '12px', color: '#7f8c8d', marginBottom: '4px' }}>
+            <label htmlFor="language-select" style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>
               {t('nav.language')}
             </label>
             <select

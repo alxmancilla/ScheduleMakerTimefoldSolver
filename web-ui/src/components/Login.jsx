@@ -46,11 +46,12 @@ function Login() {
     <div style={{ maxWidth: '360px', margin: '80px auto' }}>
       <div className="card">
         <h2>{t('login.title')}</h2>
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error" role="alert">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>{t('login.username')}</label>
+            <label htmlFor="login-username">{t('login.username')}</label>
             <input
+              id="login-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -60,8 +61,9 @@ function Login() {
             />
           </div>
           <div className="form-group">
-            <label>{t('login.password')}</label>
+            <label htmlFor="login-password">{t('login.password')}</label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
