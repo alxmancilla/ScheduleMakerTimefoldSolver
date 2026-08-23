@@ -876,13 +876,31 @@ CREATE TABLE IF NOT EXISTS schedule_run (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     hard_score INTEGER NOT NULL,
-    soft_score INTEGER NOT NULL
+    soft_score INTEGER NOT NULL,
+    -- Effective local search time budget used for this run (solverConfig.xml's
+    -- own defaults unless overridden) - always populated, never null, so a run
+    -- without an override is still fully described.
+    minutes_spent_limit INTEGER NOT NULL DEFAULT 5,
+    unimproved_minutes_spent_limit INTEGER NOT NULL DEFAULT 2
 );
 
+-- Frozen per-(run, assignment) snapshot: both the solved timeslot AND the
+-- input fields the solver saw for that assignment at that moment. The
+-- group/course/teacher/room columns are a copy, not a live FK - a later
+-- rename or deletion of that teacher/room/course/group must not alter or
+-- break a historical run's snapshot.
 CREATE TABLE IF NOT EXISTS schedule_run_result (
     schedule_run_id INTEGER NOT NULL REFERENCES schedule_run(id) ON DELETE CASCADE,
     assignment_id VARCHAR(100) NOT NULL REFERENCES course_block_assignment(id) ON DELETE CASCADE,
     block_timeslot_id VARCHAR(50) REFERENCES block_timeslot(id),
+    group_id VARCHAR(100),
+    course_id VARCHAR(100),
+    block_length INTEGER,
+    pinned BOOLEAN,
+    teacher_id VARCHAR(100),
+    room_name VARCHAR(100),
+    satisfies_room_type VARCHAR(100),
+    preferred_room_hint VARCHAR(100),
     PRIMARY KEY (schedule_run_id, assignment_id)
 );
 

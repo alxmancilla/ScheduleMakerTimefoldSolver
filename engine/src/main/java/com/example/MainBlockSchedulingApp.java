@@ -72,8 +72,8 @@ public class MainBlockSchedulingApp {
         // override point existed.
         Long minutesSpentLimit = parseLongEnv("SOLVER_MINUTES_LIMIT");
         Long unimprovedMinutesSpentLimit = parseLongEnv("SOLVER_UNIMPROVED_MINUTES_LIMIT");
-        SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory(minutesSpentLimit,
-                unimprovedMinutesSpentLimit);
+        SchoolSolverConfig.Built built = SchoolSolverConfig.build(minutesSpentLimit, unimprovedMinutesSpentLimit);
+        SolverFactory<SchoolSchedule> solverFactory = built.factory();
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
 
         // Add event listener to track progress. Best-solution events can fire very
@@ -141,7 +141,7 @@ public class MainBlockSchedulingApp {
         System.out.println("=== Saving to Database ===");
         DataSaver dataSaver = new DataSaver(jdbcUrl, username, password);
         try {
-            dataSaver.saveSchedule(solvedSchedule);
+            dataSaver.saveSchedule(solvedSchedule, built.minutesSpentLimit(), built.unimprovedMinutesSpentLimit());
 
             // Print statistics
             System.out.println();

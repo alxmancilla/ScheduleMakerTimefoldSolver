@@ -25,19 +25,35 @@ public class SchoolSolverConfig {
      */
     public static SolverFactory<SchoolSchedule> buildSolverFactory(Long minutesSpentLimit,
             Long unimprovedMinutesSpentLimit) {
+        return build(minutesSpentLimit, unimprovedMinutesSpentLimit).factory();
+    }
+
+    /**
+     * Same as {@link #buildSolverFactory(Long, Long)}, but also returns the
+     * *effective* time budget actually resolved (the override if given,
+     * otherwise solverConfig.xml's own value) - so a caller that records a run
+     * (see DataSaver) can persist what was really used, not just what was
+     * explicitly passed in.
+     */
+    public static Built build(Long minutesSpentLimit, Long unimprovedMinutesSpentLimit) {
         try {
             SolverConfig solverConfig = SolverConfig.createFromXmlResource("solverConfig.xml");
-            if (minutesSpentLimit != null || unimprovedMinutesSpentLimit != null) {
-                applyTerminationOverrides(solverConfig, minutesSpentLimit, unimprovedMinutesSpentLimit);
+            TerminationConfig terminationConfig = resolveLocalSearchTermination(solverConfig);
+            if (minutesSpentLimit != null) {
+                terminationConfig.setMinutesSpentLimit(minutesSpentLimit);
             }
-            return SolverFactory.create(solverConfig);
+            if (unimprovedMinutesSpentLimit != null) {
+                terminationConfig.setUnimprovedMinutesSpentLimit(unimprovedMinutesSpentLimit);
+            }
+            SolverFactory<SchoolSchedule> factory = SolverFactory.create(solverConfig);
+            return new Built(factory, terminationConfig.getMinutesSpentLimit(),
+                    terminationConfig.getUnimprovedMinutesSpentLimit());
         } catch (Exception e) {
             throw new RuntimeException("Failed to load solver configuration", e);
         }
     }
 
-    private static void applyTerminationOverrides(SolverConfig solverConfig, Long minutesSpentLimit,
-            Long unimprovedMinutesSpentLimit) {
+    private static TerminationConfig resolveLocalSearchTermination(SolverConfig solverConfig) {
         for (PhaseConfig<?> phaseConfig : solverConfig.getPhaseConfigList()) {
             if (!(phaseConfig instanceof LocalSearchPhaseConfig localSearchPhaseConfig)) {
                 continue;
@@ -47,15 +63,14 @@ public class SchoolSolverConfig {
                 terminationConfig = new TerminationConfig();
                 localSearchPhaseConfig.setTerminationConfig(terminationConfig);
             }
-            if (minutesSpentLimit != null) {
-                terminationConfig.setMinutesSpentLimit(minutesSpentLimit);
-            }
-            if (unimprovedMinutesSpentLimit != null) {
-                terminationConfig.setUnimprovedMinutesSpentLimit(unimprovedMinutesSpentLimit);
-            }
-            return;
+            return terminationConfig;
         }
         throw new IllegalStateException(
                 "solverConfig.xml has no <localSearch> phase to apply termination overrides to");
+    }
+
+    /** The built solver factory plus the effective (override-or-XML-default) time budget it resolved. */
+    public record Built(SolverFactory<SchoolSchedule> factory, Long minutesSpentLimit,
+            Long unimprovedMinutesSpentLimit) {
     }
 }

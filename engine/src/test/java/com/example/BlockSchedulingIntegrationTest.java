@@ -143,7 +143,7 @@ public class BlockSchedulingIntegrationTest {
 
                 // SAVE the solved timeslot assignments back to the database.
                 DataSaver saver = new DataSaver(url, user, password);
-                saver.saveSchedule(solved);
+                saver.saveSchedule(solved, null, null);
 
                 // VERIFY: the persisted schedule reports assigned blocks (teacher, room
                 // and timeslot all set).

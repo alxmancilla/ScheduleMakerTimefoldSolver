@@ -236,10 +236,14 @@ export const deleteCalendarException = (date) =>
   api.delete(`/admin/calendar-exceptions/${encodeURIComponent(date)}`);
 
 // Schedule
-export const getScheduleView = () => api.get('/schedule/view');
-export const getScheduleViewByGroup = (groupId) => api.get(`/schedule/view/group/${groupId}`);
-export const getScheduleViewByTeacher = (teacherId) => api.get(`/schedule/view/teacher/${teacherId}`);
-export const getScheduleViewByRoom = (roomName) => api.get(`/schedule/view/room/${roomName}`);
+export const getScheduleRuns = () => api.get('/schedule/runs');
+export const getScheduleView = (runId) => api.get('/schedule/view', { params: runId ? { runId } : {} });
+export const getScheduleViewByGroup = (groupId, runId) =>
+  api.get(`/schedule/view/group/${groupId}`, { params: runId ? { runId } : {} });
+export const getScheduleViewByTeacher = (teacherId, runId) =>
+  api.get(`/schedule/view/teacher/${teacherId}`, { params: runId ? { runId } : {} });
+export const getScheduleViewByRoom = (roomName, runId) =>
+  api.get(`/schedule/view/room/${roomName}`, { params: runId ? { runId } : {} });
 export const getMyScheduleView = () => api.get('/schedule/view/me');
 
 export default api;

@@ -19,6 +19,25 @@ import org.hibernate.annotations.Immutable;
 @Table(name = "course_block_assignment_current")
 public class CourseBlockAssignmentCurrentEntity {
 
+    public CourseBlockAssignmentCurrentEntity() {
+    }
+
+    /** For tests only - @Immutable already prevents Hibernate from ever persisting through this entity. */
+    public CourseBlockAssignmentCurrentEntity(String id, String groupId, String courseId, Integer blockLength,
+            Boolean pinned, String teacherId, String blockTimeslotId, String roomName, String satisfiesRoomType,
+            String preferredRoomHint) {
+        this.id = id;
+        this.groupId = groupId;
+        this.courseId = courseId;
+        this.blockLength = blockLength;
+        this.pinned = pinned;
+        this.teacherId = teacherId;
+        this.blockTimeslotId = blockTimeslotId;
+        this.roomName = roomName;
+        this.satisfiesRoomType = satisfiesRoomType;
+        this.preferredRoomHint = preferredRoomHint;
+    }
+
     @Id
     @Column(name = "id", length = 100)
     private String id;

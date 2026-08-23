@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getScheduleView, getGroups } from '../api';
+import { getScheduleView, getScheduleRuns, getGroups } from '../api';
 import { formatHour } from '../constants';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
+const formatRunTimestamp = (value) => (value ? value.replace('T', ' ').split('.')[0] : '-');
 
 function Schedule() {
   const { t } = useTranslation();
@@ -15,10 +16,14 @@ function Schedule() {
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
+  const [runs, setRuns] = useState([]);
+  // '' means "latest" (no runId sent - the current schedule).
+  const [selectedRunId, setSelectedRunId] = useState('');
 
   useEffect(() => {
     loadGroups();
-    loadSchedule();
+    loadRuns();
+    loadSchedule('');
   }, []);
 
   useEffect(() => {
@@ -37,10 +42,19 @@ function Schedule() {
     }
   };
 
-  const loadSchedule = async () => {
+  const loadRuns = async () => {
+    try {
+      const response = await getScheduleRuns();
+      setRuns(response.data);
+    } catch (err) {
+      console.error('Failed to load run history:', err);
+    }
+  };
+
+  const loadSchedule = async (runId) => {
     try {
       setLoading(true);
-      const response = await getScheduleView();
+      const response = await getScheduleView(runId || undefined);
       setSchedule(response.data);
       setError(null);
     } catch (err) {
@@ -48,6 +62,12 @@ function Schedule() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRunChange = (e) => {
+    const runId = e.target.value;
+    setSelectedRunId(runId);
+    loadSchedule(runId);
   };
 
   // Get unique teachers for the selected group
@@ -127,6 +147,28 @@ function Schedule() {
         {/* Filters */}
         <div style={{ marginTop: '20px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="runFilter" style={{ fontWeight: 'bold' }}>{t('schedule.run')}</label>
+            <select
+              id="runFilter"
+              value={selectedRunId}
+              onChange={handleRunChange}
+              style={{ padding: '8px', minWidth: '260px' }}
+            >
+              <option value="">{t('schedule.latestRun')}</option>
+              {runs.map((run) => (
+                <option key={run.id} value={run.id}>
+                  {t('schedule.runOption', {
+                    id: run.id,
+                    timestamp: formatRunTimestamp(run.createdAt),
+                    hard: run.hardScore,
+                    soft: run.softScore,
+                  })}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label htmlFor="groupFilter" style={{ fontWeight: 'bold' }}>{t('schedule.group')}</label>
             <select
               id="groupFilter"
@@ -172,6 +214,11 @@ function Schedule() {
           {selectedGroupId && t('schedule.groupSuffix', { name: groups.find(g => g.id === selectedGroupId)?.name || selectedGroupId })}
           {selectedTeacherId && t('schedule.teacherSuffix', { name: teachersForGroup.find(t2 => t2.id === selectedTeacherId)?.name || selectedTeacherId })}
         </p>
+        {selectedRunId && (
+          <p style={{ marginTop: '6px', color: '#c0392b', fontSize: '13px' }}>
+            {t('schedule.pastRunNotice')}
+          </p>
+        )}
       </div>
 
       <div className="card" style={{ overflowX: 'auto' }}>

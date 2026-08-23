@@ -17,7 +17,6 @@ import ProtectedRoute from './auth/ProtectedRoute';
 import AdminRoute from './auth/AdminRoute';
 import AdminOnly from './auth/AdminOnly';
 import WriteRoute from './auth/WriteRoute';
-import WriteOnly from './auth/WriteOnly';
 import { useAuth } from './auth/AuthContext';
 import { getTerm, TERM_UPDATED_EVENT } from './api';
 
@@ -32,6 +31,12 @@ const SETUP_ITEMS = [
 const ADMIN_ITEMS = [
   { path: '/settings', labelKey: 'nav.settings' },
   { path: '/users', labelKey: 'nav.users' },
+];
+// Reports is READER+ (no gate); Import is WRITER+ (writeOnly) - filtered per
+// role before rendering, unlike SETUP_ITEMS/ADMIN_ITEMS which are uniform.
+const TOOLS_ITEMS = [
+  { path: '/reports', labelKey: 'nav.reports' },
+  { path: '/import', labelKey: 'nav.import', writeOnly: true },
 ];
 
 /**
@@ -94,6 +99,32 @@ function SetupNavDropdown() {
       {(close) => (
         <>
           {SETUP_ITEMS.map((item) => (
+            <NavLink key={item.path} to={item.path} className={navLinkClass} onClick={close}>
+              {t(item.labelKey)}
+            </NavLink>
+          ))}
+        </>
+      )}
+    </NavDropdown>
+  );
+}
+
+function ToolsNavDropdown() {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const { canWrite } = useAuth();
+  const visibleItems = TOOLS_ITEMS.filter((item) => !item.writeOnly || canWrite());
+  const activeItem = visibleItems.find((item) => item.path === location.pathname);
+
+  return (
+    <NavDropdown
+      label={t('nav.tools')}
+      active={!!activeItem}
+      activeLabel={activeItem ? t(activeItem.labelKey) : null}
+    >
+      {(close) => (
+        <>
+          {visibleItems.map((item) => (
             <NavLink key={item.path} to={item.path} className={navLinkClass} onClick={close}>
               {t(item.labelKey)}
             </NavLink>
@@ -244,11 +275,8 @@ function Layout() {
               <>
                 <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
                 <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
-                <NavLink to="/reports" className={navLinkClass}>{t('nav.reports')}</NavLink>
                 <SetupNavDropdown />
-                <WriteOnly>
-                  <NavLink to="/import" className={navLinkClass}>{t('nav.import')}</NavLink>
-                </WriteOnly>
+                <ToolsNavDropdown />
                 <AdminOnly>
                   <AdminNavDropdown />
                 </AdminOnly>
