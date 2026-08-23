@@ -32,24 +32,43 @@ function Assignments() {
   const [filter, setFilter] = useState('all'); // 'all', 'assigned', 'unassigned', 'pinned'
   const [searchQuery, setSearchQuery] = useState('');
   // Controlled (unlike the rest of the form, which reads from FormData on submit) so
-  // selecting a group can suggest that group's preferred room, a course can suggest its
-  // own room requirement, and Room/Preferred Room can be filtered by - and cleared when
-  // they no longer match - Satisfies Room Type.
+  // selecting a group can suggest that group's preferred room and filter Course to only
+  // that group's courses, a course can suggest its own room requirement and filter
+  // Teacher to only qualified teachers, and Room/Preferred Room can be filtered by - and
+  // cleared when they no longer match - Satisfies Room Type.
   const [groupId, setGroupId] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [teacherId, setTeacherId] = useState('');
   const [roomName, setRoomName] = useState('');
   const [satisfiesRoomType, setSatisfiesRoomType] = useState('');
-  const [preferredRoomName, setPreferredRoomName] = useState('');
+  const [preferredRoomHint, setPreferredRoomHint] = useState('');
 
   // Mirrors Room.satisfiesRequirement() (engine domain model): a room satisfies a
-  // requirement of its own type, and a laboratorio additionally satisfies estándar
-  // (it's equipped with desks/board too), but never the reverse.
+  // requirement of its own type, and a mixto room additionally satisfies estándar
+  // and taller (it's equipped for both), but never the reverse.
   const roomMatchesType = (room, requiredType) => {
     if (!requiredType) return true;
     if (!room) return false;
-    return room.type === requiredType || (room.type === 'laboratorio' && requiredType === 'estándar');
+    return room.type === requiredType
+      || (room.type === 'mixto' && (requiredType === 'estándar' || requiredType === 'taller'));
   };
   const roomsMatchingType = (requiredType) => rooms.filter((r) => roomMatchesType(r, requiredType));
+
+  // Group.courses / Teacher.qualifications come embedded from getGroups()/getTeachers(),
+  // so filtering Course by group and Teacher by course needs no extra requests.
+  const coursesForGroup = (gId) => {
+    const group = groups.find((g) => g.id === gId);
+    if (!group) return courses;
+    const names = new Set(group.courses.map((gc) => gc.courseName));
+    return courses.filter((c) => names.has(c.name));
+  };
+  const teacherQualifiedFor = (teacher, courseName) =>
+    !courseName || teacher.qualifications.some((q) => q.qualification === courseName);
+  const teachersForCourse = (cId) => {
+    const course = courses.find((c) => c.id === cId);
+    if (!course) return teachers;
+    return teachers.filter((t) => teacherQualifiedFor(t, course.name));
+  };
 
   /**
    * Sets Satisfies Room Type and clears Room/Preferred Room if they no longer match it -
@@ -60,8 +79,8 @@ function Assignments() {
     setSatisfiesRoomType(newType);
     const currentRoom = rooms.find((r) => r.name === roomName);
     if (!roomMatchesType(currentRoom, newType)) setRoomName('');
-    const currentPreferred = rooms.find((r) => r.name === preferredRoomName);
-    if (!roomMatchesType(currentPreferred, newType)) setPreferredRoomName('');
+    const currentPreferred = rooms.find((r) => r.name === preferredRoomHint);
+    if (!roomMatchesType(currentPreferred, newType)) setPreferredRoomHint('');
   };
 
   const timeslotLabel = (ts) => {
@@ -142,7 +161,7 @@ function Assignments() {
       blockTimeslotId,
       roomName: formData.get('roomName') || null,
       satisfiesRoomType: formData.get('satisfiesRoomType') || null,
-      preferredRoomName: formData.get('preferredRoomName') || null,
+      preferredRoomHint: formData.get('preferredRoomHint') || null,
     };
 
     try {
@@ -171,9 +190,10 @@ function Assignments() {
     setEditingAssignment(assignment);
     setGroupId(assignment.groupId || '');
     setCourseId(assignment.courseId || '');
+    setTeacherId(assignment.teacherId || '');
     setRoomName(assignment.roomName || '');
     setSatisfiesRoomType(assignment.satisfiesRoomType || '');
-    setPreferredRoomName(assignment.preferredRoomName || '');
+    setPreferredRoomHint(assignment.preferredRoomHint || '');
     setFieldErrors({});
     setError(null);
     setShowForm(true);
@@ -183,9 +203,10 @@ function Assignments() {
     setEditingAssignment(null);
     setGroupId('');
     setCourseId('');
+    setTeacherId('');
     setRoomName('');
     setSatisfiesRoomType('');
-    setPreferredRoomName('');
+    setPreferredRoomHint('');
     setFieldErrors({});
     setError(null);
     setShowForm(true);
@@ -290,13 +311,20 @@ function Assignments() {
                   // empty (never clobber a value the user or the loaded assignment already
                   // set) and only when it actually matches Satisfies Room Type if that's
                   // already set - e.g. don't suggest a group's regular classroom onto a block
-                  // that's already marked as requiring a laboratorio.
-                  if (!preferredRoomName) {
+                  // that's already marked as requiring a mixto room.
+                  if (!preferredRoomHint) {
                     const group = groups.find((g) => g.id === newGroupId);
                     const candidateRoom = rooms.find((r) => r.name === group?.preferredRoomName);
                     if (group?.preferredRoomName && roomMatchesType(candidateRoom, satisfiesRoomType)) {
-                      setPreferredRoomName(group.preferredRoomName);
+                      setPreferredRoomHint(group.preferredRoomName);
                     }
+                  }
+                  // Course is scoped to this group's own courses below - clear it (and the
+                  // Teacher that depends on it) instead of silently keeping a course the new
+                  // group doesn't even take.
+                  if (courseId && !coursesForGroup(newGroupId).some((c) => c.id === courseId)) {
+                    setCourseId('');
+                    setTeacherId('');
                   }
                 }}
                 required
@@ -322,14 +350,24 @@ function Assignments() {
                     const course = courses.find((c) => c.id === newCourseId);
                     if (course?.roomRequirement) applySatisfiesRoomType(course.roomRequirement);
                   }
+                  // Teacher is scoped to this course's qualified teachers below - clear it
+                  // instead of silently keeping a teacher who isn't qualified for it.
+                  if (teacherId && !teachersForCourse(newCourseId).some((teacher) => teacher.id === teacherId)) {
+                    setTeacherId('');
+                  }
                 }}
                 required
               >
                 <option value="" disabled>{t('assignments.fields.coursePlaceholder')}</option>
-                {courses.map((c) => (
+                {coursesForGroup(groupId).map((c) => (
                   <option key={c.id} value={c.id}>{c.id} - {c.name}</option>
                 ))}
               </select>
+              {groupId && (
+                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                  {t('assignments.courseFilteredHint')}
+                </div>
+              )}
               {fieldErrors.courseId && <div className="error">{fieldErrors.courseId}</div>}
             </div>
             <div className="form-group">
@@ -343,12 +381,17 @@ function Assignments() {
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.teacher')}</label>
-              <select name="teacherId" defaultValue={editingAssignment?.teacherId || ''}>
+              <select name="teacherId" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
                 <option value="">{t('common.noneOption')}</option>
-                {teachers.map((tc) => (
+                {teachersForCourse(courseId).map((tc) => (
                   <option key={tc.id} value={tc.id}>{tc.id} - {tc.name} {tc.lastName}</option>
                 ))}
               </select>
+              {courseId && (
+                <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                  {t('assignments.teacherFilteredHint')}
+                </div>
+              )}
               {fieldErrors.teacherId && <div className="error">{fieldErrors.teacherId}</div>}
             </div>
             <div className="form-group">
@@ -364,9 +407,9 @@ function Assignments() {
             <div className="form-group">
               <label>{t('assignments.fields.preferredRoom')}</label>
               <select
-                name="preferredRoomName"
-                value={preferredRoomName}
-                onChange={(e) => setPreferredRoomName(e.target.value)}
+                name="preferredRoomHint"
+                value={preferredRoomHint}
+                onChange={(e) => setPreferredRoomHint(e.target.value)}
               >
                 <option value="">{t('common.noneOption')}</option>
                 {roomsMatchingType(satisfiesRoomType).map((r) => (
@@ -376,7 +419,7 @@ function Assignments() {
               <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
                 {t('assignments.preferredRoomHint')}
               </div>
-              {fieldErrors.preferredRoomName && <div className="error">{fieldErrors.preferredRoomName}</div>}
+              {fieldErrors.preferredRoomHint && <div className="error">{fieldErrors.preferredRoomHint}</div>}
             </div>
             <div className="form-group">
               <label>{t('assignments.fields.satisfiesRoomType')}</label>

@@ -29,7 +29,7 @@ public class CourseBlockAssignment {
 
     // NEW: Support for dual room requirements and custom block decomposition
     private String satisfiesRoomType; // Which room requirement this block satisfies
-    private String preferredRoomName; // Preferred room for soft constraint optimization
+    private String preferredRoomHint; // Preferred room for soft constraint optimization
 
     public CourseBlockAssignment() {
         // No-arg constructor required by Timefold
@@ -116,12 +116,12 @@ public class CourseBlockAssignment {
         this.satisfiesRoomType = satisfiesRoomType;
     }
 
-    public String getPreferredRoomName() {
-        return preferredRoomName;
+    public String getPreferredRoomHint() {
+        return preferredRoomHint;
     }
 
-    public void setPreferredRoomName(String preferredRoomName) {
-        this.preferredRoomName = preferredRoomName;
+    public void setPreferredRoomHint(String preferredRoomHint) {
+        this.preferredRoomHint = preferredRoomHint;
     }
 
     @Override

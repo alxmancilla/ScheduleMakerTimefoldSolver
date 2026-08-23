@@ -18,6 +18,11 @@ public class Course {
     private List<RoomRequirement> roomRequirements;
     private List<BlockTemplate> blockTemplates;
 
+    // Per-component HARD limit on how many blocks of this course may land on the
+    // same day for the same group, sourced from component_block_rule. Null until
+    // DataLoader populates it; the solver falls back to a code default when null.
+    private Integer maxBlocksPerDay;
+
     public Course(String id, String name, String abbreviation, Integer semester, String component,
             String roomRequirement, int requiredHoursPerWeek, Boolean active) {
         this.id = id;
@@ -90,6 +95,14 @@ public class Course {
 
     public void setBlockTemplates(List<BlockTemplate> blockTemplates) {
         this.blockTemplates = blockTemplates;
+    }
+
+    public Integer getMaxBlocksPerDay() {
+        return maxBlocksPerDay;
+    }
+
+    public void setMaxBlocksPerDay(Integer maxBlocksPerDay) {
+        this.maxBlocksPerDay = maxBlocksPerDay;
     }
 
     // NEW: Helper methods

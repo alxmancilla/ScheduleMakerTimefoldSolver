@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses, getAssignments } from '../api';
+import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses, getAssignments, getRooms } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
@@ -21,7 +21,7 @@ const DAY_LABELS = [
 // possible) only occupies the 14:00-15:00 hour - "available at 15" is never checked by
 // the solver (Teacher.isAvailableForBlock loops hour < endHour, so 15 is never reached).
 const AVAILABILITY_HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
-const EMPTY_FORM = { id: '', name: '', lastName: '', maxHoursPerWeek: 40 };
+const EMPTY_FORM = { id: '', name: '', lastName: '', maxHoursPerWeek: 40, requiredRoomName: '' };
 
 function Teachers() {
   const { t } = useTranslation();
@@ -37,6 +37,7 @@ function Teachers() {
   const [qualifications, setQualifications] = useState([]);
   const [qualInput, setQualInput] = useState('');
   const [courseNames, setCourseNames] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const qualBoxRef = useRef(null);
   const [availability, setAvailability] = useState(new Set());
@@ -47,7 +48,17 @@ function Teachers() {
     loadTeachers();
     loadCourseNames();
     loadWorkload();
+    loadRooms();
   }, []);
+
+  const loadRooms = async () => {
+    try {
+      const response = await getRooms();
+      setRooms(response.data);
+    } catch (err) {
+      // Non-critical: the required-room dropdown just won't have options.
+    }
+  };
 
   // Current teacher workload: hours already placed on the schedule, computed
   // client-side from the existing assignments list (blockLength summed per
@@ -168,6 +179,7 @@ function Teachers() {
       name: form.name,
       lastName: form.lastName,
       maxHoursPerWeek: parseInt(form.maxHoursPerWeek, 10),
+      requiredRoomName: form.requiredRoomName || null,
       qualifications,
       availability: Array.from(availability).map((key) => {
         const [dayOfWeek, hour] = key.split('-').map(Number);
@@ -207,6 +219,7 @@ function Teachers() {
       name: teacher.name || '',
       lastName: teacher.lastName || '',
       maxHoursPerWeek: teacher.maxHoursPerWeek ?? 40,
+      requiredRoomName: teacher.requiredRoomName || '',
     });
     setQualifications((teacher.qualifications || []).map((q) => q.qualification));
     setQualInput('');
@@ -299,6 +312,19 @@ function Teachers() {
                 required
               />
               {fieldErrors.maxHoursPerWeek && <div className="error">{fieldErrors.maxHoursPerWeek}</div>}
+            </div>
+            <div className="form-group">
+              <label>{t('teachers.fields.requiredRoom')}</label>
+              <select name="requiredRoomName" value={form.requiredRoomName} onChange={handleField}>
+                <option value="">{t('common.noneOption')}</option>
+                {rooms.map((room) => (
+                  <option key={room.name} value={room.name}>{room.name}</option>
+                ))}
+              </select>
+              <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '4px' }}>
+                {t('teachers.requiredRoomHint')}
+              </div>
+              {fieldErrors.requiredRoomName && <div className="error">{fieldErrors.requiredRoomName}</div>}
             </div>
 
             <div className="form-group">
@@ -478,6 +504,7 @@ function Teachers() {
               <th>{t('teachers.table.maxHoursWeek')}</th>
               <th>{t('teachers.table.workload')}</th>
               <th>{t('teachers.table.qualifications')}</th>
+              <th>{t('teachers.table.requiredRoom')}</th>
               <th>{t('teachers.table.actions')}</th>
             </tr>
           </thead>
@@ -507,6 +534,7 @@ function Teachers() {
                   })()}
                 </td>
                 <td>{(teacher.qualifications || []).map((q) => q.qualification).join(', ')}</td>
+                <td>{teacher.requiredRoomName || '-'}</td>
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(teacher)} style={{ marginRight: '5px' }}>

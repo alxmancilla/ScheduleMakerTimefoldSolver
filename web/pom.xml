@@ -16,7 +16,59 @@
     <name>Schedule Maker Web</name>
     <description>Spring Boot REST API for schedule management</description>
 
+    <dependencyManagement>
+        <dependencies>
+            <!-- Overrides spring-boot-dependencies' pinned Testcontainers 1.19.3
+                 (see the testcontainers.version property comment in the root pom)
+                 for every transitive Testcontainers module, not just the two
+                 declared directly below. -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Overrides spring-boot-dependencies' pinned Mockito 5.7.0 (with
+                 byte-buddy 1.14.10) - too old to instrument classes on newer
+                 JDKs (observed: every @MockBean-based test fails the whole
+                 module's ApplicationContext with "Mockito cannot mock this
+                 class" / "Could not modify all classes" on Java 26, then
+                 cascades into ~100 unrelated "ApplicationContext failure
+                 threshold exceeded" errors via Spring's test-context cache).
+                 Only web uses Mockito/mockito-junit-jupiter (transitively via
+                 spring-boot-starter-test); no other module is affected. -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy-agent</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!-- Shared business rules (no framework/persistence deps) -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>scheduler-common</artifactId>
+        </dependency>
+
         <!-- Spring Boot Starter Web (includes REST, Jackson, Tomcat) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -76,6 +128,24 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Testcontainers: real, disposable PostgreSQL for the *IT integration
+             tests (Failsafe, `mvn verify`, requires Docker) - never pulled in by
+             plain `mvn test` (Surefire), which stays Docker-free. Version pinned
+             explicitly rather than left to spring-boot-dependencies (1.19.3):
+             that docker-java client can't talk to newer Docker Engine/Desktop
+             releases (tested against Docker Engine 29.7.2, API 1.55) - gets a
+             malformed/empty response instead of a real connection. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -88,6 +158,24 @@
                     <execution>
                         <goals>
                             <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Failsafe: runs *IT.java integration tests during `mvn verify`,
+                 separately from Surefire's `mvn test` unit-test run. Keeps the
+                 Testcontainers/Docker dependency out of the fast, default
+                 `mvn test` path documented in CLAUDE.md/README.md. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
                         </goals>
                     </execution>
                 </executions>

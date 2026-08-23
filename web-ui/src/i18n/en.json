@@ -74,9 +74,11 @@
       "name": "Name:",
       "lastName": "Last Name:",
       "maxHoursPerWeek": "Max Hours Per Week:",
+      "requiredRoom": "Required Room (optional):",
       "qualifications": "Courses:",
       "availability": "Availability:"
     },
+    "requiredRoomHint": "If set, this teacher is always placed in this room, overriding the group's preferred room, whenever a block's room type allows it.",
     "qualificationsPlaceholder": "Type at least 2 letters to search courses, or add a course and press Enter",
     "add": "Add",
     "noQualifications": "No courses added",
@@ -89,6 +91,7 @@
       "maxHoursWeek": "Max Hours/Week",
       "workload": "Workload",
       "qualifications": "Courses",
+      "requiredRoom": "Required Room",
       "actions": "Actions"
     },
     "available": "available",
@@ -267,11 +270,19 @@
       "removeFailedPrefix": "Failed to remove course: ",
       "confirmRemove": "Remove this course from the group? (Existing schedule blocks are not affected, only future \"Generate Blocks\" runs.)",
       "table": {
-        "course": "Course"
+        "course": "Course",
+        "teacher": "Teacher"
       },
       "none": "This group has no courses yet.",
       "addedMessage": "Course added to group",
-      "removedMessage": "Course removed from group"
+      "removedMessage": "Course removed from group",
+      "noQualifiedTeacherShort": "no qualified teacher",
+      "noQualifiedTeacherHint": "No teacher currently has this course as a qualification. Add it in Teachers before this course can be assigned a block.",
+      "noBlocksYet": "no blocks yet",
+      "noBlocksYetHint": "No blocks yet - pick a teacher and it will be applied automatically once you run \"Generate Blocks\" (Settings).",
+      "teacherUpdatedMessage": "Teacher assigned to this course's blocks",
+      "teacherUpdateFailedPrefix": "Failed to assign teacher: ",
+      "defaultTeacherSavedMessage": "Teacher pre-assigned - will apply when blocks are generated"
     },
     "savedMessage": "Group saved",
     "deletedMessage": "Group deleted",
@@ -328,7 +339,9 @@
     "searchPlaceholder": "Search by group, course, teacher, or room...",
     "preferredRoomHint": "Defaults to the selected group's preferred room, if it has one; pick a different room to override.",
     "roomFilteredHint": "Showing only rooms that satisfy \"{{type}}\".",
-    "satisfiesRoomTypeHint": "Defaults to the selected course's room requirement, if it has one; pick a different type to override."
+    "satisfiesRoomTypeHint": "Defaults to the selected course's room requirement, if it has one; pick a different type to override.",
+    "courseFilteredHint": "Showing only courses the selected group takes.",
+    "teacherFilteredHint": "Showing only teachers qualified for the selected course."
   },
   "reports": {
     "title": "Reports",
@@ -458,6 +471,34 @@
         "method": "Method",
         "path": "Path",
         "status": "Status"
+      }
+    },
+    "blockRules": {
+      "title": "Block Rules",
+      "description": "Sets the preferred block size (1-4h) used to decompose a course's weekly hours when generating blocks, and the max blocks per day the solver allows for the same course/group, per course component. A component with no rule here defaults to 2h blocks and 2 blocks/day.",
+      "addRule": "+ Add Rule",
+      "editRule": "Edit Block Rule",
+      "newRule": "New Block Rule",
+      "loadFailedPrefix": "Failed to load block rules: ",
+      "saveFailedPrefix": "Failed to save block rule: ",
+      "deleteFailedPrefix": "Failed to reset block rule: ",
+      "confirmDelete": "Reset {{component}} to the defaults (2h blocks, 2 blocks/day)?",
+      "savedMessage": "Block rule saved",
+      "deletedMessage": "Block rule reset to default",
+      "none": "No custom block rules configured — every component uses the default 2h block size and 2 blocks/day.",
+      "resetToDefault": "Reset to Default",
+      "saving": "Saving...",
+      "sizeHint": "Blocks are packed greedily at this size, with a smaller trailing block for any leftover hours.",
+      "maxBlocksPerDayHint": "The solver will not place more than this many blocks of the same course, for the same group, on one day.",
+      "fields": {
+        "component": "Component:",
+        "preferredBlockSize": "Preferred Block Size (hours):",
+        "maxBlocksPerDay": "Max Blocks Per Day:"
+      },
+      "table": {
+        "component": "Component",
+        "preferredBlockSize": "Preferred Block Size",
+        "maxBlocksPerDay": "Max Blocks/Day"
       }
     }
   },

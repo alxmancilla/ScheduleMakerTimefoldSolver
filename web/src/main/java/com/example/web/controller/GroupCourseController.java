@@ -1,11 +1,14 @@
 package com.example.web.controller;
 
 import com.example.web.dto.AddGroupCourseRequest;
+import com.example.web.dto.SetGroupCourseTeacherRequest;
 import com.example.web.entity.GroupCourseEntity;
 import com.example.web.entity.StudentGroupEntity;
+import com.example.web.entity.TeacherEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.StudentGroupRepository;
+import com.example.web.repository.TeacherRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +40,9 @@ public class GroupCourseController {
     @Autowired
     private CourseRepository courseRepository;
 
+    @Autowired
+    private TeacherRepository teacherRepository;
+
     @GetMapping
     public List<GroupCourseEntity> getCourses(@PathVariable String groupId) {
         StudentGroupEntity group = requireGroup(groupId);
@@ -62,6 +68,39 @@ public class GroupCourseController {
                 .filter(gc -> gc.getCourseName().equals(courseName))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /**
+     * Pre-assigns (or clears, when teacherId is null) a teacher for this
+     * (group, course) pairing before blocks exist. Applied by
+     * BlockGenerationService to every block it creates for this pairing; has
+     * no effect once blocks already exist (that pairing is then skipped by
+     * "Generate Blocks" and its blocks carry their own teacher_id).
+     */
+    @PutMapping("/{courseName}/default-teacher")
+    public GroupCourseEntity setDefaultTeacher(@PathVariable String groupId, @PathVariable String courseName,
+            @Valid @RequestBody SetGroupCourseTeacherRequest request) {
+        StudentGroupEntity group = requireGroup(groupId);
+        GroupCourseEntity groupCourse = group.getCourses().stream()
+                .filter(gc -> gc.getCourseName().equals(courseName))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Group course", groupId + "/" + courseName));
+
+        String teacherId = request.getTeacherId();
+        if (teacherId != null) {
+            TeacherEntity teacher = teacherRepository.findById(teacherId)
+                    .orElseThrow(() -> new IllegalArgumentException("Teacher '" + teacherId + "' does not exist"));
+            boolean qualified = teacher.getQualifications().stream()
+                    .anyMatch(q -> q.getQualification().equals(courseName));
+            if (!qualified) {
+                throw new IllegalArgumentException(
+                        "Teacher '" + teacherId + "' is not qualified for course '" + courseName + "'");
+            }
+        }
+
+        groupCourse.setDefaultTeacherId(teacherId);
+        groupRepository.save(group);
+        return groupCourse;
     }
 
     @DeleteMapping("/{courseName}")

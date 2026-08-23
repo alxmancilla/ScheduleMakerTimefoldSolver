@@ -97,6 +97,11 @@ export const addGroupCourse = (groupId, courseName) =>
   api.post(`/groups/${groupId}/courses`, { courseName });
 export const removeGroupCourse = (groupId, courseName) =>
   api.delete(`/groups/${groupId}/courses/${encodeURIComponent(courseName)}`);
+// Pre-assigns (or clears, with teacherId null) a teacher for a group's course before
+// blocks exist. Applied automatically by "Generate Blocks" to every block it creates
+// for that pairing; has no effect once blocks already exist for it.
+export const setGroupCourseDefaultTeacher = (groupId, courseName, teacherId) =>
+  api.put(`/groups/${groupId}/courses/${encodeURIComponent(courseName)}/default-teacher`, { teacherId });
 
 // Rooms
 export const getRooms = () => api.get('/rooms');
@@ -203,6 +208,21 @@ export const updateTerm = (label) =>
 
 // Admin: audit log (most recent 200 write requests, logged automatically)
 export const getAuditLog = () => api.get('/admin/audit-log');
+
+// Admin: per-component preferred block size and max blocks per day. Block
+// size is read by BlockGenerationService ("Generate Blocks") when
+// decomposing a course's weekly hours into blocks; max blocks per day is
+// enforced by the solver's HARD constraint limiting same-day concentration.
+// A component with no rule here falls back to size 2 / max 2 per day
+// server-side.
+export const getComponentBlockRules = () => api.get('/admin/component-block-rules');
+export const setComponentBlockRule = (component, preferredBlockSize, maxBlocksPerDay) =>
+  api.put(`/admin/component-block-rules/${encodeURIComponent(component)}`, {
+    preferredBlockSize,
+    maxBlocksPerDay,
+  });
+export const deleteComponentBlockRule = (component) =>
+  api.delete(`/admin/component-block-rules/${encodeURIComponent(component)}`);
 
 // Schedule
 export const getScheduleView = () => api.get('/schedule/view');

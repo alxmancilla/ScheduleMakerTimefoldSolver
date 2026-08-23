@@ -57,11 +57,15 @@ DROP FUNCTION IF EXISTS generate_block_timeslots() CASCADE;
 -- TEACHERS TABLE
 -- ============================================================================
 -- Stores teacher information including workload capacity
+-- required_room_name references room(name), but room isn't created until
+-- later in this script - its FK constraint is added just after the ROOMS
+-- TABLE section below instead of inline here.
 CREATE TABLE teacher (
     id VARCHAR(100) PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
     last_name VARCHAR(200) NOT NULL,
     max_hours_per_week INTEGER NOT NULL DEFAULT 40,
+    required_room_name VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT check_max_hours_positive CHECK (max_hours_per_week > 0)
@@ -76,6 +80,7 @@ COMMENT ON COLUMN teacher.id IS 'Unique identifier for teacher (sanitized from l
 COMMENT ON COLUMN teacher.name IS 'First name(s) of the teacher';
 COMMENT ON COLUMN teacher.last_name IS 'Last name(s) of the teacher';
 COMMENT ON COLUMN teacher.max_hours_per_week IS 'Maximum teaching hours per week allowed for this teacher';
+COMMENT ON COLUMN teacher.required_room_name IS 'Optional room this teacher must always use, overriding the group''s preferred room. Enforced wherever this teacher gets assigned to a block, subject to room-type compatibility.';
 
 -- ============================================================================
 -- TEACHER QUALIFICATIONS TABLE
@@ -122,6 +127,48 @@ COMMENT ON COLUMN teacher_availability.day_of_week IS 'Day of week: 1=Monday, 2=
 COMMENT ON COLUMN teacher_availability.hour IS 'Hour of day when teacher is available (typically 7-15 for school hours)';
 
 -- ============================================================================
+-- ROOM TYPE TABLE
+-- ============================================================================
+-- Bare reference list of valid room/room-requirement classification values.
+-- Referenced by FK from every column that stores a room type (room.type,
+-- course.room_requirement, course_room_requirement.room_type,
+-- course_block_template.room_type, course_block_assignment.satisfies_room_type)
+-- so a rename is a single UPDATE instead of editing a CHECK constraint in
+-- several places by hand.
+CREATE TABLE room_type (
+    name VARCHAR(50) PRIMARY KEY
+);
+
+COMMENT ON TABLE room_type IS 'Valid room/room-requirement classification values (estándar, taller, centro de cómputo, mixto).';
+
+INSERT INTO room_type (name) VALUES
+    ('estándar'),
+    ('taller'),
+    ('centro de cómputo'),
+    ('mixto');
+
+-- ============================================================================
+-- COURSE COMPONENT TABLE
+-- ============================================================================
+-- Bare reference list of valid course component values. Referenced by FK
+-- from course.component and component_block_rule.component, so a typo'd
+-- component fails loudly (FK violation) instead of silently creating an
+-- orphaned, unconfigured category. Kept separate from component_block_rule
+-- itself: that table only holds a row for components with a NON-default
+-- block rule, and a component with no row deliberately falls back to code
+-- defaults - FK'ing course.component straight at component_block_rule would
+-- force a row to exist for every component and destroy that behavior.
+CREATE TABLE course_component (
+    name VARCHAR(20) PRIMARY KEY
+);
+
+COMMENT ON TABLE course_component IS 'Valid course component category values (BASICAS, TEM, TCOM, etc.).';
+
+INSERT INTO course_component (name) VALUES
+    ('BASICAS'), ('DIGITAL'), ('TCOM'), ('TCSEG'), ('TELE'),
+    ('TEM'), ('TIA'), ('TPIA'), ('TPROG'), ('TRH');
+
+-- ============================================================================
 -- COURSES TABLE
 -- ============================================================================
 -- Courses that can be taught
@@ -136,7 +183,8 @@ CREATE TABLE course (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     active BOOLEAN NOT NULL DEFAULT TRUE,
-    CONSTRAINT check_course_room_requirement CHECK (room_requirement IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica', 'centro de cómputo', 'laboratorio')),
+    CONSTRAINT fk_course_room_requirement FOREIGN KEY (room_requirement) REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_course_component FOREIGN KEY (component) REFERENCES course_component(name) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT check_course_required_hours CHECK (required_hours_per_week > 0),
     CONSTRAINT check_course_semester CHECK (semester BETWEEN 1 AND 12)
 );
@@ -151,10 +199,10 @@ COMMENT ON TABLE course IS 'Courses offered in the curriculum';
 COMMENT ON COLUMN course.id IS 'Unique course identifier (short code)';
 COMMENT ON COLUMN course.name IS 'Full course name';
 COMMENT ON COLUMN course.abbreviation IS 'Short abbreviation for display';
-COMMENT ON COLUMN course.room_requirement IS 'Type of room required: estándar, taller, centro de cómputo, or laboratorio';
+COMMENT ON COLUMN course.room_requirement IS 'Type of room required. References room_type(name).';
 COMMENT ON COLUMN course.required_hours_per_week IS 'Number of hours per week this course needs';
 COMMENT ON COLUMN course.semester IS 'Semester number (1-12)';
-COMMENT ON COLUMN course.component IS 'Course component category (BASICAS, TADRH, TEM, etc.)';
+COMMENT ON COLUMN course.component IS 'Course component category. References course_component(name).';
 COMMENT ON COLUMN course.active IS 'Whether this course is currently active in the curriculum';
 
 -- ============================================================================
@@ -168,7 +216,7 @@ CREATE TABLE room (
     capacity INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT check_room_type CHECK (type IN ('estándar', 'taller', 'taller electromecánica', 'taller electrónica', 'centro de cómputo', 'laboratorio')),
+    CONSTRAINT fk_room_type FOREIGN KEY (type) REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT check_room_capacity CHECK (capacity IS NULL OR capacity > 0)
 );
 
@@ -178,8 +226,12 @@ CREATE INDEX idx_room_type ON room(type);
 COMMENT ON TABLE room IS 'Physical classrooms and laboratory spaces';
 COMMENT ON COLUMN room.name IS 'Unique room identifier/name';
 COMMENT ON COLUMN room.building IS 'Building identifier where room is located';
-COMMENT ON COLUMN room.type IS 'Room type: estándar, taller, taller electromecánica, taller electrónica, centro de cómputo, or laboratorio';
+COMMENT ON COLUMN room.type IS 'Room type. References room_type(name).';
 COMMENT ON COLUMN room.capacity IS 'Optional seating capacity. When set alongside student_group.student_count, a soft constraint warns if an assigned group exceeds it.';
+
+ALTER TABLE teacher ADD CONSTRAINT fk_teacher_required_room
+    FOREIGN KEY (required_room_name) REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX idx_teacher_required_room ON teacher(required_room_name);
 
 -- ============================================================================
 -- STUDENT GROUPS TABLE
@@ -192,7 +244,7 @@ CREATE TABLE student_group (
     student_count INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_student_group_room FOREIGN KEY (preferred_room_name) REFERENCES room(name) ON DELETE SET NULL,
+    CONSTRAINT fk_student_group_room FOREIGN KEY (preferred_room_name) REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT check_student_group_student_count CHECK (student_count IS NULL OR student_count > 0)
 );
 
@@ -212,18 +264,22 @@ COMMENT ON COLUMN student_group.student_count IS 'Optional headcount. When set a
 CREATE TABLE group_course (
     group_id VARCHAR(100) NOT NULL,
     course_name VARCHAR(200) NOT NULL,
+    default_teacher_id VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (group_id, course_name),
     CONSTRAINT fk_group_course_group FOREIGN KEY (group_id) REFERENCES student_group(id) ON DELETE CASCADE,
-    CONSTRAINT fk_group_course_course FOREIGN KEY (course_name) REFERENCES course(name) ON DELETE CASCADE
+    CONSTRAINT fk_group_course_course FOREIGN KEY (course_name) REFERENCES course(name) ON DELETE CASCADE,
+    CONSTRAINT fk_group_course_default_teacher FOREIGN KEY (default_teacher_id) REFERENCES teacher(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_group_course_group ON group_course(group_id);
 CREATE INDEX idx_group_course_course ON group_course(course_name);
+CREATE INDEX idx_group_course_default_teacher ON group_course(default_teacher_id);
 
 COMMENT ON TABLE group_course IS 'Defines which courses each student group must take';
 COMMENT ON COLUMN group_course.group_id IS 'Reference to student group';
 COMMENT ON COLUMN group_course.course_name IS 'Reference to course name';
+COMMENT ON COLUMN group_course.default_teacher_id IS 'Optional teacher pre-assigned to this pairing before blocks exist; applied by BlockGenerationService to every block it creates for this pairing. No effect once blocks already exist.';
 
 
 
@@ -276,7 +332,7 @@ CREATE TABLE IF NOT EXISTS course_block_assignment (
     CONSTRAINT fk_block_assignment_course FOREIGN KEY (course_id) REFERENCES course(id) ON DELETE CASCADE,
     CONSTRAINT fk_block_assignment_teacher FOREIGN KEY (teacher_id) REFERENCES teacher(id) ON DELETE SET NULL,
     CONSTRAINT fk_block_assignment_timeslot FOREIGN KEY (block_timeslot_id) REFERENCES block_timeslot(id) ON DELETE SET NULL,
-    CONSTRAINT fk_block_assignment_room FOREIGN KEY (room_name) REFERENCES room(name) ON DELETE SET NULL,
+    CONSTRAINT fk_block_assignment_room FOREIGN KEY (room_name) REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT check_block_assignment_length CHECK (block_length BETWEEN 1 AND 4),
     CONSTRAINT check_block_assignment_pinned_requires_timeslot CHECK (pinned = FALSE OR block_timeslot_id IS NOT NULL)
     -- Note: No unique constraint on (group_id, course_id) because a course can have multiple blocks
@@ -635,7 +691,9 @@ CREATE TABLE IF NOT EXISTS course_room_requirement (
     CONSTRAINT fk_room_req_course FOREIGN KEY (course_id)
         REFERENCES course(id) ON DELETE CASCADE,
     CONSTRAINT fk_default_room FOREIGN KEY (default_preferred_room)
-        REFERENCES room(name) ON DELETE SET NULL
+        REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_course_room_requirement_type FOREIGN KEY (room_type)
+        REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_room_req_course ON course_room_requirement(course_id);
@@ -669,9 +727,11 @@ CREATE TABLE IF NOT EXISTS course_block_template (
     CONSTRAINT fk_template_group FOREIGN KEY (group_id)
         REFERENCES student_group(id) ON DELETE CASCADE,
     CONSTRAINT fk_preferred_room FOREIGN KEY (preferred_room_name)
-        REFERENCES room(name) ON DELETE SET NULL,
+        REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT fk_preferred_timeslot FOREIGN KEY (preferred_timeslot_id)
         REFERENCES block_timeslot(id) ON DELETE SET NULL,
+    CONSTRAINT fk_course_block_template_room_type FOREIGN KEY (room_type)
+        REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT uq_block_template UNIQUE (course_id, group_id, block_index)
 );
 
@@ -686,25 +746,32 @@ COMMENT ON COLUMN course_block_template.preferred_day IS '1=Monday, 2=Tuesday, 3
 -- Add new columns to course_block_assignment for dual room requirements
 ALTER TABLE course_block_assignment
 ADD COLUMN IF NOT EXISTS satisfies_room_type VARCHAR(50),
-ADD COLUMN IF NOT EXISTS preferred_room_name VARCHAR(100);
+ADD COLUMN IF NOT EXISTS preferred_room_hint VARCHAR(100);
 
--- Add foreign key constraint if not exists
+-- Add foreign key constraints if not exists
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'fk_cba_preferred_room'
     ) THEN
         ALTER TABLE course_block_assignment
-        ADD CONSTRAINT fk_cba_preferred_room FOREIGN KEY (preferred_room_name)
-            REFERENCES room(name) ON DELETE SET NULL;
+        ADD CONSTRAINT fk_cba_preferred_room FOREIGN KEY (preferred_room_hint)
+            REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_cba_satisfies_room_type'
+    ) THEN
+        ALTER TABLE course_block_assignment
+        ADD CONSTRAINT fk_cba_satisfies_room_type FOREIGN KEY (satisfies_room_type)
+            REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE;
     END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_cba_room_type ON course_block_assignment(satisfies_room_type);
-CREATE INDEX IF NOT EXISTS idx_cba_preferred_room ON course_block_assignment(preferred_room_name);
+CREATE INDEX IF NOT EXISTS idx_cba_preferred_room ON course_block_assignment(preferred_room_hint);
 
-COMMENT ON COLUMN course_block_assignment.satisfies_room_type IS 'Which room requirement this assignment satisfies (for dual-requirement courses)';
-COMMENT ON COLUMN course_block_assignment.preferred_room_name IS 'Preferred room for this assignment (soft constraint)';
+COMMENT ON COLUMN course_block_assignment.satisfies_room_type IS 'Which room requirement this assignment satisfies (for dual-requirement courses). References room_type(name).';
+COMMENT ON COLUMN course_block_assignment.preferred_room_hint IS 'Preferred room for this assignment (soft constraint hint, not enforced)';
 
 -- ============================================================================
 -- SCHOOL TERM TABLE
@@ -741,6 +808,35 @@ CREATE INDEX IF NOT EXISTS idx_schedule_audit_log_occurred_at ON schedule_audit_
 COMMENT ON TABLE schedule_audit_log IS 'Write requests (POST/PUT/DELETE) to /api/**, logged automatically by a servlet interceptor for basic accountability.';
 COMMENT ON COLUMN schedule_audit_log.username IS 'Authenticated username that made the request.';
 COMMENT ON COLUMN schedule_audit_log.status_code IS 'HTTP response status; only 2xx (successful) requests are logged.';
+
+-- ============================================================================
+-- COMPONENT BLOCK RULES TABLE
+-- ============================================================================
+-- Preferred block size (1-4h) and max blocks per day (1-4) per course
+-- component. Block size is used by BlockGenerationService to decompose a
+-- course's weekly hours into blocks; max blocks per day is enforced by the
+-- solver's HARD constraint limiting same-day concentration of a course.
+-- A component with no row here falls back to size 2 / max 2 per day in code.
+CREATE TABLE IF NOT EXISTS component_block_rule (
+    component VARCHAR(20) PRIMARY KEY,
+    preferred_block_size INTEGER NOT NULL,
+    max_blocks_per_day INTEGER NOT NULL DEFAULT 2,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_preferred_block_size CHECK (preferred_block_size BETWEEN 1 AND 4),
+    CONSTRAINT check_max_blocks_per_day CHECK (max_blocks_per_day BETWEEN 1 AND 4),
+    CONSTRAINT fk_component_block_rule_component FOREIGN KEY (component)
+        REFERENCES course_component(name) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+INSERT INTO component_block_rule (component, preferred_block_size, max_blocks_per_day)
+VALUES ('BASICAS', 1, 1)
+ON CONFLICT (component) DO NOTHING;
+
+COMMENT ON TABLE component_block_rule IS 'Preferred block size (1-4h) and max blocks per day (1-4) per course component, used by BlockGenerationService and the solver respectively. A component with no row here defaults to size 2 / max 2 per day in code.';
+COMMENT ON COLUMN component_block_rule.component IS 'Matches course.component (e.g. BASICAS, TEM, TCS).';
+COMMENT ON COLUMN component_block_rule.preferred_block_size IS 'Blocks are packed greedily at this size, with a trailing remainder block if hours don''t divide evenly.';
+COMMENT ON COLUMN component_block_rule.max_blocks_per_day IS 'HARD limit on how many blocks of this component''s courses may land on the same day for the same group.';
 
 -- ============================================================================
 -- END OF SCHEMA

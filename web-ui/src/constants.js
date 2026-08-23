@@ -3,10 +3,8 @@
 // values. Keep in sync with database/schema_block_scheduling*.sql.
 export const ROOM_TYPES = [
   'estándar',
-  'laboratorio',
+  'mixto',
   'taller',
-  'taller electromecánica',
-  'taller electrónica',
   'centro de cómputo',
 ];
 

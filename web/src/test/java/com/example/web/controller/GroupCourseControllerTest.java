@@ -1,8 +1,10 @@
 package com.example.web.controller;
 
 import com.example.web.entity.StudentGroupEntity;
+import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.StudentGroupRepository;
+import com.example.web.repository.TeacherRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,6 +55,9 @@ public class GroupCourseControllerTest {
 
     @MockBean
     private CourseRepository courseRepository;
+
+    @MockBean
+    private TeacherRepository teacherRepository;
 
     private StudentGroupEntity group;
 
@@ -160,6 +166,72 @@ public class GroupCourseControllerTest {
     public void removeCourse_groupNotFound_returns404() throws Exception {
         when(groupRepository.findById("nope")).thenReturn(Optional.empty());
         mockMvc.perform(delete("/api/groups/nope/courses/Mathematics"))
+                .andExpect(status().isNotFound());
+    }
+
+    // ---- PUT (default teacher) ----
+
+    @Test
+    public void setDefaultTeacher_qualifiedTeacher_savesIt() throws Exception {
+        group.addCourse("Mathematics");
+        TeacherEntity teacher = new TeacherEntity("T1", "Ana", "Lopez", 40);
+        teacher.addQualification("Mathematics");
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        Map<String, Object> body = Map.of("teacherId", "T1");
+        mockMvc.perform(put("/api/groups/G1/courses/Mathematics/default-teacher")
+                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultTeacherId").value("T1"));
+        verify(groupRepository).save(group);
+    }
+
+    @Test
+    public void setDefaultTeacher_unqualifiedTeacher_returns400() throws Exception {
+        group.addCourse("Mathematics");
+        TeacherEntity teacher = new TeacherEntity("T1", "Ana", "Lopez", 40);
+        teacher.addQualification("Physics");
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        Map<String, Object> body = Map.of("teacherId", "T1");
+        mockMvc.perform(put("/api/groups/G1/courses/Mathematics/default-teacher")
+                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("not qualified")));
+        verify(groupRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    public void setDefaultTeacher_unknownTeacher_returns400() throws Exception {
+        group.addCourse("Mathematics");
+        when(teacherRepository.findById("nope")).thenReturn(Optional.empty());
+
+        Map<String, Object> body = Map.of("teacherId", "nope");
+        mockMvc.perform(put("/api/groups/G1/courses/Mathematics/default-teacher")
+                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("does not exist")));
+    }
+
+    @Test
+    public void setDefaultTeacher_nullTeacherId_clearsIt() throws Exception {
+        group.addCourse("Mathematics");
+        group.getCourses().stream().findFirst().orElseThrow().setDefaultTeacherId("T1");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("teacherId", null);
+        mockMvc.perform(put("/api/groups/G1/courses/Mathematics/default-teacher")
+                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultTeacherId").doesNotExist());
+        verify(groupRepository).save(group);
+    }
+
+    @Test
+    public void setDefaultTeacher_courseNotLinked_returns404() throws Exception {
+        Map<String, Object> body = Map.of("teacherId", "T1");
+        mockMvc.perform(put("/api/groups/G1/courses/Mathematics/default-teacher")
+                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isNotFound());
     }
 }

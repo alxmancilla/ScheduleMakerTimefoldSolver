@@ -14,7 +14,16 @@ import java.util.*;
  */
 public final class BlockScheduleAnalyzer {
 
+    // Mirrors SchoolConstraintProvider.DEFAULT_MAX_BLOCKS_PER_DAY: the fallback
+    // used when a course's component has no row in component_block_rule.
+    private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
+
     private BlockScheduleAnalyzer() {
+    }
+
+    private static int maxBlocksPerDay(com.example.domain.Course course) {
+        Integer configured = course.getMaxBlocksPerDay();
+        return configured != null ? configured : DEFAULT_MAX_BLOCKS_PER_DAY;
     }
 
     /**
@@ -122,9 +131,9 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Group cannot have two courses at same time", groupConflict);
 
-        // Maximum 2 blocks per course per group per day (HARD) - Count
-        // BASICAS: max 1 block per day
-        // Non-BASICAS: max 2 blocks per day ONLY if total > 4 hours
+        // Maximum blocks per course per group per day (HARD) - Count
+        // Limit is per-component via component_block_rule, falling back to
+        // DEFAULT_MAX_BLOCKS_PER_DAY when a component has no configured rule.
         int maxTwoBlocksPerCoursePerDay = 0;
         Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments = new HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -146,28 +155,15 @@ public final class BlockScheduleAnalyzer {
                     List<CourseBlockAssignment> assignments = dayEntry.getValue();
                     int count = assignments.size();
                     if (count > 0) {
-                        String component = assignments.get(0).getCourse().getComponent();
-                        boolean isBasicas = "BASICAS".equals(component);
-
-                        if (isBasicas && count > 1) {
-                            // BASICAS: max 1 block per day
-                            maxTwoBlocksPerCoursePerDay += (count - 1);
-                        } else if (!isBasicas) {
-                            // Non-BASICAS: calculate total hours
-                            int totalHours = assignments.stream()
-                                    .mapToInt(a -> a.getTimeslot().getLengthHours())
-                                    .sum();
-
-                            // Only violation if total > 4 hours AND count > 2
-                            if (totalHours > 4 && count > 2) {
-                                maxTwoBlocksPerCoursePerDay += (count - 2);
-                            }
+                        int limit = maxBlocksPerDay(assignments.get(0).getCourse());
+                        if (count > limit) {
+                            maxTwoBlocksPerCoursePerDay += (count - limit);
                         }
                     }
                 }
             }
         }
-        result.put("Maximum 2 blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
+        result.put("Maximum blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
 
         // Course blocks must be consecutive (HARD) - Count
         // Mirror the solver: group unpinned blocks by (group, course, day), sort by
@@ -315,9 +311,9 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Group cannot have two courses at same time", groupConflict);
 
-        // Maximum 2 blocks per course per group per day (HARD) - Detailed
-        // BASICAS: max 1 block per day
-        // Non-BASICAS: max 2 blocks per day ONLY if total > 4 hours
+        // Maximum blocks per course per group per day (HARD) - Detailed
+        // Limit is per-component via component_block_rule, falling back to
+        // DEFAULT_MAX_BLOCKS_PER_DAY when a component has no configured rule.
         List<String> maxTwoBlocksDetails = new ArrayList<>();
         Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments2 = new HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -339,36 +335,20 @@ public final class BlockScheduleAnalyzer {
                     List<CourseBlockAssignment> assignments = dayEntry.getValue();
                     int count = assignments.size();
                     if (count > 0) {
-                        String component = assignments.get(0).getCourse().getComponent();
-                        boolean isBasicas = "BASICAS".equals(component);
-                        String courseName = assignments.get(0).getCourse().getName();
-                        String groupName = assignments.get(0).getGroup().getName();
-                        String dayName = formatDay(dayEntry.getKey());
-
-                        if (isBasicas && count > 1) {
-                            // BASICAS: max 1 block per day
-                            String reason = String.format("(%s has %d blocks on %s, limit=1 for BASICAS)",
-                                    groupName, count, dayName);
+                        int limit = maxBlocksPerDay(assignments.get(0).getCourse());
+                        if (count > limit) {
+                            String courseName = assignments.get(0).getCourse().getName();
+                            String groupName = assignments.get(0).getGroup().getName();
+                            String dayName = formatDay(dayEntry.getKey());
+                            String reason = String.format("(%s has %d blocks on %s, limit=%d)",
+                                    groupName, count, dayName, limit);
                             maxTwoBlocksDetails.add(courseName + " " + reason);
-                        } else if (!isBasicas) {
-                            // Non-BASICAS: calculate total hours
-                            int totalHours = assignments.stream()
-                                    .mapToInt(a -> a.getTimeslot().getLengthHours())
-                                    .sum();
-
-                            // Only violation if total > 4 hours AND count > 2
-                            if (totalHours > 4 && count > 2) {
-                                String reason = String.format(
-                                        "(%s has %d blocks on %s totaling %dh, limit=2 blocks when >4h)",
-                                        groupName, count, dayName, totalHours);
-                                maxTwoBlocksDetails.add(courseName + " " + reason);
-                            }
                         }
                     }
                 }
             }
         }
-        details.put("Maximum 2 blocks per course per group per day", maxTwoBlocksDetails);
+        details.put("Maximum blocks per course per group per day", maxTwoBlocksDetails);
 
         // Course blocks must be consecutive (HARD) - Detailed
         List<String> courseBlocksNonConsecutiveDetails = new ArrayList<>();
@@ -479,11 +459,11 @@ public final class BlockScheduleAnalyzer {
         List<String> blockSpecifiedRoomDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null) {
-                String preferredRoomName = a.getPreferredRoomName();
-                if (preferredRoomName != null && !preferredRoomName.isEmpty()) {
-                    if (!preferredRoomName.equals(a.getRoom().getName())) {
+                String preferredRoomHint = a.getPreferredRoomHint();
+                if (preferredRoomHint != null && !preferredRoomHint.isEmpty()) {
+                    if (!preferredRoomHint.equals(a.getRoom().getName())) {
                         String reason = String.format("(preferred=%s, assigned=%s)",
-                                preferredRoomName, a.getRoom().getName());
+                                preferredRoomHint, a.getRoom().getName());
                         blockSpecifiedRoomDetails.add(blockAssignmentToString(a) + " " + reason);
                     }
                 }
@@ -531,7 +511,7 @@ public final class BlockScheduleAnalyzer {
             if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
                 var preferredRoom = a.getGroup().getPreferredRoom();
                 if (preferredRoom != null &&
-                        !(a.getSatisfiesRoomType() != null && "laboratorio".equalsIgnoreCase(a.getSatisfiesRoomType()))
+                        !(a.getSatisfiesRoomType() != null && "mixto".equalsIgnoreCase(a.getSatisfiesRoomType()))
                         &&
                         !preferredRoom.equals(a.getRoom())) {
                     preferredRoomViolations++;
@@ -688,9 +668,9 @@ public final class BlockScheduleAnalyzer {
         int blockSpecifiedRoomViolations = 0;
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null) {
-                String preferredRoomName = a.getPreferredRoomName();
-                if (preferredRoomName != null && !preferredRoomName.isEmpty()) {
-                    if (!preferredRoomName.equals(a.getRoom().getName())) {
+                String preferredRoomHint = a.getPreferredRoomHint();
+                if (preferredRoomHint != null && !preferredRoomHint.isEmpty()) {
+                    if (!preferredRoomHint.equals(a.getRoom().getName())) {
                         blockSpecifiedRoomViolations++;
                     }
                 }

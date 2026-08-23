@@ -70,8 +70,9 @@ README).
 ### Entity Management (CRUD, search, pagination)
 
 #### Teachers
-- Qualifications, per-day availability, `maxHoursPerWeek`, and a live workload column
-  (assigned hours vs. weekly max, computed client-side)
+- Qualifications, per-day availability, `maxHoursPerWeek`, an optional required-room override
+  (this teacher's blocks always use it, ahead of the group's preferred room, when the room
+  type fits), and a live workload column (assigned hours vs. weekly max, computed client-side)
 
 #### Courses
 - Legacy single `roomRequirement` field, plus per-course **Room Requirements** (dual room-
@@ -86,7 +87,9 @@ README).
 
 #### Student Groups
 - Preferred room, optional `studentCount`, and a Group-Courses card managing which courses
-  each group takes
+  each group takes — each course row flags when no teacher is qualified for it, and lets you
+  pick a teacher directly: pre-assigned before blocks exist (applied automatically the next
+  time blocks are generated), or applied straight to a course's existing blocks once they do
 
 #### Course Block Assignments
 - Group, course, block length, teacher, timeslot, room, pinned status; filter by All /
@@ -103,6 +106,9 @@ README).
   export → edit → re-import round trip (any role except `TEACHER`)
 
 ### Settings (`ADMIN`)
+- Block Rules: per-course-component preferred block size and max blocks per day
+  (`component_block_rule`), read by "Generate Blocks" and the solver instead of being
+  hardcoded — a component with no rule falls back to a size-2 / max-2-per-day default
 - Timeslot management, grouped by day
 - Current-term label (a free-text string like "Fall 2026", shown in the header for every role)
 - Write-activity audit log viewer (who/what/when for every successful write)
@@ -164,7 +170,7 @@ web-ui/
 │   │   ├── Assignments.jsx    # Course block assignment management
 │   │   ├── Reports.jsx        # PDF report generation/download
 │   │   ├── Import.jsx         # Excel import + export
-│   │   ├── Settings.jsx       # Admin: timeslots, term, audit log, solver runs
+│   │   ├── Settings.jsx       # Admin: block rules, timeslots, term, audit log, solver runs
 │   │   ├── Users.jsx          # Admin: application user CRUD
 │   │   └── Login.jsx          # Login form
 │   ├── auth/                  # AuthContext, ProtectedRoute/AdminRoute/WriteRoute, AdminOnly/WriteOnly

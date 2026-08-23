@@ -23,6 +23,9 @@ public class TeacherEntity {
     @Column(name = "max_hours_per_week", nullable = false)
     private Integer maxHoursPerWeek = 40;
 
+    @Column(name = "required_room_name", length = 100)
+    private String requiredRoomName;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -90,6 +93,14 @@ public class TeacherEntity {
 
     public void setMaxHoursPerWeek(Integer maxHoursPerWeek) {
         this.maxHoursPerWeek = maxHoursPerWeek;
+    }
+
+    public String getRequiredRoomName() {
+        return requiredRoomName;
+    }
+
+    public void setRequiredRoomName(String requiredRoomName) {
+        this.requiredRoomName = requiredRoomName;
     }
 
     public LocalDateTime getCreatedAt() {

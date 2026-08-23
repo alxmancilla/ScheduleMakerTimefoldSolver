@@ -35,8 +35,8 @@ public class CourseBlockAssignmentEntity {
     @Column(name = "satisfies_room_type", length = 100)
     private String satisfiesRoomType;
 
-    @Column(name = "preferred_room_name", length = 100)
-    private String preferredRoomName;
+    @Column(name = "preferred_room_hint", length = 100)
+    private String preferredRoomHint;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -132,12 +132,12 @@ public class CourseBlockAssignmentEntity {
         this.satisfiesRoomType = satisfiesRoomType;
     }
 
-    public String getPreferredRoomName() {
-        return preferredRoomName;
+    public String getPreferredRoomHint() {
+        return preferredRoomHint;
     }
 
-    public void setPreferredRoomName(String preferredRoomName) {
-        this.preferredRoomName = preferredRoomName;
+    public void setPreferredRoomHint(String preferredRoomHint) {
+        this.preferredRoomHint = preferredRoomHint;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -74,9 +74,11 @@
       "name": "Nombre:",
       "lastName": "Apellido:",
       "maxHoursPerWeek": "Máximo de Horas por Semana:",
+      "requiredRoom": "Salón Requerido (opcional):",
       "qualifications": "Cursos:",
       "availability": "Disponibilidad:"
     },
+    "requiredRoomHint": "Si se define, este maestro siempre se coloca en este salón, sin importar el salón preferido del grupo, siempre que el tipo de salón del bloque lo permita.",
     "qualificationsPlaceholder": "Escriba al menos 2 letras para buscar cursos, o agregue un curso y presione Enter",
     "add": "Agregar",
     "noQualifications": "No se han agregado cursos",
@@ -89,6 +91,7 @@
       "maxHoursWeek": "Máx Horas/Sem",
       "workload": "Carga",
       "qualifications": "Cursos",
+      "requiredRoom": "Salón Requerido",
       "actions": "Acciones"
     },
     "available": "disponible",
@@ -267,11 +270,19 @@
       "removeFailedPrefix": "Error al quitar curso: ",
       "confirmRemove": "¿Quitar este curso del grupo? (Los bloques de horario ya generados no se ven afectados, solo las futuras ejecuciones de \"Generar Bloques\".)",
       "table": {
-        "course": "Curso"
+        "course": "Curso",
+        "teacher": "Maestro"
       },
       "none": "Este grupo aún no tiene cursos.",
       "addedMessage": "Materia añadida al grupo",
-      "removedMessage": "Materia eliminada del grupo"
+      "removedMessage": "Materia eliminada del grupo",
+      "noQualifiedTeacherShort": "sin maestro calificado",
+      "noQualifiedTeacherHint": "Ningún maestro tiene actualmente este curso como calificación. Agréguela en Maestros antes de poder asignar un bloque para este curso.",
+      "noBlocksYet": "aún sin bloques",
+      "noBlocksYetHint": "Aún sin bloques - elija un maestro y se aplicará automáticamente al ejecutar \"Generar Bloques\" (Configuración).",
+      "teacherUpdatedMessage": "Maestro asignado a los bloques de este curso",
+      "teacherUpdateFailedPrefix": "Error al asignar maestro: ",
+      "defaultTeacherSavedMessage": "Maestro preasignado - se aplicará al generar los bloques"
     },
     "savedMessage": "Grupo guardado",
     "deletedMessage": "Grupo eliminado",
@@ -328,7 +339,9 @@
     "searchPlaceholder": "Buscar por grupo, materia, maestro o aula...",
     "preferredRoomHint": "Por defecto usa el aula preferida del grupo seleccionado, si tiene una; elija otra aula para anularlo.",
     "roomFilteredHint": "Mostrando solo aulas que satisfacen \"{{type}}\".",
-    "satisfiesRoomTypeHint": "Por defecto usa el requisito de aula del curso seleccionado, si tiene uno; elija otro tipo para anularlo."
+    "satisfiesRoomTypeHint": "Por defecto usa el requisito de aula del curso seleccionado, si tiene uno; elija otro tipo para anularlo.",
+    "courseFilteredHint": "Mostrando solo las materias que cursa el grupo seleccionado.",
+    "teacherFilteredHint": "Mostrando solo maestros calificados para la materia seleccionada."
   },
   "reports": {
     "title": "Reportes",
@@ -458,6 +471,34 @@
         "method": "Método",
         "path": "Ruta",
         "status": "Estado"
+      }
+    },
+    "blockRules": {
+      "title": "Reglas de Bloques",
+      "description": "Define el tamaño de bloque preferido (1-4h) usado para descomponer las horas semanales de un curso al generar bloques, y el máximo de bloques por día que el solucionador permite para el mismo curso/grupo, por componente de curso. Un componente sin regla aquí usa por defecto bloques de 2h y 2 bloques/día.",
+      "addRule": "+ Agregar Regla",
+      "editRule": "Editar Regla de Bloque",
+      "newRule": "Nueva Regla de Bloque",
+      "loadFailedPrefix": "Error al cargar las reglas de bloques: ",
+      "saveFailedPrefix": "Error al guardar la regla de bloque: ",
+      "deleteFailedPrefix": "Error al restablecer la regla de bloque: ",
+      "confirmDelete": "¿Restablecer {{component}} a los valores por defecto (bloques de 2h, 2 bloques/día)?",
+      "savedMessage": "Regla de bloque guardada",
+      "deletedMessage": "Regla de bloque restablecida al valor por defecto",
+      "none": "No hay reglas de bloques personalizadas — todos los componentes usan el tamaño de bloque por defecto de 2h y 2 bloques/día.",
+      "resetToDefault": "Restablecer por Defecto",
+      "saving": "Guardando...",
+      "sizeHint": "Los bloques se empaquetan de forma voraz a este tamaño, con un bloque final más pequeño para las horas restantes.",
+      "maxBlocksPerDayHint": "El solucionador no colocará más de este número de bloques del mismo curso, para el mismo grupo, en un solo día.",
+      "fields": {
+        "component": "Componente:",
+        "preferredBlockSize": "Tamaño de Bloque Preferido (horas):",
+        "maxBlocksPerDay": "Máximo de Bloques por Día:"
+      },
+      "table": {
+        "component": "Componente",
+        "preferredBlockSize": "Tamaño de Bloque Preferido",
+        "maxBlocksPerDay": "Máx. Bloques/Día"
       }
     }
   },

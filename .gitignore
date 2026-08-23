@@ -37,6 +37,15 @@ database/migrations/*
 !database/migrations/add_school_term.sql
 !database/migrations/add_schedule_audit_log.sql
 !database/migrations/add_teacher_role.sql
+!database/migrations/add_component_block_rules.sql
+!database/migrations/add_group_course_default_teacher.sql
+!database/migrations/add_teacher_required_room.sql
+!database/migrations/remove_electromecanica_electronica_room_types.sql
+!database/migrations/rename_laboratorio_to_dual.sql
+!database/migrations/rename_dual_to_mixto.sql
+!database/migrations/rename_assignment_preferred_room_to_hint.sql
+!database/migrations/add_room_rename_cascade.sql
+!database/migrations/add_room_type_and_course_component_lookup_tables.sql
 md_files/
 
 # Build artifacts

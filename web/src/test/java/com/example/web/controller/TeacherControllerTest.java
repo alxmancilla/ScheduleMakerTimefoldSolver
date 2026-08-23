@@ -1,6 +1,10 @@
 package com.example.web.controller;
 
+import com.example.web.entity.CourseBlockAssignmentEntity;
+import com.example.web.entity.RoomEntity;
 import com.example.web.entity.TeacherEntity;
+import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
@@ -53,11 +57,18 @@ public class TeacherControllerTest {
     @MockBean
     private TeacherRepository teacherRepository;
 
+    @MockBean
+    private CourseBlockAssignmentRepository assignmentRepository;
+
+    @MockBean
+    private RoomRepository roomRepository;
+
     private TeacherEntity teacher;
 
     @Before
     public void setUp() {
         teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        when(assignmentRepository.findByTeacherId(org.mockito.ArgumentMatchers.anyString())).thenReturn(List.of());
     }
 
     private Map<String, Object> validPayload() {
@@ -194,6 +205,73 @@ public class TeacherControllerTest {
                 .andExpect(jsonPath("$.id").value("T1"))
                 .andExpect(jsonPath("$.name").value("Grace"));
         verify(teacherRepository).save(any(TeacherEntity.class));
+    }
+
+    private CourseBlockAssignmentEntity block(String id, String satisfiesRoomType, String roomName, boolean pinned) {
+        CourseBlockAssignmentEntity block = new CourseBlockAssignmentEntity();
+        block.setId(id);
+        block.setGroupId("G1");
+        block.setCourseId("C1");
+        block.setBlockLength(2);
+        block.setTeacherId("T1");
+        block.setSatisfiesRoomType(satisfiesRoomType);
+        block.setRoomName(roomName);
+        block.setPinned(pinned);
+        return block;
+    }
+
+    @Test
+    public void updateTeacher_setsRequiredRoom_backfillsCompatibleExistingBlock() throws Exception {
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        CourseBlockAssignmentEntity existing = block("A1", "estándar", null, false);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(existing));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("requiredRoomName", "ROOM1");
+        mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requiredRoomName").value("ROOM1"));
+
+        verify(assignmentRepository).save(existing);
+        org.junit.Assert.assertEquals("ROOM1", existing.getRoomName());
+    }
+
+    @Test
+    public void updateTeacher_setsRequiredRoom_skipsIncompatibleBlock() throws Exception {
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        // A mixto-required block can't be forced into a plain estándar room.
+        CourseBlockAssignmentEntity existing = block("A1", "mixto", null, false);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(existing));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("requiredRoomName", "ROOM1");
+        mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+
+        verify(assignmentRepository, never()).save(existing);
+    }
+
+    @Test
+    public void updateTeacher_setsRequiredRoom_skipsPinnedBlock() throws Exception {
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        CourseBlockAssignmentEntity pinned = block("A1", "estándar", "ROOM2", true);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(pinned));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("requiredRoomName", "ROOM1");
+        mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+
+        verify(assignmentRepository, never()).save(pinned);
     }
 
     @Test

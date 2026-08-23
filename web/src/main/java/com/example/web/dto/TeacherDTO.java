@@ -34,6 +34,11 @@ public class TeacherDTO {
     @Max(value = 60, message = "Max hours per week must not exceed 60")
     private Integer maxHoursPerWeek;
 
+    // Optional: a room this teacher must always use, overriding the group's
+    // preferred room wherever this teacher gets assigned to a block.
+    @Size(max = 100, message = "Required room name must not exceed 100 characters")
+    private String requiredRoomName;
+
     private Set<@NotBlank(message = "Qualification must not be blank") String> qualifications;
 
     @Valid
@@ -81,6 +86,14 @@ public class TeacherDTO {
 
     public void setMaxHoursPerWeek(Integer maxHoursPerWeek) {
         this.maxHoursPerWeek = maxHoursPerWeek;
+    }
+
+    public String getRequiredRoomName() {
+        return requiredRoomName;
+    }
+
+    public void setRequiredRoomName(String requiredRoomName) {
+        this.requiredRoomName = requiredRoomName;
     }
 
     public Set<String> getQualifications() {

@@ -17,6 +17,12 @@
     <description>Timefold-based scheduling engine (domain, solver, analysis, data, reports)</description>
 
     <dependencies>
+        <!-- Shared business rules (no framework/persistence deps) -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>scheduler-common</artifactId>
+        </dependency>
+
         <!-- Timefold Solver -->
         <dependency>
             <groupId>ai.timefold.solver</groupId>

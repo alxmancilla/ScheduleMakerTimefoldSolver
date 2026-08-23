@@ -1,15 +1,21 @@
 package com.example.web.service;
 
+import com.example.web.entity.ComponentBlockRuleEntity;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.CourseBlockTemplateEntity;
 import com.example.web.entity.CourseEntity;
 import com.example.web.entity.CourseRoomRequirementEntity;
+import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
+import com.example.web.entity.TeacherEntity;
+import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.CourseRoomRequirementRepository;
+import com.example.web.repository.RoomRepository;
 import com.example.web.repository.StudentGroupRepository;
+import com.example.web.repository.TeacherRepository;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,6 +49,12 @@ public class BlockGenerationServiceTest {
     private CourseRoomRequirementRepository roomRequirementRepository;
     @Mock
     private CourseBlockTemplateRepository blockTemplateRepository;
+    @Mock
+    private ComponentBlockRuleRepository componentBlockRuleRepository;
+    @Mock
+    private RoomRepository roomRepository;
+    @Mock
+    private TeacherRepository teacherRepository;
 
     @InjectMocks
     private BlockGenerationService service;
@@ -52,6 +64,13 @@ public class BlockGenerationServiceTest {
         when(assignmentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(roomRequirementRepository.findByCourseIdOrderByPriority(anyString())).thenReturn(List.of());
         when(blockTemplateRepository.findApplicableTemplates(anyString(), anyString())).thenReturn(List.of());
+        // No rule configured by default (falls back to the size-2 default), except BASICAS,
+        // which is seeded with preferredBlockSize=1 in the real migration/schema too.
+        when(componentBlockRuleRepository.findById(anyString())).thenReturn(Optional.empty());
+        when(componentBlockRuleRepository.findById("BASICAS"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("BASICAS", 1, 1)));
+        when(roomRepository.findById(anyString())).thenReturn(Optional.empty());
+        when(teacherRepository.findById(anyString())).thenReturn(Optional.empty());
     }
 
     private CourseEntity course(String id, String name, int hours, String component, String roomReq) {
@@ -106,6 +125,115 @@ public class BlockGenerationServiceTest {
         verify(assignmentRepository, times(3)).save(captor.capture());
         List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
         assertEquals(List.of(2, 2, 1), lengths);
+    }
+
+    @Test
+    public void groupWithCompatiblePreferredRoom_defaultsGeneratedBlocksToIt() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.setPreferredRoomName("ROOM1");
+        group.addCourse("Mathematics");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        service.generateBlocks();
+
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        for (CourseBlockAssignmentEntity block : captor.getAllValues()) {
+            assertEquals("ROOM1", block.getRoomName());
+        }
+    }
+
+    @Test
+    public void groupCourseWithDefaultTeacher_appliesItToEveryGeneratedBlock() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics");
+        group.getCourses().stream().findFirst().orElseThrow().setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+
+        service.generateBlocks();
+
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        for (CourseBlockAssignmentEntity block : captor.getAllValues()) {
+            assertEquals("T1", block.getTeacherId());
+        }
+    }
+
+    @Test
+    public void defaultTeacherRequiredRoom_takesPrecedenceOverGroupPreferredRoom() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.setPreferredRoomName("GROUPROOM");
+        group.addCourse("Mathematics");
+        group.getCourses().stream().findFirst().orElseThrow().setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        // No stub for GROUPROOM: the teacher's required room short-circuits before
+        // defaultRoomFor ever falls back to checking the group's preferred room.
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("TEACHERROOM");
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("TEACHERROOM"))
+                .thenReturn(Optional.of(new RoomEntity("TEACHERROOM", "Building B", "estándar")));
+
+        service.generateBlocks();
+
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        for (CourseBlockAssignmentEntity block : captor.getAllValues()) {
+            assertEquals("TEACHERROOM", block.getRoomName());
+        }
+    }
+
+    @Test
+    public void groupWithIncompatiblePreferredRoom_leavesRoomUnset() {
+        // A mixto-required block can't default to a plain estándar room.
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.setPreferredRoomName("ROOM1");
+        group.addCourse("Chemistry");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Chemistry"))
+                .thenReturn(Optional.of(course("C4", "Chemistry", 2, "BASICAS", "mixto")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C4")).thenReturn(false);
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        service.generateBlocks();
+
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        for (CourseBlockAssignmentEntity block : captor.getAllValues()) {
+            assertEquals(null, block.getRoomName());
+        }
+    }
+
+    @Test
+    public void roomRequirementDefaultPreferredRoom_takesPrecedenceOverGroupPreference() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.setPreferredRoomName("ROOM1");
+        group.addCourse("Computing");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Computing"))
+                .thenReturn(Optional.of(course("C5", "Computing", 2, "TIA", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C5")).thenReturn(false);
+        when(roomRequirementRepository.findByCourseIdOrderByPriority("C5")).thenReturn(List.of(
+                new CourseRoomRequirementEntity("C5", "estándar", 2, 1, "CC1")));
+        // No roomRepository stub needed: the requirement's own defaultPreferredRoom
+        // ("CC1") short-circuits defaultRoomFor() before it would look up ROOM1.
+
+        service.generateBlocks();
+
+        // 2h at the default block size of 2 -> a single block.
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals("CC1", captor.getValue().getRoomName());
     }
 
     @Test
@@ -173,7 +301,7 @@ public class BlockGenerationServiceTest {
         assertEquals("G1_C3_0", saved.get(0).getId());
         assertEquals(Integer.valueOf(2), saved.get(0).getBlockLength());
         assertEquals("centro de cómputo", saved.get(0).getSatisfiesRoomType());
-        assertEquals("CC 1", saved.get(0).getPreferredRoomName());
+        assertEquals("CC 1", saved.get(0).getPreferredRoomHint());
 
         assertEquals("G1_C3_1", saved.get(1).getId());
         assertEquals(Integer.valueOf(2), saved.get(1).getBlockLength());
@@ -182,7 +310,7 @@ public class BlockGenerationServiceTest {
         assertEquals("G1_C3_2", saved.get(2).getId());
         assertEquals(Integer.valueOf(1), saved.get(2).getBlockLength());
         assertEquals("estándar", saved.get(2).getSatisfiesRoomType());
-        assertEquals(null, saved.get(2).getPreferredRoomName());
+        assertEquals(null, saved.get(2).getPreferredRoomHint());
     }
 
     @Test
@@ -194,7 +322,7 @@ public class BlockGenerationServiceTest {
                 .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
         when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
         when(roomRequirementRepository.findByCourseIdOrderByPriority("C1")).thenReturn(List.of(
-                new CourseRoomRequirementEntity("C1", "laboratorio", 2, 1, null)));
+                new CourseRoomRequirementEntity("C1", "mixto", 2, 1, null)));
 
         BlockGenerationService.GenerationResult result = service.generateBlocks();
 
@@ -204,7 +332,7 @@ public class BlockGenerationServiceTest {
         List<CourseBlockAssignmentEntity> saved = captor.getAllValues();
         assertEquals(Integer.valueOf(1), saved.get(0).getBlockLength());
         assertEquals(Integer.valueOf(1), saved.get(1).getBlockLength());
-        assertEquals("laboratorio", saved.get(0).getSatisfiesRoomType());
+        assertEquals("mixto", saved.get(0).getSatisfiesRoomType());
     }
 
     @Test
@@ -232,7 +360,7 @@ public class BlockGenerationServiceTest {
         assertEquals("G1_C2_0", saved.get(0).getId());
         assertEquals(Integer.valueOf(3), saved.get(0).getBlockLength());
         assertEquals("taller", saved.get(0).getSatisfiesRoomType());
-        assertEquals("TALLER 1", saved.get(0).getPreferredRoomName());
+        assertEquals("TALLER 1", saved.get(0).getPreferredRoomHint());
         // A template's preferred room is pre-assigned onto roomName directly (room is
         // never solver-assigned), not left as just a soft preference.
         assertEquals("TALLER 1", saved.get(0).getRoomName());
@@ -285,5 +413,45 @@ public class BlockGenerationServiceTest {
         CourseBlockAssignmentEntity saved = captor.getValue();
         assertEquals(Integer.valueOf(2), saved.getBlockLength());
         assertEquals("taller", saved.getSatisfiesRoomType());
+    }
+
+    @Test
+    public void componentWithConfiguredBlockSize_packsAtThatSizeInsteadOfDefault() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Cybersecurity");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Cybersecurity"))
+                .thenReturn(Optional.of(course("C3", "Cybersecurity", 9, "TCS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C3")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TCS"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TCS", 4, 2)));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // 9h at a preferred size of 4 -> [4, 4, 1], not the size-2 default's [2, 2, 2, 2, 1]
+        assertEquals(3, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(3)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(4, 4, 1), lengths);
+    }
+
+    @Test
+    public void componentWithNoConfiguredRule_fallsBackToDefaultSizeTwo() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Electronics");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Electronics"))
+                .thenReturn(Optional.of(course("C4", "Electronics", 3, "TELE", "taller")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C4")).thenReturn(false);
+        // No stub for "TELE" - componentBlockRuleRepository.findById returns empty by default.
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(2, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(2, 1), lengths);
     }
 }

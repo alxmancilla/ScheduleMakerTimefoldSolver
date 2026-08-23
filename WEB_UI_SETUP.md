@@ -8,8 +8,8 @@ student groups, course block assignments, and admin functions (users, timeslots,
 label, audit log, admin-triggered solver runs, Excel import/export, PDF reports). It consists
 of:
 
-- **Backend**: Spring Boot REST API (Java 17), one of three Maven modules — see the root
-  [README.md](README.md) for the full multi-module architecture (`engine`/`reporter`/`web`)
+- **Backend**: Spring Boot REST API (Java 17), one of four Maven modules — see the root
+  [README.md](README.md) for the full multi-module architecture (`common`/`engine`/`reporter`/`web`)
 - **Frontend**: React + Vite SPA (`web-ui/`)
 - **Database**: PostgreSQL
 
@@ -81,12 +81,15 @@ RBAC; it is **not** part of the schema file itself:
 psql -U mancilla -d school_schedule -f database/migrations/add_app_users.sql
 ```
 
-Three more migrations are already folded into a fresh `schema_block_scheduling.sql` load —
+Six more migrations are already folded into a fresh `schema_block_scheduling.sql` load —
 apply them only if your database predates that feature:
 ```bash
-psql -U mancilla -d school_schedule -f database/migrations/add_room_capacity_and_group_size.sql  # room.capacity / student_group.student_count
-psql -U mancilla -d school_schedule -f database/migrations/add_school_term.sql                   # current-term label
-psql -U mancilla -d school_schedule -f database/migrations/add_schedule_audit_log.sql             # write-activity audit log
+psql -U mancilla -d school_schedule -f database/migrations/add_room_capacity_and_group_size.sql   # room.capacity / student_group.student_count
+psql -U mancilla -d school_schedule -f database/migrations/add_school_term.sql                    # current-term label
+psql -U mancilla -d school_schedule -f database/migrations/add_schedule_audit_log.sql              # write-activity audit log
+psql -U mancilla -d school_schedule -f database/migrations/add_component_block_rules.sql           # component_block_rule (Settings > Block Rules)
+psql -U mancilla -d school_schedule -f database/migrations/add_group_course_default_teacher.sql    # group_course.default_teacher_id
+psql -U mancilla -d school_schedule -f database/migrations/add_teacher_required_room.sql           # teacher.required_room_name
 ```
 Two more manage the `app_user` table itself and are only needed if your `app_user` table
 predates them (`add_app_users.sql` above already includes both for new installs):
@@ -190,6 +193,10 @@ Every endpoint is under `/api`. Unless noted, `GET` requires `READER`/`WRITER`/`
 | `PUT /teachers/{id}` | Update |
 | `DELETE /teachers/{id}` | Delete |
 
+A teacher's optional `requiredRoomName` is set via `POST`/`PUT` like any other field. Setting or
+changing it also **backfills every existing non-pinned block already assigned to that teacher**
+whose room type is compatible — not just future ones.
+
 ### Courses (`/api/courses`)
 | Method & Path | Description |
 |---|---|
@@ -248,6 +255,7 @@ decomposition, optionally scoped to one group:
 | `GET .../courses` | List for a group |
 | `POST .../courses` | Add `{courseName}` |
 | `DELETE .../courses/{courseName}` | Remove |
+| `PUT .../courses/{courseName}/default-teacher` | Pre-assign (or clear, with `{teacherId: null}`) a teacher for this pairing before blocks exist — validated against that teacher's qualifications, then applied automatically to every block `POST /admin/blocks/generate` creates for it; has no effect once blocks already exist |
 
 ### Assignments (`/api/assignments`)
 | Method & Path | Description |
@@ -264,6 +272,11 @@ decomposition, optionally scoped to one group:
 | `PUT /assignments/{id}` | Update |
 | `DELETE /assignments/{id}` | Delete |
 
+`POST`/`PUT` apply one override automatically: if the submitted `teacherId` resolves to a
+teacher with a `requiredRoomName` whose type fits this block's `satisfiesRoomType`, `roomName`
+is forced to it regardless of what was submitted — matching "this teacher always uses this
+room" even if a different room (e.g. the group's preferred one) was sent in the request body.
+
 ### Schedule (`/api/schedule`)
 | Method & Path | Role | Description |
 |---|---|---|
@@ -278,6 +291,16 @@ decomposition, optionally scoped to one group:
 |---|---|---|
 | `GET /timeslots`, `GET /timeslots/{id}` | `READER`+ | Read-only, for building the Assignments form |
 | `GET`/`POST`/`PUT`/`DELETE /admin/timeslots...` | `ADMIN` | Full CRUD (Settings tab) |
+
+### Component Block Rules (`/api/admin/component-block-rules`, `ADMIN`)
+Per-course-component preferred block size and max blocks per day (Settings → Block Rules tab),
+read by `BlockGenerationService` and the solver instead of being hardcoded. A component with no
+row here falls back to a size-2 / max-2-per-day default in code.
+| Method & Path | Description |
+|---|---|
+| `GET /admin/component-block-rules` | All configured rules |
+| `PUT /admin/component-block-rules/{component}` | Upsert `{preferredBlockSize, maxBlocksPerDay}` (1-4 each) for a component |
+| `DELETE /admin/component-block-rules/{component}` | Reset a component to the code default (idempotent) |
 
 ### Excel Import / Export (`/api/import`)
 | Method & Path | Role | Description |

@@ -49,7 +49,7 @@ public class ConstraintConsistencyTest {
                                 "No room double-booking",
                                 "Room type must satisfy course requirement",
                                 "Group cannot have two courses at same time",
-                                "Maximum 2 blocks per course per group per day",
+                                "Maximum blocks per course per group per day",
                                 "Course blocks must be consecutive"));
 
                 // Assert they match

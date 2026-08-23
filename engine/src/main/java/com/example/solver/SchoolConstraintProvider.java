@@ -39,8 +39,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 noRoomDoubleBooking(constraintFactory), // #6: ~45 pairs, very high selectivity
 
                 // ========== TIER 3: Medium-Selectivity HARD Pair Constraints ==========
-                maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max 2 blocks per course per group per
-                                                                        // day
+                maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max blocks per course per group per
+                                                                        // day (per-component via component_block_rule)
                 courseBlocksMustBeConsecutive(constraintFactory), // HARD: ALL course blocks MUST be consecutive
 
                 // ========== TIER 4: SOFT Constraints - Quality Optimization ==========
@@ -238,10 +238,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         //
         // Non-standard room types:
         // - centro de cómputo (Computer Centers: CC 1, CC 2, CC 3)
-        // - taller electromecánica (Electromechanical Workshops: TEM 1, TEM 2, TEM 3)
-        // - taller electrónica (Electronics Workshop: TE 1)
         // - taller (General Workshop: AULA 4)
-        // - laboratorio (Labs: LQ 1, LMICRO)
+        // - mixto (LQ1, LMICRO, TEM1-3, TE1, TPIAL - also satisfy estándar/taller)
         //
         // Standard rooms (estándar) can run until 3pm (15:00) for flexibility.
         //
@@ -288,13 +286,16 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Non-standard rooms should finish by 2pm");
     }
 
+    // A component with no row in component_block_rule falls back to this,
+    // matching the old default cap for non-BASICAS courses.
+    private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
+
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
-        // HARD: Maximum 1 block per day for BASICAS courses
-        // For non-BASICAS: Maximum 2 blocks per day ONLY if total length > 4 hours
-        // This prevents excessive concentration of same course on one day
-        // BASICAS courses: Maximum 1 block per course per group per day
-        // Non-BASICAS courses: Maximum 2 blocks per course per group per day if total >
-        // 4 hours
+        // HARD: No more than course.getMaxBlocksPerDay() blocks of the same
+        // course/group may land on the same day. This prevents excessive
+        // concentration of the same course on one day. The limit is configurable
+        // per course component via component_block_rule (Settings > Block Rules);
+        // a component with no configured rule falls back to DEFAULT_MAX_BLOCKS_PER_DAY.
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
@@ -304,38 +305,19 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         a -> a.getTimeslot().getDayOfWeek(),
                         ConstraintCollectors.toList())
                 .filter((group, course, day, assignments) -> {
-                    int count = assignments.size();
-
-                    // BASICAS courses: max 1 block per day
-                    if ("BASICAS".equals(course.getComponent())) {
-                        return count > 1;
-                    }
-
-                    // Non-BASICAS courses: calculate total hours
-                    int totalHours = assignments.stream()
-                            .mapToInt(a -> a.getTimeslot().getLengthHours())
-                            .sum();
-
-                    // If total <= 4 hours, allow any number of blocks
-                    if (totalHours <= 4) {
-                        return false; // No violation if total is 4 hours or less
-                    }
-
-                    // If total > 4 hours, max 2 blocks per day
-                    return count > 2;
+                    int limit = course.getMaxBlocksPerDay() != null
+                            ? course.getMaxBlocksPerDay()
+                            : DEFAULT_MAX_BLOCKS_PER_DAY;
+                    return assignments.size() > limit;
                 })
                 .penalize(HardSoftScore.ONE_HARD,
                         (group, course, day, assignments) -> {
-                            int count = assignments.size();
-
-                            // BASICAS: penalize each block beyond 1
-                            if ("BASICAS".equals(course.getComponent())) {
-                                return count - 1;
-                            }
-                            // Non-BASICAS: penalize each block beyond 2 (only if total > 4 hours)
-                            return count - 2;
+                            int limit = course.getMaxBlocksPerDay() != null
+                                    ? course.getMaxBlocksPerDay()
+                                    : DEFAULT_MAX_BLOCKS_PER_DAY;
+                            return assignments.size() - limit;
                         })
-                .asConstraint("Maximum blocks per course per group per day (1 for BASICAS, 2 for non-BASICAS if >4h)");
+                .asConstraint("Maximum blocks per course per group per day");
     }
 
     private Constraint courseBlocksMustBeConsecutive(ConstraintFactory constraintFactory) {
@@ -432,10 +414,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (assignment.getGroup() == null || assignment.getRoom() == null) {
                         return false;
                     }
-                    // Only apply to non-lab blocks (labs must use lab rooms)
-                    // Uses satisfiesRoomType field to support dual room requirements
+                    // Only apply to blocks that don't require the "mixto" room type (those
+                    // must get an actual mixto room)
                     if (assignment.getSatisfiesRoomType() != null &&
-                            "laboratorio".equalsIgnoreCase(assignment.getSatisfiesRoomType())) {
+                            "mixto".equalsIgnoreCase(assignment.getSatisfiesRoomType())) {
                         return false;
                     }
                     // Check if group has a preferred room
@@ -679,12 +661,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         return false;
                     }
                     // Check if block has a preferred room specified
-                    String preferredRoomName = assignment.getPreferredRoomName();
-                    if (preferredRoomName == null || preferredRoomName.isEmpty()) {
+                    String preferredRoomHint = assignment.getPreferredRoomHint();
+                    if (preferredRoomHint == null || preferredRoomHint.isEmpty()) {
                         return false; // No preference specified
                     }
                     // Penalize if NOT using the preferred room
-                    return !preferredRoomName.equals(assignment.getRoom().getName());
+                    return !preferredRoomHint.equals(assignment.getRoom().getName());
                 })
                 .penalize(HardSoftScore.ofSoft(3))
                 .asConstraint("Prefer block's specified room");

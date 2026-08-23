@@ -1,10 +1,15 @@
 package com.example.web.controller;
 
 import com.example.web.dto.TeacherDTO;
+import com.example.web.entity.CourseBlockAssignmentEntity;
+import com.example.web.entity.RoomEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.entity.TeacherQualificationEntity;
 import com.example.web.exception.ResourceNotFoundException;
+import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
+import com.example.common.RoomTypeCompatibility;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.http.ResponseEntity;
@@ -21,9 +26,14 @@ import java.util.stream.Collectors;
 public class TeacherController {
 
     private final TeacherRepository teacherRepository;
+    private final CourseBlockAssignmentRepository assignmentRepository;
+    private final RoomRepository roomRepository;
 
-    public TeacherController(TeacherRepository teacherRepository) {
+    public TeacherController(TeacherRepository teacherRepository,
+            CourseBlockAssignmentRepository assignmentRepository, RoomRepository roomRepository) {
         this.teacherRepository = teacherRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.roomRepository = roomRepository;
     }
 
     @GetMapping
@@ -51,6 +61,7 @@ public class TeacherController {
         }
         TeacherEntity teacher = new TeacherEntity(request.getId(), request.getName(), request.getLastName(),
                 request.getMaxHoursPerWeek());
+        teacher.setRequiredRoomName(request.getRequiredRoomName());
         applyQualifications(teacher, request.getQualifications());
         applyAvailability(teacher, request.getAvailability());
         return teacherRepository.save(teacher);
@@ -64,9 +75,41 @@ public class TeacherController {
         teacher.setName(request.getName());
         teacher.setLastName(request.getLastName());
         teacher.setMaxHoursPerWeek(request.getMaxHoursPerWeek());
+        teacher.setRequiredRoomName(request.getRequiredRoomName());
         applyQualifications(teacher, request.getQualifications());
         applyAvailability(teacher, request.getAvailability());
-        return teacherRepository.save(teacher);
+        TeacherEntity saved = teacherRepository.save(teacher);
+        backfillRequiredRoom(saved);
+        return saved;
+    }
+
+    /**
+     * When a teacher has a required room, forces it onto every existing
+     * (non-pinned) block already assigned to them whose room type is
+     * compatible - so setting/changing required_room_name fixes blocks that
+     * were assigned before the requirement existed, not just future ones.
+     * Leaves a block's room untouched if the type isn't compatible (e.g. a
+     * lab-required block for a teacher whose required room is estándar), same
+     * as BlockGenerationService's own defaulting.
+     */
+    private void backfillRequiredRoom(TeacherEntity teacher) {
+        String requiredRoomName = teacher.getRequiredRoomName();
+        if (requiredRoomName == null) {
+            return;
+        }
+        RoomEntity requiredRoom = roomRepository.findById(requiredRoomName).orElse(null);
+        if (requiredRoom == null) {
+            return;
+        }
+        for (CourseBlockAssignmentEntity block : assignmentRepository.findByTeacherId(teacher.getId())) {
+            if (Boolean.TRUE.equals(block.getPinned()) || requiredRoomName.equals(block.getRoomName())) {
+                continue;
+            }
+            if (RoomTypeCompatibility.satisfies(requiredRoom.getType(), block.getSatisfiesRoomType())) {
+                block.setRoomName(requiredRoomName);
+                assignmentRepository.save(block);
+            }
+        }
     }
 
     @DeleteMapping("/{id}")

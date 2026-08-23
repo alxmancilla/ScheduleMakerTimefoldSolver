@@ -1,16 +1,23 @@
 package com.example.web.service;
 
+import com.example.web.entity.ComponentBlockRuleEntity;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.CourseBlockTemplateEntity;
 import com.example.web.entity.CourseEntity;
 import com.example.web.entity.CourseRoomRequirementEntity;
 import com.example.web.entity.GroupCourseEntity;
+import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
+import com.example.web.entity.TeacherEntity;
+import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.CourseRoomRequirementRepository;
+import com.example.web.repository.RoomRepository;
 import com.example.web.repository.StudentGroupRepository;
+import com.example.web.repository.TeacherRepository;
+import com.example.common.RoomTypeCompatibility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,9 +53,32 @@ import java.util.Map;
  *    satisfiesRoomType/preferredRoomName per portion.
  * 3. Neither: the single legacy CourseEntity.roomRequirement field for every
  *    block, as before dual requirements existed.
+ *
+ * Within tiers 2/3, each portion's hours are decomposed by greedily packing
+ * component_block_rule's preferred block size for the course's component
+ * (e.g. BASICAS=1 -> every block is 1h), falling back to DEFAULT_BLOCK_SIZE
+ * for any component with no configured rule.
+ *
+ * Room defaulting: whenever a generated block would otherwise have no room
+ * (no block-template preferredRoomName, no room-requirement
+ * defaultPreferredRoom) and the group has a preferredRoomName whose type
+ * satisfies the block's satisfiesRoomType - the same estándar/taller/mixto
+ * compatibility convention as engine's Room.satisfiesRequirement() - the
+ * group's preferred room is used as roomName directly, since room is never
+ * solver-assigned. A group's preferred room never overrides a more specific
+ * room already supplied by a template or room requirement.
+ *
+ * Teacher defaulting: every block generated for a (group, course) pair also
+ * gets group_course.default_teacher_id (if set) as its teacher_id, since
+ * teacher is likewise never solver-assigned. That column is the only place a
+ * teacher can be pre-assigned before blocks exist (course_block_assignment
+ * rows don't exist yet) - set via PUT
+ * /api/groups/{groupId}/courses/{courseName}/default-teacher.
  */
 @Service
 public class BlockGenerationService {
+
+    private static final int DEFAULT_BLOCK_SIZE = 2;
 
     @Autowired
     private StudentGroupRepository studentGroupRepository;
@@ -60,6 +90,12 @@ public class BlockGenerationService {
     private CourseRoomRequirementRepository roomRequirementRepository;
     @Autowired
     private CourseBlockTemplateRepository blockTemplateRepository;
+    @Autowired
+    private ComponentBlockRuleRepository componentBlockRuleRepository;
+    @Autowired
+    private RoomRepository roomRepository;
+    @Autowired
+    private TeacherRepository teacherRepository;
 
     @Transactional
     public GenerationResult generateBlocks() {
@@ -79,7 +115,7 @@ public class BlockGenerationService {
                     skippedExisting++;
                     continue;
                 }
-                created += generateBlocksForGroupCourse(group, course);
+                created += generateBlocksForGroupCourse(group, course, groupCourse.getDefaultTeacherId());
             }
         }
 
@@ -87,11 +123,11 @@ public class BlockGenerationService {
     }
 
     /** Decomposes and saves the blocks for one (group, course) pair; returns how many blocks were created. */
-    private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course) {
+    private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());
         if (!templates.isEmpty()) {
             for (CourseBlockTemplateEntity template : templates) {
-                saveTemplateBlock(group, course, template);
+                saveTemplateBlock(group, course, template, defaultTeacherId);
             }
             return templates.size();
         }
@@ -101,7 +137,7 @@ public class BlockGenerationService {
         int created = 0;
         if (requirements.isEmpty()) {
             for (int length : decomposeHours(course.getRequiredHoursPerWeek(), course.getComponent())) {
-                saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null);
+                saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null, defaultTeacherId);
                 blockIndex++;
                 created++;
             }
@@ -109,7 +145,7 @@ public class BlockGenerationService {
             for (CourseRoomRequirementEntity requirement : requirements) {
                 for (int length : decomposeHours(requirement.getHoursRequired(), course.getComponent())) {
                     saveBlock(group, course, blockIndex, length, requirement.getRoomType(),
-                            requirement.getDefaultPreferredRoom());
+                            requirement.getDefaultPreferredRoom(), defaultTeacherId);
                     blockIndex++;
                     created++;
                 }
@@ -138,54 +174,99 @@ public class BlockGenerationService {
                 .toList();
     }
 
-    private void saveTemplateBlock(StudentGroupEntity group, CourseEntity course, CourseBlockTemplateEntity template) {
+    private void saveTemplateBlock(StudentGroupEntity group, CourseEntity course, CourseBlockTemplateEntity template,
+            String defaultTeacherId) {
         CourseBlockAssignmentEntity block = new CourseBlockAssignmentEntity();
         block.setId(group.getId() + "_" + course.getId() + "_" + template.getBlockIndex());
         block.setGroupId(group.getId());
         block.setCourseId(course.getId());
         block.setBlockLength(template.getBlockLength());
         block.setSatisfiesRoomType(template.getRoomType());
-        block.setPreferredRoomName(template.getPreferredRoomName());
-        block.setRoomName(template.getPreferredRoomName());
+        block.setPreferredRoomHint(template.getPreferredRoomName());
+        block.setRoomName(template.getPreferredRoomName() != null
+                ? template.getPreferredRoomName()
+                : defaultRoomFor(group, template.getRoomType(), defaultTeacherId));
+        block.setTeacherId(defaultTeacherId);
         block.setBlockTimeslotId(template.getPreferredTimeslotId());
         block.setPinned(Boolean.TRUE.equals(template.getPinAssignment()));
         assignmentRepository.save(block);
     }
 
     private void saveBlock(StudentGroupEntity group, CourseEntity course, int blockIndex, int length,
-            String satisfiesRoomType, String preferredRoomName) {
+            String satisfiesRoomType, String preferredRoomHint, String defaultTeacherId) {
         CourseBlockAssignmentEntity block = new CourseBlockAssignmentEntity();
         block.setId(group.getId() + "_" + course.getId() + "_" + blockIndex);
         block.setGroupId(group.getId());
         block.setCourseId(course.getId());
         block.setBlockLength(length);
         block.setSatisfiesRoomType(satisfiesRoomType);
-        block.setPreferredRoomName(preferredRoomName);
+        block.setPreferredRoomHint(preferredRoomHint);
+        block.setRoomName(preferredRoomHint != null ? preferredRoomHint
+                : defaultRoomFor(group, satisfiesRoomType, defaultTeacherId));
+        block.setTeacherId(defaultTeacherId);
         block.setPinned(false);
         assignmentRepository.save(block);
     }
 
     /**
-     * Decomposes required hours into 1-2 hour blocks. A BASICAS course with
-     * exactly 2 hours/week becomes two separate 1-hour blocks (maximizes
-     * scheduling flexibility for general-ed courses); everything else greedily
-     * uses 2-hour blocks with a trailing 1-hour block for an odd remainder.
+     * The room a generated block should default to, in priority order: the
+     * defaultTeacherId's required room (if set and type-compatible - a
+     * teacher's fixed-room requirement overrides the group's preference), then
+     * the group's preferred room (if set and type-compatible). Null if neither
+     * applies, leaving the room for manual assignment instead of an invalid
+     * default.
+     */
+    private String defaultRoomFor(StudentGroupEntity group, String satisfiesRoomType, String defaultTeacherId) {
+        if (defaultTeacherId != null) {
+            String teacherRoom = requiredRoomFor(defaultTeacherId, satisfiesRoomType);
+            if (teacherRoom != null) {
+                return teacherRoom;
+            }
+        }
+        String preferredRoomName = group.getPreferredRoomName();
+        if (preferredRoomName == null) {
+            return null;
+        }
+        RoomEntity preferredRoom = roomRepository.findById(preferredRoomName).orElse(null);
+        if (preferredRoom == null || !RoomTypeCompatibility.satisfies(preferredRoom.getType(), satisfiesRoomType)) {
+            return null;
+        }
+        return preferredRoomName;
+    }
+
+    /** A teacher's required room, if set and its type satisfies the requirement - null otherwise. */
+    private String requiredRoomFor(String teacherId, String satisfiesRoomType) {
+        TeacherEntity teacher = teacherRepository.findById(teacherId).orElse(null);
+        if (teacher == null || teacher.getRequiredRoomName() == null) {
+            return null;
+        }
+        RoomEntity requiredRoom = roomRepository.findById(teacher.getRequiredRoomName()).orElse(null);
+        if (requiredRoom == null || !RoomTypeCompatibility.satisfies(requiredRoom.getType(), satisfiesRoomType)) {
+            return null;
+        }
+        return teacher.getRequiredRoomName();
+    }
+
+    /**
+     * Decomposes required hours by greedily packing blocks at the component's
+     * configured preferred size (component_block_rule), or DEFAULT_BLOCK_SIZE
+     * if that component has no rule, with a trailing remainder block for any
+     * leftover hours that don't divide evenly.
      */
     private List<Integer> decomposeHours(int hours, String component) {
+        int blockSize = componentBlockRuleRepository.findById(component)
+                .map(ComponentBlockRuleEntity::getPreferredBlockSize)
+                .orElse(DEFAULT_BLOCK_SIZE);
+
         List<Integer> lengths = new ArrayList<>();
-        if ("BASICAS".equals(component) && hours == 2) {
-            lengths.add(1);
-            lengths.add(1);
-            return lengths;
-        }
         int remaining = hours;
         while (remaining > 0) {
-            if (remaining >= 2) {
-                lengths.add(2);
-                remaining -= 2;
+            if (remaining >= blockSize) {
+                lengths.add(blockSize);
+                remaining -= blockSize;
             } else {
-                lengths.add(1);
-                remaining -= 1;
+                lengths.add(remaining);
+                remaining = 0;
             }
         }
         return lengths;

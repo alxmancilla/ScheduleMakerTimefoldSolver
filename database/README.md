@@ -36,7 +36,9 @@ Upgrading an existing database) — this file only orients you within
 
 ## Core Tables (block-based)
 
-1. **`teacher`** — teacher info with workload capacity (`max_hours_per_week`)
+1. **`teacher`** — teacher info, workload capacity (`max_hours_per_week`), and
+   an optional `required_room_name` override (always used for this teacher's
+   blocks, ahead of the group's preferred room, when room-type compatible)
 2. **`teacher_qualification`** — courses each teacher is qualified to teach
 3. **`teacher_availability`** — per-day, per-hour availability
 4. **`course`** — courses offered, with legacy `room_requirement` plus the
@@ -44,7 +46,9 @@ Upgrading an existing database) — this file only orients you within
 5. **`room`** — classrooms/labs, with `type`, `building`, optional `capacity`
 6. **`student_group`** — student groups, with optional `preferred_room` and
    `student_count`
-7. **`group_course`** — which courses each group takes
+7. **`group_course`** — which courses each group takes, with an optional
+   `default_teacher_id` pre-assignment applied by `BlockGenerationService`
+   the next time blocks are generated for that pairing
 8. **`block_timeslot`** — a day + start hour + length (1-4h) a block can
    occupy
 9. **`course_block_assignment`** — the `@PlanningEntity`; one
@@ -53,20 +57,26 @@ Upgrading an existing database) — this file only orients you within
     computer center + 1h standard) for a course
 11. **`course_block_template`** — explicit, hand-authored block decomposition
     for a course (optionally scoped to one group)
-12. **`school_term`** — current term/period display label
-13. **`schedule_audit_log`** — write-activity audit trail
-14. *(via migration)* **`app_user`** — login accounts + role (RBAC)
+12. **`component_block_rule`** — per-course-component preferred block size and
+    max blocks per day, editable from Settings → Block Rules; a component with
+    no row falls back to a size-2 / max-2-per-day default in code
+13. **`school_term`** — current term/period display label
+14. **`schedule_audit_log`** — write-activity audit trail
+15. *(via migration)* **`app_user`** — login accounts + role (RBAC)
 
 ## Data Mapping from the Java Domain Model
 
-- `Teacher` (`id`, qualifications, per-day availability, `maxHoursPerWeek`)
-  → `teacher` / `teacher_qualification` / `teacher_availability`
+- `Teacher` (`id`, qualifications, per-day availability, `maxHoursPerWeek`,
+  optional `requiredRoomName`) → `teacher` / `teacher_qualification` /
+  `teacher_availability`
 - `Course` (`roomRequirement`, `roomRequirements`, `blockTemplates`,
-  `requiredHoursPerWeek`) → `course` / `course_room_requirement` /
-  `course_block_template`
+  `requiredHoursPerWeek`, `maxBlocksPerDay`) → `course` /
+  `course_room_requirement` / `course_block_template` /
+  `component_block_rule` (looked up by component, not a direct FK)
 - `Room` (`type`, `building`, optional `capacity`) → `room`
 - `Group` (assigned courses, optional `preferredRoom`, `studentCount`) →
-  `student_group` / `group_course`
+  `student_group` / `group_course` (each course link can carry an optional
+  `defaultTeacherId` pre-assignment)
 - `BlockTimeslot` (`DayOfWeek`, start hour, length) → `block_timeslot`
 - `CourseBlockAssignment` (one `@PlanningVariable`: `timeslot`; teacher/room/
   course fixed inputs) → `course_block_assignment`

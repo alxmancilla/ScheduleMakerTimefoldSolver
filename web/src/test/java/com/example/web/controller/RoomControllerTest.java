@@ -156,10 +156,10 @@ public class RoomControllerTest {
         when(roomRepository.save(any(RoomEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         Map<String, Object> body = validPayload();
         body.remove("name");
-        body.put("type", "laboratorio");
+        body.put("type", "mixto");
         mockMvc.perform(put("/api/rooms/A1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.type").value("laboratorio"));
+                .andExpect(jsonPath("$.type").value("mixto"));
         verify(roomRepository).save(any(RoomEntity.class));
     }
 

@@ -1,7 +1,11 @@
 package com.example.web.controller;
 
 import com.example.web.entity.CourseBlockAssignmentEntity;
+import com.example.web.entity.RoomEntity;
+import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.RoomRepository;
+import com.example.web.repository.TeacherRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -51,6 +55,12 @@ public class CourseBlockAssignmentControllerTest {
 
     @MockBean
     private CourseBlockAssignmentRepository assignmentRepository;
+
+    @MockBean
+    private TeacherRepository teacherRepository;
+
+    @MockBean
+    private RoomRepository roomRepository;
 
     private CourseBlockAssignmentEntity assignment;
 
@@ -160,6 +170,58 @@ public class CourseBlockAssignmentControllerTest {
         mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.blockLength").exists());
+    }
+
+    @Test
+    public void createAssignment_teacherHasCompatibleRequiredRoom_overridesSubmittedRoom() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        Map<String, Object> body = validPayload();
+        body.put("teacherId", "T1");
+        body.put("roomName", "AULA-CHOSEN-BY-GROUP-PREFERENCE");
+        body.put("satisfiesRoomType", "estándar");
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roomName").value("ROOM1"));
+    }
+
+    @Test
+    public void createAssignment_teacherRequiredRoomIncompatibleType_keepsSubmittedRoom() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        // A mixto-required block can't be forced into a plain estándar room.
+        Map<String, Object> body = validPayload();
+        body.put("teacherId", "T1");
+        body.put("roomName", "LAB1");
+        body.put("satisfiesRoomType", "mixto");
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roomName").value("LAB1"));
+    }
+
+    @Test
+    public void createAssignment_teacherWithoutRequiredRoom_keepsSubmittedRoom() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        Map<String, Object> body = validPayload();
+        body.put("teacherId", "T1");
+        body.put("roomName", "AULA1");
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roomName").value("AULA1"));
     }
 
     // ---- PUT (update) ----

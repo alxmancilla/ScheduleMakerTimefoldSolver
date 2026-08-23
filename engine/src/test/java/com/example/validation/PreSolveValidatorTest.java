@@ -72,7 +72,7 @@ public class PreSolveValidatorTest {
     public void unpinnedInvalidAssignmentsAreIgnored() {
         BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 3);
         Room room = new Room("AULA 1", "A", "estándar");
-        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, room, qualifiedAvailableTeacher(), "laboratorio");
+        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, room, qualifiedAvailableTeacher(), "mixto");
         a.setPinned(false); // solver handles unpinned blocks; validator must skip them
         assertTrue(PreSolveValidator.validate(scheduleWith(a)).isValid());
     }
@@ -91,9 +91,9 @@ public class PreSolveValidatorTest {
     @Test
     public void roomTypeMismatchIsReported() {
         BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
-        Room standard = new Room("AULA 1", "A", "estándar"); // cannot satisfy laboratorio
+        Room standard = new Room("AULA 1", "A", "estándar"); // cannot satisfy mixto
         SchoolSchedule schedule = scheduleWith(
-                pinnedBlock("A1", 2, slot, standard, qualifiedAvailableTeacher(), "laboratorio"));
+                pinnedBlock("A1", 2, slot, standard, qualifiedAvailableTeacher(), "mixto"));
         ValidationResult r = PreSolveValidator.validate(schedule);
         assertFalse(r.isValid());
         assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("room type")));

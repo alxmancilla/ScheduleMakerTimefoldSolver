@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  getGroups, createGroup, updateGroup, deleteGroup, getRooms, getCourses,
-  getGroupCourses, addGroupCourse, removeGroupCourse,
+  getGroups, createGroup, updateGroup, deleteGroup, getRooms, getCourses, getTeachers,
+  getGroupCourses, addGroupCourse, removeGroupCourse, setGroupCourseDefaultTeacher,
+  getAssignmentsByGroup, updateAssignment,
 } from '../api';
 import WriteOnly from '../auth/WriteOnly';
+import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
@@ -13,9 +15,11 @@ function Groups() {
   const { t } = useTranslation();
   const showToast = useToast();
   const confirmAction = useConfirm();
+  const { canWrite } = useAuth();
   const [groups, setGroups] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [allCourses, setAllCourses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingGroup, setEditingGroup] = useState(null);
@@ -25,11 +29,14 @@ function Groups() {
   const [groupCourses, setGroupCourses] = useState([]);
   const [coursesError, setCoursesError] = useState(null);
   const [courseToAdd, setCourseToAdd] = useState('');
+  const [groupAssignments, setGroupAssignments] = useState([]);
+  const [savingTeacherFor, setSavingTeacherFor] = useState(null);
 
   useEffect(() => {
     loadGroups();
     loadRooms();
     loadAllCourses();
+    loadTeachers();
   }, []);
 
   const loadRooms = async () => {
@@ -50,6 +57,21 @@ function Groups() {
     }
   };
 
+  const loadTeachers = async () => {
+    try {
+      const response = await getTeachers();
+      setTeachers(response.data);
+    } catch (err) {
+      // Non-critical: the "no qualified teacher" warning just won't show.
+    }
+  };
+
+  // Course names with at least one teacher qualification matching them exactly
+  // (the same convention the solver and Assignments.jsx use for "qualified").
+  const qualifiedCourseNames = new Set(
+    teachers.flatMap((t) => (t.qualifications || []).map((q) => q.qualification))
+  );
+
   const loadGroupCourses = async (groupId) => {
     try {
       const response = await getGroupCourses(groupId);
@@ -57,6 +79,82 @@ function Groups() {
       setCoursesError(null);
     } catch (err) {
       setCoursesError(t('groups.courses.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const loadGroupAssignments = async (groupId) => {
+    try {
+      const response = await getAssignmentsByGroup(groupId);
+      setGroupAssignments(response.data);
+    } catch (err) {
+      // Non-critical: the inline teacher picker just won't have data to work with.
+    }
+  };
+
+  // Teachers qualified for a course, same "qualification string === course name"
+  // convention the solver and Assignments.jsx use.
+  const teachersForCourseName = (courseName) =>
+    teachers.filter((teacher) => (teacher.qualifications || []).some((q) => q.qualification === courseName));
+
+  const blocksForCourse = (courseName) => {
+    const course = allCourses.find((c) => c.name === courseName);
+    if (!course) return [];
+    return groupAssignments.filter((a) => a.courseId === course.id);
+  };
+
+  // The teacher shown for a course row: the value shared by every block of that
+  // course, or '' if there are no blocks yet or their teachers disagree.
+  const teacherForCourse = (courseName) => {
+    const blocks = blocksForCourse(courseName);
+    if (blocks.length === 0) return '';
+    const teacherIds = new Set(blocks.map((b) => b.teacherId || ''));
+    return teacherIds.size === 1 ? [...teacherIds][0] : '';
+  };
+
+  const handleSetCourseTeacher = async (courseName, newTeacherId) => {
+    const blocks = blocksForCourse(courseName);
+    if (blocks.length === 0) return;
+    setSavingTeacherFor(courseName);
+    setCoursesError(null);
+    try {
+      await Promise.all(
+        blocks.map((block) =>
+          updateAssignment(block.id, {
+            groupId: block.groupId,
+            courseId: block.courseId,
+            blockLength: block.blockLength,
+            pinned: block.pinned,
+            teacherId: newTeacherId || null,
+            blockTimeslotId: block.blockTimeslotId,
+            roomName: block.roomName,
+            satisfiesRoomType: block.satisfiesRoomType,
+            preferredRoomHint: block.preferredRoomHint,
+          })
+        )
+      );
+      await loadGroupAssignments(editingGroup.id);
+      showToast(t('groups.courses.teacherUpdatedMessage'));
+    } catch (err) {
+      setCoursesError(err.response?.data?.message || t('groups.courses.teacherUpdateFailedPrefix') + err.message);
+    } finally {
+      setSavingTeacherFor(null);
+    }
+  };
+
+  // Pre-assigns a teacher for a (group, course) pair before blocks exist - stored on
+  // group_course.default_teacher_id and applied by "Generate Blocks" to every block it
+  // creates for this pairing. Only relevant while blocksForCourse(courseName) is empty.
+  const handleSetDefaultTeacher = async (courseName, newTeacherId) => {
+    setSavingTeacherFor(courseName);
+    setCoursesError(null);
+    try {
+      await setGroupCourseDefaultTeacher(editingGroup.id, courseName, newTeacherId || null);
+      await loadGroupCourses(editingGroup.id);
+      showToast(t('groups.courses.defaultTeacherSavedMessage'));
+    } catch (err) {
+      setCoursesError(err.response?.data?.message || t('groups.courses.teacherUpdateFailedPrefix') + err.message);
+    } finally {
+      setSavingTeacherFor(null);
     }
   };
 
@@ -105,6 +203,7 @@ function Groups() {
     setCoursesError(null);
     setCourseToAdd('');
     loadGroupCourses(group.id);
+    loadGroupAssignments(group.id);
   };
 
   const handleDelete = async (id) => {
@@ -122,6 +221,7 @@ function Groups() {
     setShowForm(false);
     setEditingGroup(null);
     setGroupCourses([]);
+    setGroupAssignments([]);
     setCoursesError(null);
     setCourseToAdd('');
   };
@@ -174,6 +274,7 @@ function Groups() {
                 setEditingGroup(null);
                 setShowForm(true);
                 setGroupCourses([]);
+                setGroupAssignments([]);
                 setCoursesError(null);
                 setCourseToAdd('');
               }}
@@ -234,7 +335,9 @@ function Groups() {
                 {allCourses
                   .filter((c) => !groupCourses.some((gc) => gc.courseName === c.name))
                   .map((c) => (
-                    <option key={c.id} value={c.name}>{c.id} - {c.name}</option>
+                    <option key={c.id} value={c.name}>
+                      {c.id} - {c.name}{!qualifiedCourseNames.has(c.name) ? ` (${t('groups.courses.noQualifiedTeacherShort')})` : ''}
+                    </option>
                   ))}
               </select>
               <button type="button" className="btn btn-success" onClick={handleAddGroupCourse} disabled={!courseToAdd}>
@@ -247,25 +350,87 @@ function Groups() {
             <thead>
               <tr>
                 <th>{t('groups.courses.table.course')}</th>
+                <th>{t('groups.courses.table.teacher')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {groupCourses.map((gc) => (
-                <tr key={gc.courseName}>
-                  <td>{gc.courseName}</td>
-                  <td>
-                    <WriteOnly>
-                      <button className="btn btn-danger" onClick={() => handleRemoveGroupCourse(gc.courseName)}>
-                        {t('common.delete')}
-                      </button>
-                    </WriteOnly>
-                  </td>
-                </tr>
-              ))}
+              {groupCourses.map((gc) => {
+                const blocks = blocksForCourse(gc.courseName);
+                const qualifiedTeachers = teachersForCourseName(gc.courseName);
+                return (
+                  <tr key={gc.courseName}>
+                    <td>
+                      {gc.courseName}
+                      {!qualifiedCourseNames.has(gc.courseName) && (
+                        <span
+                          title={t('groups.courses.noQualifiedTeacherHint')}
+                          style={{ color: '#e67e22', marginLeft: '8px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                        >
+                          ⚠ {t('groups.courses.noQualifiedTeacherShort')}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {blocks.length === 0 ? (
+                        canWrite() ? (
+                          <>
+                            <select
+                              value={gc.defaultTeacherId || ''}
+                              disabled={savingTeacherFor === gc.courseName}
+                              onChange={(e) => handleSetDefaultTeacher(gc.courseName, e.target.value)}
+                            >
+                              <option value="">{t('common.noneOption')}</option>
+                              {qualifiedTeachers.map((qt) => (
+                                <option key={qt.id} value={qt.id}>{qt.id} - {qt.name} {qt.lastName}</option>
+                              ))}
+                            </select>
+                            <div style={{ color: '#7f8c8d', fontSize: '12px', marginTop: '2px' }}>
+                              {t('groups.courses.noBlocksYetHint')}
+                            </div>
+                          </>
+                        ) : (
+                          (() => {
+                            const currentTeacher = teachers.find((tc) => tc.id === gc.defaultTeacherId);
+                            return currentTeacher
+                              ? `${currentTeacher.name} ${currentTeacher.lastName} (${t('groups.courses.noBlocksYet')})`
+                              : t('common.noneOption');
+                          })()
+                        )
+                      ) : canWrite() ? (
+                        <select
+                          value={teacherForCourse(gc.courseName)}
+                          disabled={savingTeacherFor === gc.courseName}
+                          onChange={(e) => handleSetCourseTeacher(gc.courseName, e.target.value)}
+                        >
+                          <option value="">{t('common.noneOption')}</option>
+                          {qualifiedTeachers.map((qt) => (
+                            <option key={qt.id} value={qt.id}>{qt.id} - {qt.name} {qt.lastName}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        (() => {
+                          const currentId = teacherForCourse(gc.courseName);
+                          const currentTeacher = teachers.find((tc) => tc.id === currentId);
+                          return currentTeacher
+                            ? `${currentTeacher.name} ${currentTeacher.lastName}`
+                            : t('common.noneOption');
+                        })()
+                      )}
+                    </td>
+                    <td>
+                      <WriteOnly>
+                        <button className="btn btn-danger" onClick={() => handleRemoveGroupCourse(gc.courseName)}>
+                          {t('common.delete')}
+                        </button>
+                      </WriteOnly>
+                    </td>
+                  </tr>
+                );
+              })}
               {groupCourses.length === 0 && (
                 <tr>
-                  <td colSpan={2} style={{ color: '#7f8c8d' }}>{t('groups.courses.none')}</td>
+                  <td colSpan={3} style={{ color: '#7f8c8d' }}>{t('groups.courses.none')}</td>
                 </tr>
               )}
             </tbody>

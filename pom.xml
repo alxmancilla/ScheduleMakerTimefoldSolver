@@ -13,6 +13,7 @@
     <description>School scheduling solution using Timefold Solver (multi-module)</description>
 
     <modules>
+        <module>common</module>
         <module>engine</module>
         <module>reporter</module>
         <module>web</module>
@@ -30,6 +31,17 @@
         <slf4j.version>2.0.5</slf4j.version>
         <logback.version>1.4.5</logback.version>
         <junit.version>4.13.2</junit.version>
+        <!-- Override spring-boot-dependencies' pinned Testcontainers version
+             (1.19.3): its docker-java client can't talk to newer Docker
+             Engine/Desktop releases (tested against Docker Engine 29.7.2,
+             API 1.55) - gets a malformed/empty response instead of a real
+             connection. This is Spring Boot's own documented override point. -->
+        <testcontainers.version>1.20.4</testcontainers.version>
+        <!-- Override spring-boot-dependencies' pinned Mockito/byte-buddy
+             (5.7.0 / 1.14.10): too old to instrument classes on newer JDKs.
+             See the dependencyManagement comment in web/pom.xml. -->
+        <mockito.version>5.23.0</mockito.version>
+        <byte-buddy.version>1.17.7</byte-buddy.version>
     </properties>
 
     <dependencyManagement>
@@ -42,6 +54,11 @@
                 <scope>import</scope>
             </dependency>
 
+            <dependency>
+                <groupId>com.example</groupId>
+                <artifactId>scheduler-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>ai.timefold.solver</groupId>
                 <artifactId>timefold-solver-core</artifactId>

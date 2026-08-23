@@ -18,6 +18,9 @@ public class GroupCourseEntity {
     @Column(name = "course_name", length = 200)
     private String courseName;
 
+    @Column(name = "default_teacher_id", length = 100)
+    private String defaultTeacherId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -55,6 +58,14 @@ public class GroupCourseEntity {
 
     public void setCourseName(String courseName) {
         this.courseName = courseName;
+    }
+
+    public String getDefaultTeacherId() {
+        return defaultTeacherId;
+    }
+
+    public void setDefaultTeacherId(String defaultTeacherId) {
+        this.defaultTeacherId = defaultTeacherId;
     }
 
     public LocalDateTime getCreatedAt() {

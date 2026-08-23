@@ -351,6 +351,35 @@ public class DataLoader {
     }
 
     /**
+     * Load per-component max-blocks-per-day rules and populate them in courses.
+     * A component with no row keeps {@code maxBlocksPerDay} null; the solver's
+     * constraint provider applies its own code default in that case.
+     */
+    private void loadComponentBlockRules(Connection conn, List<com.example.domain.Course> courses)
+            throws SQLException {
+        String sql = "SELECT component, max_blocks_per_day FROM component_block_rule";
+
+        Map<String, Integer> maxBlocksPerDayByComponent = new HashMap<>();
+
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                String component = rs.getString("component");
+                int maxBlocksPerDay = rs.getInt("max_blocks_per_day");
+                maxBlocksPerDayByComponent.put(component, maxBlocksPerDay);
+            }
+        }
+
+        for (com.example.domain.Course course : courses) {
+            Integer maxBlocksPerDay = maxBlocksPerDayByComponent.get(course.getComponent());
+            if (maxBlocksPerDay != null) {
+                course.setMaxBlocksPerDay(maxBlocksPerDay);
+            }
+        }
+    }
+
+    /**
      * Load the complete dataset for block-based scheduling from the database.
      *
      * @return SchoolSchedule with block timeslots and course block assignments
@@ -364,6 +393,7 @@ public class DataLoader {
             // NEW: Load room requirements and block templates
             loadRoomRequirements(conn, courses);
             loadBlockTemplates(conn, courses);
+            loadComponentBlockRules(conn, courses);
 
             List<Room> rooms = loadRooms(conn);
             List<BlockTimeslot> blockTimeslots = loadBlockTimeslots(conn);
@@ -417,7 +447,7 @@ public class DataLoader {
             throws SQLException {
         List<CourseBlockAssignment> assignments = new ArrayList<>();
 
-        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_name FROM course_block_assignment ORDER BY id";
+        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_hint FROM course_block_assignment ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -486,9 +516,9 @@ public class DataLoader {
                     assignment.setSatisfiesRoomType(satisfiesRoomType);
                 }
 
-                String preferredRoomName = rs.getString("preferred_room_name");
-                if (preferredRoomName != null && !preferredRoomName.isEmpty()) {
-                    assignment.setPreferredRoomName(preferredRoomName);
+                String preferredRoomHint = rs.getString("preferred_room_hint");
+                if (preferredRoomHint != null && !preferredRoomHint.isEmpty()) {
+                    assignment.setPreferredRoomHint(preferredRoomHint);
                 }
 
                 if (assignment.isPinned()) {

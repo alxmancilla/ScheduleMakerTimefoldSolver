@@ -2,8 +2,13 @@ package com.example.web.controller;
 
 import com.example.web.dto.CourseBlockAssignmentDTO;
 import com.example.web.entity.CourseBlockAssignmentEntity;
+import com.example.web.entity.RoomEntity;
+import com.example.web.entity.TeacherEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.RoomRepository;
+import com.example.web.repository.TeacherRepository;
+import com.example.common.RoomTypeCompatibility;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +24,12 @@ public class CourseBlockAssignmentController {
 
     @Autowired
     private CourseBlockAssignmentRepository assignmentRepository;
+
+    @Autowired
+    private TeacherRepository teacherRepository;
+
+    @Autowired
+    private RoomRepository roomRepository;
 
     @GetMapping
     public List<CourseBlockAssignmentEntity> getAllAssignments() {
@@ -102,6 +113,30 @@ public class CourseBlockAssignmentController {
         assignment.setBlockTimeslotId(request.getBlockTimeslotId());
         assignment.setRoomName(request.getRoomName());
         assignment.setSatisfiesRoomType(request.getSatisfiesRoomType());
-        assignment.setPreferredRoomName(request.getPreferredRoomName());
+        assignment.setPreferredRoomHint(request.getPreferredRoomHint());
+        applyTeacherRequiredRoom(assignment);
+    }
+
+    /**
+     * When this block's teacher has a required room, forces it onto roomName -
+     * overriding whatever room was submitted, regardless of the group's
+     * preferred room - as long as the room's type is compatible with this
+     * block's satisfiesRoomType. Runs on every create/update, not just when
+     * teacherId changes, so the requirement holds even if the room field alone
+     * is edited afterward.
+     */
+    private void applyTeacherRequiredRoom(CourseBlockAssignmentEntity assignment) {
+        if (assignment.getTeacherId() == null) {
+            return;
+        }
+        TeacherEntity teacher = teacherRepository.findById(assignment.getTeacherId()).orElse(null);
+        if (teacher == null || teacher.getRequiredRoomName() == null) {
+            return;
+        }
+        RoomEntity requiredRoom = roomRepository.findById(teacher.getRequiredRoomName()).orElse(null);
+        if (requiredRoom == null || !RoomTypeCompatibility.satisfies(requiredRoom.getType(), assignment.getSatisfiesRoomType())) {
+            return;
+        }
+        assignment.setRoomName(teacher.getRequiredRoomName());
     }
 }

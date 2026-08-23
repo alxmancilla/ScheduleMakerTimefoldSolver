@@ -37,8 +37,19 @@ Teacher, room, and course are fixed inputs, validated against the chosen timeslo
 constraints below rather than chosen by the solver.
 
 Blocks are 1-4 consecutive hours; how a course's weekly hours decompose into blocks is
-controlled by the course's component type (see `BlockGenerationService`/`DemoDataGenerator`)
-or, per course/group, an explicit `course_block_template` override managed in the Courses tab.
+controlled by the course's component type — a size configurable per component from Settings →
+Block Rules (`component_block_rule`), defaulting to 2h — or, per course/group, an explicit
+`course_block_template` override managed in the Courses tab.
+
+Since teacher and room aren't solver-assigned, `BlockGenerationService` ("Generate Blocks")
+pre-fills them wherever a more specific override doesn't already provide one: a block's room
+defaults first to a teacher's `required_room_name` (if that teacher is already pre-assigned to
+the block, and their required room's type fits), then to the group's `preferred_room_name` —
+each gated by room-type compatibility so a bad default is never applied. A teacher can be
+pre-assigned to a (group, course) pairing before any blocks exist via `group_course.
+default_teacher_id`, applied automatically the next time blocks are generated. Assigning a
+teacher afterward (Groups tab, Assignments tab, or the API) also re-applies their required room
+if one is set, regardless of the group's preference.
 
 ## Constraints
 
@@ -54,7 +65,7 @@ test run (9 hard, 8 soft).
 5. **No Room Double-Booking**
 6. **Room Type Must Satisfy Course Requirement** — uses `assignment.satisfiesRoomType`, not `course.roomRequirement` (dual room requirement support)
 7. **Group Cannot Have Two Courses at Same Time**
-8. **Maximum 2 Blocks Per Course Per Group Per Day**
+8. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
 9. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
 
 #### Soft Constraints (weighted quality preferences)
@@ -62,9 +73,9 @@ test run (9 hard, 8 soft).
 2. **Teacher Exceeds Max Hours Per Week** (weight 5)
 3. **Room Capacity Should Fit Group Size** (weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
 4. **Minimize Group Idle Gaps** (weight 3/hour, adjacent-pair only)
-5. **Prefer Block's Specified Room** (weight 3) — `preferred_room_name`
+5. **Prefer Block's Specified Room** (weight 3) — `preferred_room_hint`
 6. **Minimize Teacher Idle Gaps** (weight 2/hour, availability-aware, adjacent-pair only)
-7. **Prefer Group's Preferred Room** (weight 2) — excludes lab-satisfying blocks
+7. **Prefer Group's Preferred Room** (weight 2) — excludes `mixto`-required blocks
 8. **Minimize Teacher Building Changes** (weight 1)
 
 ## Features
@@ -72,30 +83,38 @@ test run (9 hard, 8 soft).
 ### Solver / engine
 - Multi-hour consecutive blocks (1-4 hours), with pinning support for locking specific blocks to a teacher/room/timeslot
 - Dual room requirements (a course can split its hours across multiple room types) and custom per-course/per-group block templates — both database-driven and web-UI-manageable
+- Per-component block-sizing and max-blocks-per-day rules (`component_block_rule`), configurable from Settings → Block Rules instead of hardcoded
+- Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's preferred room are applied automatically wherever a more specific override doesn't already provide one
 - Optional room-capacity awareness (`room.capacity` vs. `student_group.student_count`)
-- 6 room types: estándar, laboratorio, taller, taller electromecánica, taller electrónica, centro de cómputo
+- 4 room types: estándar, mixto (doubles as estándar or taller), taller, centro de cómputo
 - PostgreSQL-backed: schema, reporting views, and data loading scripts
 - Three PDF reports (violations, by-teacher, by-group) via Constraint Streams-based analysis
 
 ### Web app
 - Role-based access control (`READER`/`WRITER`/`ADMIN`/`TEACHER`) over stateless JWT — see [Authentication & Roles](#authentication--roles)
-- Full CRUD for teachers, courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management), and course block assignments
+- Full CRUD for teachers (incl. an optional required-room override), courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management, a per-course-teacher pre-assignment, and a warning when a course has no qualified teacher), and course block assignments
 - Bilingual UI (English/Spanish, `react-i18next`) with a per-user language preference
-- Admin: user management, timeslot management, current-term label, write-activity audit log, admin-triggered solver runs and block generation
+- Admin: user management, timeslot management, current-term label, write-activity audit log, admin-triggered solver runs and block generation, per-component block rules
 - Excel import/export (`POST`/`GET /api/import/excel`) — the same `.xlsx` layout both ways, for a full export → edit → re-import round trip
 - Teacher self-service: a `TEACHER`-role account sees only its own schedule
 - Search, pagination, toast notifications, and confirm dialogs throughout
 
 ## Project Structure
 
-Maven multi-module build: an aggregator `pom.xml` at the root with three
-modules that only integrate through the shared PostgreSQL database (no
-module-to-module dependency between `engine` and `web`), plus the standalone
-`web-ui/` React frontend.
+Maven multi-module build: an aggregator `pom.xml` at the root with four
+modules, plus the standalone `web-ui/` React frontend. `engine` and `web`
+integrate with each other only through the shared PostgreSQL database (no
+module-to-module dependency between them) but both depend on `common` for
+shared business rules — the one exception to "modules only talk through the
+database," used specifically to avoid hand-syncing the same rule twice.
 
 ```
 .
 ├── pom.xml                              # Aggregator/parent POM
+├── common/                              # scheduler-common: shared business rules, plain Java,
+│   │                                     # no framework/persistence deps
+│   └── src/main/java/com/example/common/
+│       └── RoomTypeCompatibility.java   # e.g. does room type X satisfy requirement Y
 ├── engine/                              # scheduler-engine: Timefold + JDBC, no Spring
 │   └── src/main/java/com/example/
 │       ├── MainBlockSchedulingApp.java  # Entry point: load -> solve -> save
@@ -166,6 +185,33 @@ user `mancilla`, empty password).
 mvn clean compile
 mvn test
 ```
+
+`mvn test` (Surefire) is unit tests only, no external dependencies, and should always be green
+(`web`: 278 tests, 0 failures, 0 errors). If you see `web` tests failing in bulk with "Mockito
+cannot mock this class" / "Could not modify all classes" cascading into dozens of unrelated
+"ApplicationContext failure threshold exceeded" errors, that's `spring-boot-dependencies`
+3.2.1's pinned Mockito 5.7.0/byte-buddy 1.14.10 being too old to instrument classes on your JDK —
+already fixed here by overriding `mockito.version`/`byte-buddy.version` in the root `pom.xml` and
+importing them in `web/pom.xml`'s `dependencyManagement`; bump those two properties further if a
+newer JDK regresses again.
+
+The `web` module also has a thin **integration test layer** against a real, disposable PostgreSQL
+container (Testcontainers) covering the handful of behaviors a mocked repository can't verify —
+FK/cascade enforcement, JPQL null-handling. It's bound to Failsafe (`*IT.java`, the `verify`
+phase), not Surefire, so it never runs as part of plain `mvn test`:
+```bash
+# Requires Docker running
+mvn -pl web verify
+```
+If this fails immediately with `Could not find a valid Docker environment` even though `docker
+info` works fine from a terminal, it's very likely Testcontainers' bundled docker-java client
+failing to talk to a newer Docker Desktop/Engine than it was built against (seen with Docker
+Engine 29.7.2 / API 1.55 against Testcontainers 1.19.3, the version `spring-boot-dependencies`
+3.2.1 pins — fixed here by pinning `testcontainers.version` and importing `testcontainers-bom`
+directly in `web/pom.xml`, see the comments there). If it still fails intermittently after that,
+try forking the Failsafe JVM under a different installed JDK (`-Djvm=/path/to/java`) — a
+bleeding-edge JDK for the Maven/test process itself has been observed to make the same Docker
+Desktop connection flaky.
 
 ### Run the Solver
 ```bash
@@ -279,10 +325,12 @@ sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 ## Contributing
 
 1. **Constraints**: edit `engine/.../solver/SchoolConstraintProvider.java`, keeping `engine/.../analysis/BlockScheduleAnalyzer.java` in sync — `ConstraintConsistencyTest` fails the build if they drift
-2. **Schema**: update `database/schema_block_scheduling.sql` (fresh-install shape) and add a corresponding file under `database/migrations/` for existing databases
-3. **Dataset**: modify `database/datasets/load_final_dataset_blocks.sql`, then reload it
-4. **Test**: `mvn test` (all three modules), plus a solver run if you touched constraints
-5. **Web API/UI**: see [Project Structure](#project-structure) for where each concern lives (`web/.../controller`, `entity`, `dto`, `security`; `web-ui/src/components`, `api.js`, `i18n/{en,es}.json`)
+2. **A rule needed by both `engine` and `web`**: put it in `common/` instead of writing it twice — that's the whole reason the module exists (see `RoomTypeCompatibility` for the pattern)
+3. **Schema**: update `database/schema_block_scheduling.sql` (fresh-install shape) and add a corresponding file under `database/migrations/` for existing databases
+4. **Dataset**: modify `database/datasets/load_final_dataset_blocks.sql`, then reload it
+5. **A hand-maintained set of valid string values reused across several columns** (like room type or course component): make it a lookup table with FKs into it instead — see `room_type`/`course_component` for the pattern. Turns a rename into one `UPDATE` and turns a typo into a loud FK violation instead of a silent orphaned value.
+6. **Test**: `mvn test` (all four modules) for unit tests; see [Compile & Test](#compile--test) for the Testcontainers-backed integration layer (requires Docker) — add to it when a change relies on real DB behavior (a constraint, cascade, or JPQL null-handling) a mock can't verify. Run a solver pass too if you touched constraints
+7. **Web API/UI**: see [Project Structure](#project-structure) for where each concern lives (`web/.../controller`, `entity`, `dto`, `security`; `web-ui/src/components`, `api.js`, `i18n/{en,es}.json`)
 
 For the change history, use `git log` rather than this file.
 

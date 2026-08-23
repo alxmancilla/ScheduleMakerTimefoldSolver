@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 public class ExcelImportService {
 
     private static final Set<String> VALID_ROOM_TYPES = Set.of(
-            "estándar", "laboratorio", "taller", "taller electromecánica", "taller electrónica", "centro de cómputo");
+            "estándar", "mixto", "taller", "centro de cómputo");
     private static final Pattern ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
 
     @Autowired

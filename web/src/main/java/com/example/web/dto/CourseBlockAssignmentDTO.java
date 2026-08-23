@@ -46,8 +46,8 @@ public class CourseBlockAssignmentDTO {
     @Size(max = 100, message = "Satisfies room type must not exceed 100 characters")
     private String satisfiesRoomType;
 
-    @Size(max = 100, message = "Preferred room name must not exceed 100 characters")
-    private String preferredRoomName;
+    @Size(max = 100, message = "Preferred room hint must not exceed 100 characters")
+    private String preferredRoomHint;
 
     public CourseBlockAssignmentDTO() {
     }
@@ -126,11 +126,11 @@ public class CourseBlockAssignmentDTO {
         this.satisfiesRoomType = satisfiesRoomType;
     }
 
-    public String getPreferredRoomName() {
-        return preferredRoomName;
+    public String getPreferredRoomHint() {
+        return preferredRoomHint;
     }
 
-    public void setPreferredRoomName(String preferredRoomName) {
-        this.preferredRoomName = preferredRoomName;
+    public void setPreferredRoomHint(String preferredRoomHint) {
+        this.preferredRoomHint = preferredRoomHint;
     }
 }

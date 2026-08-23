@@ -1,21 +1,13 @@
 package com.example.domain;
 
-import java.util.Collections;
-import java.util.HashSet;
+import com.example.common.RoomTypeCompatibility;
+
 import java.util.Objects;
-import java.util.Set;
 
 public class Room {
     private final String name;
     private final String building;
-    private final String type; // 'estándar', 'laboratorio', 'taller', 'taller electromecánica',
-                               // 'taller electrónica', 'centro de cómputo'
-
-    // The set of room-type requirements this physical room can satisfy. Seeded by
-    // convention from the primary type: a laboratorio can also serve as a plain
-    // classroom (estándar), while every other type satisfies only itself. A plain
-    // estándar room deliberately does NOT satisfy a laboratorio requirement.
-    private final Set<String> capabilities;
+    private final String type; // 'estándar', 'mixto', 'taller', 'centro de cómputo'
 
     // Optional seating capacity. Null when unknown/not tracked, in which case
     // the room-capacity soft constraint is skipped for this room.
@@ -30,19 +22,6 @@ public class Room {
         this.building = building;
         this.type = type;
         this.capacity = capacity;
-        this.capabilities = capabilitiesFor(type);
-    }
-
-    private static Set<String> capabilitiesFor(String type) {
-        Set<String> caps = new HashSet<>();
-        if (type != null) {
-            caps.add(type);
-            if ("laboratorio".equals(type)) {
-                // A lab is equipped with desks/board, so it can also host a regular class.
-                caps.add("estándar");
-            }
-        }
-        return Collections.unmodifiableSet(caps);
     }
 
     public String getName() {
@@ -61,8 +40,15 @@ public class Room {
         return capacity;
     }
 
+    /**
+     * Whether this room satisfies a room-type requirement, per the shared
+     * convention-seeded rule in {@link RoomTypeCompatibility} (a mixto room
+     * also satisfies estándar and taller; every other type satisfies only
+     * itself). Delegates rather than reimplementing so engine and web can
+     * never drift on this rule again.
+     */
     public boolean satisfiesRequirement(String requirement) {
-        return capabilities.contains(requirement);
+        return RoomTypeCompatibility.satisfies(type, requirement);
     }
 
     @Override
