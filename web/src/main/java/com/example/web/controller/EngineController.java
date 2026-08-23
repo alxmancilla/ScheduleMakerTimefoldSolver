@@ -1,10 +1,13 @@
 package com.example.web.controller;
 
+import com.example.web.dto.EngineRunRequest;
 import com.example.web.dto.EngineStatusResponse;
 import com.example.web.service.EngineRunnerService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,8 +23,10 @@ public class EngineController {
     private EngineRunnerService engineRunnerService;
 
     @PostMapping("/run")
-    public EngineStatusResponse runEngine() {
-        if (!engineRunnerService.tryStart()) {
+    public EngineStatusResponse runEngine(@Valid @RequestBody(required = false) EngineRunRequest request) {
+        Integer minutesSpentLimit = request != null ? request.getMinutesSpentLimit() : null;
+        Integer unimprovedMinutesSpentLimit = request != null ? request.getUnimprovedMinutesSpentLimit() : null;
+        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit)) {
             throw new IllegalArgumentException("The engine is already running");
         }
         return new EngineStatusResponse(engineRunnerService.getSnapshot());

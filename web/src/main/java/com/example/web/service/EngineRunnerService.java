@@ -72,11 +72,24 @@ public class EngineRunnerService {
     }
 
     /**
-     * Starts the engine subprocess if one isn't already running.
+     * Starts the engine subprocess if one isn't already running, with the
+     * solverConfig.xml local search time budget as configured.
      *
      * @return true if this call started a run, false if one was already in progress
      */
     public boolean tryStart() {
+        return tryStart(null, null);
+    }
+
+    /**
+     * Starts the engine subprocess if one isn't already running, optionally
+     * overriding the local search phase's total/unimproved time budget for this
+     * run only (solverConfig.xml is never modified). Either argument may be null
+     * to leave that value as solverConfig.xml defines it.
+     *
+     * @return true if this call started a run, false if one was already in progress
+     */
+    public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit) {
         synchronized (lock) {
             if (state == State.RUNNING) {
                 return false;
@@ -87,15 +100,22 @@ public class EngineRunnerService {
             exitCode = null;
             logLines.clear();
         }
-        executor.submit(this::runProcess);
+        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit));
         return true;
     }
 
-    private void runProcess() {
+    private void runProcess(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit) {
         Integer resultCode = null;
         try {
             ProcessBuilder builder = new ProcessBuilder("bash", "scripts/run-engine.sh");
             builder.directory(new File(workingDir));
+            if (minutesSpentLimit != null) {
+                builder.environment().put("SOLVER_MINUTES_LIMIT", String.valueOf(minutesSpentLimit));
+            }
+            if (unimprovedMinutesSpentLimit != null) {
+                builder.environment().put("SOLVER_UNIMPROVED_MINUTES_LIMIT",
+                        String.valueOf(unimprovedMinutesSpentLimit));
+            }
             builder.redirectErrorStream(true);
             Process process = builder.start();
 

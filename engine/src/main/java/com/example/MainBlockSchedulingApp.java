@@ -66,8 +66,14 @@ public class MainBlockSchedulingApp {
             System.exit(1);
         }
 
-        // Build solver
-        SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory();
+        // Build solver, optionally overriding the local search time budget via env
+        // vars (SOLVER_MINUTES_LIMIT / SOLVER_UNIMPROVED_MINUTES_LIMIT) - unset means
+        // "use solverConfig.xml's own values" (5 / 2 minutes), same as before this
+        // override point existed.
+        Long minutesSpentLimit = parseLongEnv("SOLVER_MINUTES_LIMIT");
+        Long unimprovedMinutesSpentLimit = parseLongEnv("SOLVER_UNIMPROVED_MINUTES_LIMIT");
+        SolverFactory<SchoolSchedule> solverFactory = SchoolSolverConfig.buildSolverFactory(minutesSpentLimit,
+                unimprovedMinutesSpentLimit);
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
 
         // Add event listener to track progress. Best-solution events can fire very
@@ -150,5 +156,14 @@ public class MainBlockSchedulingApp {
 
         System.out.println("=== Block-Based Scheduling Complete! ===");
         System.out.println("Run the reporter module to generate PDF reports from the persisted schedule.");
+    }
+
+    /** Null if the env var is unset/blank; throws on a set-but-non-numeric value rather than silently ignoring it. */
+    private static Long parseLongEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return Long.parseLong(value.trim());
     }
 }

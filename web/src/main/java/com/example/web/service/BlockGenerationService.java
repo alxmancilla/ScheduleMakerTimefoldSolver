@@ -123,6 +123,24 @@ public class BlockGenerationService {
         return new GenerationResult(created, skippedExisting, warnings);
     }
 
+    /**
+     * Clears block_timeslot_id on every unpinned course_block_assignment row,
+     * leaving pinned rows untouched - useful for discarding a solve (or a bad
+     * manual edit) and starting fresh without losing pinned placements.
+     * Teacher and room are untouched too, since neither is solver-assigned.
+     *
+     * @return how many rows were cleared
+     */
+    @Transactional
+    public int clearUnpinnedTimeslots() {
+        List<CourseBlockAssignmentEntity> unpinned = assignmentRepository.findByPinned(false);
+        for (CourseBlockAssignmentEntity assignment : unpinned) {
+            assignment.setBlockTimeslotId(null);
+        }
+        assignmentRepository.saveAll(unpinned);
+        return unpinned.size();
+    }
+
     /** Decomposes and saves the blocks for one (group, course) pair; returns how many blocks were created. */
     private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());

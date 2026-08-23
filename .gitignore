@@ -52,6 +52,7 @@ database/migrations/*
 !database/migrations/rename_digital_add_specialized_designation.sql
 !database/migrations/consolidate_non_core_digital_designations_to_specialized.sql
 !database/migrations/add_calendar_exception.sql
+!database/migrations/add_schedule_run_history.sql
 md_files/
 
 # Build artifacts

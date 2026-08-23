@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 public class ScheduleController {
 
         @Autowired
-        private CourseBlockAssignmentRepository assignmentRepository;
+        private CourseBlockAssignmentCurrentRepository assignmentRepository;
 
         @Autowired
         private BlockTimeslotRepository timeslotRepository;
@@ -37,7 +37,7 @@ public class ScheduleController {
 
         @GetMapping("/view")
         public ScheduleViewDTO getScheduleView() {
-                List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findAssignedBlocks();
+                List<CourseBlockAssignmentCurrentEntity> assignments = assignmentRepository.findAssignedBlocks();
                 Map<String, BlockTimeslotEntity> timeslots = timeslotRepository.findAll().stream()
                                 .collect(Collectors.toMap(BlockTimeslotEntity::getId, t -> t));
                 Map<String, CourseEntity> courses = courseRepository.findAll().stream()
@@ -51,7 +51,7 @@ public class ScheduleController {
 
                 List<ScheduleViewDTO.ScheduleEntry> entries = new ArrayList<>();
 
-                for (CourseBlockAssignmentEntity assignment : assignments) {
+                for (CourseBlockAssignmentCurrentEntity assignment : assignments) {
                         BlockTimeslotEntity timeslot = timeslots.get(assignment.getBlockTimeslotId());
                         CourseEntity course = courses.get(assignment.getCourseId());
                         TeacherEntity teacher = teachers.get(assignment.getTeacherId());
@@ -88,7 +88,7 @@ public class ScheduleController {
 
         @GetMapping("/view/group/{groupId}")
         public ScheduleViewDTO getScheduleViewByGroup(@PathVariable String groupId) {
-                List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findByGroupId(groupId)
+                List<CourseBlockAssignmentCurrentEntity> assignments = assignmentRepository.findByGroupId(groupId)
                                 .stream()
                                 .filter(a -> a.getBlockTimeslotId() != null)
                                 .collect(Collectors.toList());
@@ -98,7 +98,7 @@ public class ScheduleController {
 
         @GetMapping("/view/teacher/{teacherId}")
         public ScheduleViewDTO getScheduleViewByTeacher(@PathVariable String teacherId) {
-                List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findByTeacherId(teacherId)
+                List<CourseBlockAssignmentCurrentEntity> assignments = assignmentRepository.findByTeacherId(teacherId)
                                 .stream()
                                 .filter(a -> a.getBlockTimeslotId() != null)
                                 .collect(Collectors.toList());
@@ -120,7 +120,7 @@ public class ScheduleController {
                 if (teacherId == null) {
                         return buildScheduleView(Collections.emptyList());
                 }
-                List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findByTeacherId(teacherId)
+                List<CourseBlockAssignmentCurrentEntity> assignments = assignmentRepository.findByTeacherId(teacherId)
                                 .stream()
                                 .filter(a -> a.getBlockTimeslotId() != null)
                                 .collect(Collectors.toList());
@@ -130,7 +130,7 @@ public class ScheduleController {
 
         @GetMapping("/view/room/{roomName}")
         public ScheduleViewDTO getScheduleViewByRoom(@PathVariable String roomName) {
-                List<CourseBlockAssignmentEntity> assignments = assignmentRepository.findByRoomName(roomName)
+                List<CourseBlockAssignmentCurrentEntity> assignments = assignmentRepository.findByRoomName(roomName)
                                 .stream()
                                 .filter(a -> a.getBlockTimeslotId() != null)
                                 .collect(Collectors.toList());
@@ -138,7 +138,7 @@ public class ScheduleController {
                 return buildScheduleView(assignments);
         }
 
-        private ScheduleViewDTO buildScheduleView(List<CourseBlockAssignmentEntity> assignments) {
+        private ScheduleViewDTO buildScheduleView(List<CourseBlockAssignmentCurrentEntity> assignments) {
                 Map<String, BlockTimeslotEntity> timeslots = timeslotRepository.findAll().stream()
                                 .collect(Collectors.toMap(BlockTimeslotEntity::getId, t -> t));
                 Map<String, CourseEntity> courses = courseRepository.findAll().stream()
@@ -152,7 +152,7 @@ public class ScheduleController {
 
                 List<ScheduleViewDTO.ScheduleEntry> entries = new ArrayList<>();
 
-                for (CourseBlockAssignmentEntity assignment : assignments) {
+                for (CourseBlockAssignmentCurrentEntity assignment : assignments) {
                         BlockTimeslotEntity timeslot = timeslots.get(assignment.getBlockTimeslotId());
                         CourseEntity course = courses.get(assignment.getCourseId());
                         TeacherEntity teacher = teachers.get(assignment.getTeacherId());

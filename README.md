@@ -2,7 +2,9 @@
 
 A Java 17 application that places pre-assigned teacher/room/course blocks into weekly timeslots using **Timefold Solver 1.29.0**. Each `CourseBlockAssignment` arrives with its teacher, room, and course already assigned; the solver's single planning variable is the block's `timeslot`. It optimizes timeslot placement while respecting hard constraints and soft preferences.
 
-> **Scope note:** Teacher and room are **not** planning variables — they are fixed inputs pre-assigned from the database (the `teacher`/`room` `@PlanningVariable` annotations are intentionally commented out, and `DataSaver` persists only `block_timeslot_id`). This is a **timeslot optimizer** over pre-assigned teacher/room blocks, not a full teacher/room scheduler.
+> **Scope note:** Teacher and room are **not** planning variables — they are fixed inputs pre-assigned from the database (the `teacher`/`room` `@PlanningVariable` annotations are intentionally commented out). This is a **timeslot optimizer** over pre-assigned teacher/room blocks, not a full teacher/room scheduler.
+
+> **Schedule run history:** `course_block_assignment` is pure input — the solver never writes to it. Each solve inserts a `schedule_run` (score + timestamp) and one `schedule_run_result` row per assignment, then prunes to the most recent 10 runs. Anything showing "the current schedule" reads through the `course_block_assignment_current` view (pinned rows resolve to their own input timeslot; everything else resolves to the latest run), which also gives the solver warm-starting for free.
 
 ## Purpose
 

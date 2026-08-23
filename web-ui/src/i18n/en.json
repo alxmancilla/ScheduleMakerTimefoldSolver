@@ -394,6 +394,9 @@
       "running": "Running…",
       "description": "Runs the solver as a background process (scripts/run-engine.sh) and writes results straight to the database. This can take up to a few minutes.",
       "startFailedPrefix": "Failed to start engine: ",
+      "minutesSpentLimit": "Total time limit (minutes)",
+      "unimprovedMinutesSpentLimit": "Give up if stuck for (minutes)",
+      "limitsDescription": "Applies to this run only — solverConfig.xml itself isn't changed. Leave the defaults (5 / 2) unless you have a reason to run longer or shorter.",
       "state": "State:",
       "started": "Started:",
       "finished": "Finished:",
@@ -419,7 +422,16 @@
       "generating": "Generating…",
       "description": "Creates the unassigned schedule blocks the solver needs, one per (group, course) pair in Group_Courses, decomposing each course's required hours into 1-2 hour blocks. Only fills gaps — a (group, course) pair that already has blocks is left untouched, so this is safe to re-run after importing new groups/courses. Run this after the Import tab and before Start Engine.",
       "failedPrefix": "Failed to generate blocks: ",
-      "resultSummary": "Created {{created}} block(s); skipped {{skipped}} pair(s) that already had blocks."
+      "resultSummary": "Created {{created}} block(s); skipped {{skipped}} pair(s) that already had blocks.",
+      "clearTimeslots": {
+        "title": "Clear Unpinned Timeslots",
+        "button": "Clear Unpinned Timeslots",
+        "clearing": "Clearing…",
+        "description": "Unassigns the timeslot on every block that isn't pinned, leaving pinned placements untouched. Teacher and room assignments are not affected. Use this to discard a solve (or a bad manual edit) before running the engine again.",
+        "confirm": "Clear the timeslot on every unpinned block? Pinned blocks won't be touched. This can't be undone.",
+        "failedPrefix": "Failed to clear timeslots: ",
+        "resultSummary": "Cleared the timeslot on {{count}} unpinned block(s)."
+      }
     },
     "timeslots": {
       "title": "Timeslots",

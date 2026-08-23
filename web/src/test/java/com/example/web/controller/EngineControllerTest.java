@@ -16,6 +16,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,20 +43,42 @@ public class EngineControllerTest {
     }
 
     @Test
-    public void runEngine_notAlreadyRunning_startsAndReturnsStatus() throws Exception {
-        when(engineRunnerService.tryStart()).thenReturn(true);
+    public void runEngine_noBody_startsWithNoOverrides() throws Exception {
+        when(engineRunnerService.tryStart(null, null)).thenReturn(true);
         when(engineRunnerService.getSnapshot()).thenReturn(snapshot(EngineRunnerService.State.RUNNING, null));
 
         mockMvc.perform(post("/api/admin/engine/run"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("RUNNING"));
 
-        verify(engineRunnerService).tryStart();
+        verify(engineRunnerService).tryStart(null, null);
+    }
+
+    @Test
+    public void runEngine_withOverrides_passesThemThrough() throws Exception {
+        when(engineRunnerService.tryStart(10, 4)).thenReturn(true);
+        when(engineRunnerService.getSnapshot()).thenReturn(snapshot(EngineRunnerService.State.RUNNING, null));
+
+        mockMvc.perform(post("/api/admin/engine/run")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"minutesSpentLimit\":10,\"unimprovedMinutesSpentLimit\":4}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("RUNNING"));
+
+        verify(engineRunnerService).tryStart(10, 4);
+    }
+
+    @Test
+    public void runEngine_outOfBoundsOverride_returns400() throws Exception {
+        mockMvc.perform(post("/api/admin/engine/run")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"minutesSpentLimit\":60}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     public void runEngine_alreadyRunning_returns400() throws Exception {
-        when(engineRunnerService.tryStart()).thenReturn(false);
+        when(engineRunnerService.tryStart(null, null)).thenReturn(false);
 
         mockMvc.perform(post("/api/admin/engine/run"))
                 .andExpect(status().isBadRequest())

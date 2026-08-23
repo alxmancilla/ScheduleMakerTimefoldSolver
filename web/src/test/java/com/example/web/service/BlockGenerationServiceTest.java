@@ -454,4 +454,26 @@ public class BlockGenerationServiceTest {
         List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
         assertEquals(List.of(2, 1), lengths);
     }
+
+    @Test
+    public void clearUnpinnedTimeslots_clearsOnlyUnpinnedRowsAndReturnsCount() {
+        CourseBlockAssignmentEntity unpinned1 = new CourseBlockAssignmentEntity();
+        unpinned1.setId("a1");
+        unpinned1.setBlockTimeslotId("slot-1");
+        unpinned1.setPinned(false);
+
+        CourseBlockAssignmentEntity unpinned2 = new CourseBlockAssignmentEntity();
+        unpinned2.setId("a2");
+        unpinned2.setBlockTimeslotId("slot-2");
+        unpinned2.setPinned(false);
+
+        when(assignmentRepository.findByPinned(false)).thenReturn(List.of(unpinned1, unpinned2));
+
+        int cleared = service.clearUnpinnedTimeslots();
+
+        assertEquals(2, cleared);
+        assertEquals(null, unpinned1.getBlockTimeslotId());
+        assertEquals(null, unpinned2.getBlockTimeslotId());
+        verify(assignmentRepository).saveAll(List.of(unpinned1, unpinned2));
+    }
 }

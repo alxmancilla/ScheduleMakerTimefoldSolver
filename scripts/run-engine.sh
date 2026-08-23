@@ -8,12 +8,14 @@
 # not a daemon, so it is well suited to on-demand or cron invocation.
 #
 # Configuration (environment variables, all optional):
-#   DB_URL              JDBC URL      (default: jdbc:postgresql://localhost:5432/school_schedule)
-#   DB_USER             DB username   (default: mancilla)
-#   DB_PASSWORD         DB password   (default: empty)
-#   ENGINE_JAR          Path to the shaded engine jar (default: newest under engine/target)
-#   ENGINE_OUTPUT_DIR   Where PDF reports are written  (default: current directory)
-#   JAVA_OPTS           Extra JVM flags (e.g. -Xmx1g)
+#   DB_URL                              JDBC URL      (default: jdbc:postgresql://localhost:5432/school_schedule)
+#   DB_USER                             DB username   (default: mancilla)
+#   DB_PASSWORD                         DB password   (default: empty)
+#   ENGINE_JAR                          Path to the shaded engine jar (default: newest under engine/target)
+#   ENGINE_OUTPUT_DIR                   Where PDF reports are written  (default: current directory)
+#   JAVA_OPTS                           Extra JVM flags (e.g. -Xmx1g)
+#   SOLVER_MINUTES_LIMIT                Overrides solverConfig.xml's local search total time budget (default: 5)
+#   SOLVER_UNIMPROVED_MINUTES_LIMIT     Overrides solverConfig.xml's give-up-if-stuck limit (default: 2)
 #
 # Exit code is that of the JVM: non-zero on failure, so cron/orchestrators can
 # detect a failed run.

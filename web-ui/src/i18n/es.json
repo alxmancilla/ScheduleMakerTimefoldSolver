@@ -394,6 +394,9 @@
       "running": "Ejecutando…",
       "description": "Ejecuta el solver como un proceso en segundo plano (scripts/run-engine.sh) y escribe los resultados directamente en la base de datos. Esto puede tardar hasta unos minutos.",
       "startFailedPrefix": "Error al iniciar el motor: ",
+      "minutesSpentLimit": "Límite de tiempo total (minutos)",
+      "unimprovedMinutesSpentLimit": "Rendirse si no mejora en (minutos)",
+      "limitsDescription": "Aplica solo a esta ejecución — solverConfig.xml no se modifica. Deje los valores predeterminados (5 / 2) salvo que tenga motivo para ejecutar más o menos tiempo.",
       "state": "Estado:",
       "started": "Iniciado:",
       "finished": "Finalizado:",
@@ -419,7 +422,16 @@
       "generating": "Generando…",
       "description": "Crea los bloques de horario sin asignar que necesita el solver, uno por cada par (grupo, curso) en Group_Courses, descomponiendo las horas requeridas de cada curso en bloques de 1-2 horas. Solo llena los vacíos — un par (grupo, curso) que ya tiene bloques queda sin modificar, por lo que es seguro volver a ejecutarlo después de importar nuevos grupos/cursos. Ejecute esto después de la pestaña Importar y antes de Iniciar Motor.",
       "failedPrefix": "Error al generar bloques: ",
-      "resultSummary": "Se crearon {{created}} bloque(s); se omitieron {{skipped}} par(es) que ya tenían bloques."
+      "resultSummary": "Se crearon {{created}} bloque(s); se omitieron {{skipped}} par(es) que ya tenían bloques.",
+      "clearTimeslots": {
+        "title": "Vaciar Horarios Sin Fijar",
+        "button": "Vaciar Horarios Sin Fijar",
+        "clearing": "Vaciando…",
+        "description": "Quita el horario asignado de cada bloque que no esté fijado, dejando intactas las asignaciones fijadas. No afecta las asignaciones de maestro ni de aula. Úselo para descartar una resolución (o una edición manual incorrecta) antes de volver a ejecutar el motor.",
+        "confirm": "¿Vaciar el horario de cada bloque sin fijar? Los bloques fijados no se tocarán. Esto no se puede deshacer.",
+        "failedPrefix": "Error al vaciar horarios: ",
+        "resultSummary": "Se vació el horario de {{count}} bloque(s) sin fijar."
+      }
     },
     "timeslots": {
       "title": "Horarios",

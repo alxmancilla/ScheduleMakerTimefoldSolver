@@ -137,11 +137,12 @@ export const getPinnedAssignments = () => api.get('/assignments/pinned');
 export const listTimeslots = () => api.get('/timeslots');
 
 // Admin: Engine (solver)
-export const runEngine = () => api.post('/admin/engine/run');
+export const runEngine = (overrides) => api.post('/admin/engine/run', overrides || {});
 export const getEngineStatus = () => api.get('/admin/engine/status');
 
 // Admin: Generate Blocks
 export const generateBlocks = () => api.post('/admin/blocks/generate');
+export const clearUnpinnedTimeslots = () => api.post('/admin/blocks/clear-timeslots');
 
 // Admin: compliance-snapshot PDFs (calendario-incumplimientos.pdf),
 // generated automatically after each engine run - ADMIN only, distinct from

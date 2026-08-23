@@ -447,7 +447,12 @@ public class DataLoader {
             throws SQLException {
         List<CourseBlockAssignment> assignments = new ArrayList<>();
 
-        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_hint FROM course_block_assignment ORDER BY id";
+        // Reads through course_block_assignment_current rather than the raw table:
+        // pinned rows resolve to their own input block_timeslot_id, every other row
+        // resolves to the most recent schedule_run's result - which is also what
+        // gives the solver warm-starting (continuing from the last run's placements)
+        // without any extra seeding logic here.
+        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_hint FROM course_block_assignment_current ORDER BY id";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {

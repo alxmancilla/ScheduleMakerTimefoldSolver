@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   getTimeslots, createTimeslot, updateTimeslot, deleteTimeslot,
-  runEngine, getEngineStatus, generateBlocks,
+  runEngine, getEngineStatus, generateBlocks, clearUnpinnedTimeslots,
   listAdminReports, downloadAdminReport,
   getTerm, updateTerm, getAuditLog,
   getComponentBlockRules, setComponentBlockRule, deleteComponentBlockRule, getCourseDesignations,
@@ -58,6 +58,11 @@ function Settings() {
 
   const [engineStatus, setEngineStatus] = useState(null);
   const [engineError, setEngineError] = useState(null);
+  // Pre-filled with solverConfig.xml's own defaults; omitted from the request
+  // (left as null) only if the field is cleared entirely, which leaves that
+  // value as the XML defines it.
+  const [minutesSpentLimit, setMinutesSpentLimit] = useState(5);
+  const [unimprovedMinutesSpentLimit, setUnimprovedMinutesSpentLimit] = useState(2);
   const pollRef = useRef(null);
 
   const [adminReports, setAdminReports] = useState([]);
@@ -191,7 +196,10 @@ function Settings() {
   const handleRunEngine = async () => {
     setEngineError(null);
     try {
-      const response = await runEngine();
+      const response = await runEngine({
+        minutesSpentLimit: minutesSpentLimit === '' ? null : minutesSpentLimit,
+        unimprovedMinutesSpentLimit: unimprovedMinutesSpentLimit === '' ? null : unimprovedMinutesSpentLimit,
+      });
       setEngineStatus(response.data);
       startPolling();
     } catch (err) {
@@ -214,6 +222,27 @@ function Settings() {
       setBlockGenError(err.response?.data?.message || t('settings.generateBlocks.failedPrefix') + err.message);
     } finally {
       setGeneratingBlocks(false);
+    }
+  };
+
+  const [clearTimeslotsResult, setClearTimeslotsResult] = useState(null);
+  const [clearTimeslotsError, setClearTimeslotsError] = useState(null);
+  const [clearingTimeslots, setClearingTimeslots] = useState(false);
+
+  const handleClearUnpinnedTimeslots = async () => {
+    if (!(await confirmAction(t('settings.generateBlocks.clearTimeslots.confirm')))) return;
+    setClearingTimeslots(true);
+    setClearTimeslotsError(null);
+    setClearTimeslotsResult(null);
+    try {
+      const response = await clearUnpinnedTimeslots();
+      setClearTimeslotsResult(response.data);
+    } catch (err) {
+      setClearTimeslotsError(
+        err.response?.data?.message || t('settings.generateBlocks.clearTimeslots.failedPrefix') + err.message
+      );
+    } finally {
+      setClearingTimeslots(false);
     }
   };
 
@@ -500,7 +529,7 @@ function Settings() {
       {activeTab === 'solver' && (
       <div role="tabpanel" id="settings-panel-solver" aria-labelledby="settings-tab-solver">
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <h3>{t('settings.solver.title')}</h3>
           <button
             className="btn btn-success"
@@ -512,6 +541,37 @@ function Settings() {
         </div>
         <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
           {t('settings.solver.description')}
+        </p>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginTop: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="minutesSpentLimit">{t('settings.solver.minutesSpentLimit')}</label>
+            <input
+              id="minutesSpentLimit"
+              type="number"
+              min="1"
+              max="30"
+              value={minutesSpentLimit}
+              onChange={(e) => setMinutesSpentLimit(e.target.value === '' ? '' : Number(e.target.value))}
+              disabled={engineStatus?.state === 'RUNNING'}
+              style={{ width: '70px', padding: '6px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label htmlFor="unimprovedMinutesSpentLimit">{t('settings.solver.unimprovedMinutesSpentLimit')}</label>
+            <input
+              id="unimprovedMinutesSpentLimit"
+              type="number"
+              min="1"
+              max="15"
+              value={unimprovedMinutesSpentLimit}
+              onChange={(e) => setUnimprovedMinutesSpentLimit(e.target.value === '' ? '' : Number(e.target.value))}
+              disabled={engineStatus?.state === 'RUNNING'}
+              style={{ width: '70px', padding: '6px' }}
+            />
+          </div>
+        </div>
+        <p style={{ marginTop: '6px', color: '#7f8c8d', fontSize: '12px' }}>
+          {t('settings.solver.limitsDescription')}
         </p>
         {engineError && <div className="error">{engineError}</div>}
         {engineStatus && (
@@ -628,6 +688,31 @@ function Settings() {
                 ))}
               </ul>
             )}
+          </div>
+        )}
+      </div>
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('settings.generateBlocks.clearTimeslots.title')}</h3>
+          <button
+            className="btn btn-danger"
+            onClick={handleClearUnpinnedTimeslots}
+            disabled={clearingTimeslots}
+          >
+            {clearingTimeslots
+              ? t('settings.generateBlocks.clearTimeslots.clearing')
+              : t('settings.generateBlocks.clearTimeslots.button')}
+          </button>
+        </div>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          {t('settings.generateBlocks.clearTimeslots.description')}
+        </p>
+        {clearTimeslotsError && <div className="error">{clearTimeslotsError}</div>}
+        {clearTimeslotsResult && (
+          <div style={{ marginTop: '10px', fontSize: '13px', color: '#2e7d32' }}>
+            {t('settings.generateBlocks.clearTimeslots.resultSummary', {
+              count: clearTimeslotsResult.clearedCount,
+            })}
           </div>
         )}
       </div>

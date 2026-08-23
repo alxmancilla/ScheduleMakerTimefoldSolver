@@ -55,4 +55,13 @@ public class BlockGenerationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.warnings[0]").value("Group 'G1': course 'Ghost' not found, skipped"));
     }
+
+    @Test
+    public void clearUnpinnedTimeslots_returnsClearedCount() throws Exception {
+        when(blockGenerationService.clearUnpinnedTimeslots()).thenReturn(42);
+
+        mockMvc.perform(post("/api/admin/blocks/clear-timeslots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clearedCount").value(42));
+    }
 }
