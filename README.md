@@ -6,12 +6,18 @@ A Java 17 application that places pre-assigned teacher/room/course blocks into w
 
 ## Purpose
 
-Building a school's weekly bell schedule by hand doesn't scale past a handful of groups —
-every added course, teacher, or room multiplies the ways two things can collide. This
-project automates that: given each course block's teacher, room, and course (assigned
-separately, e.g. by an administrator or a prior planning step), it finds a weekly placement
-that avoids every double-booking and honors teacher availability and qualifications, while
-also optimizing for schedule quality (minimal idle gaps, room preferences, workload balance).
+This project targets **cohort-based, pre-staffed, semester-driven schools** — institutions
+that already know which teacher and which room a course uses (vocational/technical secondary
+schools are the primary fit), and whose real scheduling problem is purely combinatorial: given
+every course block's teacher, room, and course (assigned separately, e.g. by an administrator
+or a prior planning step), find a weekly placement that avoids every double-booking and honors
+teacher availability, qualifications, and rest requirements, while also optimizing for schedule
+quality (minimal idle gaps, room preferences, workload balance).
+
+Building that weekly bell schedule by hand doesn't scale past a handful of groups — every added
+course, teacher, or room multiplies the ways two things can collide. This project automates
+that combinatorial core rather than the staffing/room-assignment problem, which these schools
+have typically already solved by the time scheduling starts.
 
 **Goal:** eliminate scheduling conflicts and minimize the manual effort of building and
 maintaining a term timetable.
@@ -23,7 +29,8 @@ teachers read-only access to their own resulting schedule).
 ## At a Glance
 
 - Block-based scheduling only (multi-hour consecutive blocks, 1-4 hours); hour-based scheduling has been fully removed
-- 9 hard / 8 soft constraints, kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`
+- 11 hard / 8 soft constraints, kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest` — including a hard rest-period rule so teachers and groups can't be scheduled into an unbroken run longer than 4 hours
+- Calendar exceptions (holidays, exam days, half-days) are tracked from Settings → Calendar — record-keeping v1, not yet read by block generation or the solver (see [Known Limitations](#known-limitations))
 - Dual room requirements and custom block templates are fully manageable from the web UI, not just the database
 - Web app: JWT auth with `READER`/`WRITER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
 - Solver termination: best score `0hard/0soft`, or 5 minutes, or 2 minutes without improvement (see `solverConfig.xml`)
@@ -50,6 +57,12 @@ pre-assigned to a (group, course) pairing before any blocks exist via `group_cou
 default_teacher_id`, applied automatically the next time blocks are generated. Assigning a
 teacher afterward (Groups tab, Assignments tab, or the API) also re-applies their required room
 if one is set, regardless of the group's preference.
+
+`BlockTimeslot` is a **recurring weekly template** (day-of-week + start hour + length), not tied
+to a calendar date — the same Monday 8:00 slot applies every week of the term. Calendar
+exceptions (holidays, exam days, half-days) are tracked separately as real dates via Settings →
+Calendar, but that data doesn't gate block generation or the solver yet — see
+[Known Limitations](#known-limitations).
 
 ## Constraints
 
@@ -86,6 +99,7 @@ test run (11 hard, 8 soft).
 - Multi-hour consecutive blocks (1-4 hours), with pinning support for locking specific blocks to a teacher/room/timeslot
 - Dual room requirements (a course can split its hours across multiple room types) and custom per-course/per-group block templates — both database-driven and web-UI-manageable
 - Per-component block-sizing and max-blocks-per-day rules (`component_block_rule`), configurable from Settings → Block Rules instead of hardcoded
+- Hard rest-period rule: a teacher or group can't be scheduled into more than 4 unbroken hours without a gap
 - Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's preferred room are applied automatically wherever a more specific override doesn't already provide one
 - Optional room-capacity awareness (`room.capacity` vs. `student_group.student_count`)
 - 4 room types: Standard, Mixed (doubles as Standard or Specialized - Workshop), Specialized - Workshop, Specialized - Computer Lab
@@ -96,7 +110,7 @@ test run (11 hard, 8 soft).
 - Role-based access control (`READER`/`WRITER`/`ADMIN`/`TEACHER`) over stateless JWT — see [Authentication & Roles](#authentication--roles)
 - Full CRUD for teachers (incl. an optional required-room override), courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management, a per-course-teacher pre-assignment, and a warning when a course has no qualified teacher), and course block assignments
 - Bilingual UI (English/Spanish, `react-i18next`) with a per-user language preference
-- Admin: user management, timeslot management, current-term label, write-activity audit log, admin-triggered solver runs and block generation, per-component block rules
+- Admin: user management, timeslot management, current-term label, calendar exceptions (holidays/exam days/half-days), write-activity audit log, admin-triggered solver runs and block generation, per-component block rules
 - Excel import/export (`POST`/`GET /api/import/excel`) — the same `.xlsx` layout both ways, for a full export → edit → re-import round trip
 - Teacher self-service: a `TEACHER`-role account sees only its own schedule
 - Search, pagination, toast notifications, and confirm dialogs throughout
@@ -136,7 +150,8 @@ database," used specifically to avoid hand-syncing the same rule twice.
 │   └── src/main/java/com/example/web/
 │       ├── controller/                  # One controller per resource (Teachers, Courses,
 │       │                                 # Rooms, Groups, Assignments, Schedule, Auth, Users,
-│       │                                 # Timeslots, Engine, Reports, Import, Term, AuditLog, ...)
+│       │                                 # Timeslots, Engine, Reports, Import, Term,
+│       │                                 # CalendarException, AuditLog, ...)
 │       ├── entity/ + repository/        # JPA entities and Spring Data repositories
 │       ├── dto/                         # Request/response DTOs with bean validation
 │       ├── security/                    # SecurityConfig (JWT + RBAC), AuditLogInterceptor
@@ -156,7 +171,7 @@ database," used specifically to avoid hand-syncing the same rule twice.
 │   │                                     # includes all reporting views)
 │   ├── migrations/                      # Incremental migrations applied on top of the
 │   │                                     # schema (app_user/RBAC, room capacity, school_term,
-│   │                                     # audit log, TEACHER role, ...)
+│   │                                     # audit log, TEACHER role, calendar_exception, ...)
 │   └── datasets/                        # Demo and production seed data
 └── scripts/                             # run-engine.sh, run-reporter.sh helper scripts
 ```
@@ -271,10 +286,10 @@ Stateless JWT auth; every `/api/**` endpoint except `POST /api/auth/login` requi
 `Authorization: Bearer <token>`.
 
 | Role      | Permissions                                                         |
-|-----------|---------------------------------------------------------------------|
+|-----------|-----------------------------------------------------------------------|
 | `READER`  | `GET` only.                                                          |
 | `WRITER`  | `READER` + create/update/delete on domain entities.                 |
-| `ADMIN`   | `WRITER` + full access, including user management under `/api/admin/**`. |
+| `ADMIN`   | `WRITER` + full access, including user management and calendar exceptions under `/api/admin/**`. |
 | `TEACHER` | Scoped to itself only: its own schedule, its own identity/language, and the term label — **not** general domain data. An admin links a `TEACHER` account to a teacher record from the Users tab. |
 
 **First-time setup** — apply the users migration (creates `app_user`; not part of the schema
@@ -312,14 +327,15 @@ sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 2. **Teachers and rooms are pre-assigned** — the solver only assigns timeslots (see the Scope note above)
 3. **No multi-teacher courses** — each block has exactly one teacher
 4. **Soft constraints scale O(n²)** (pairwise) — may need optimization for much larger datasets
-5. **No calendar/term dates** — `BlockTimeslot` is a recurring weekly template (day-of-week + hour), not tied to actual dates; no holiday/exception-date support, and the "current term" label is display-only, not a scheduling boundary
+5. **Calendar exceptions aren't wired into scheduling yet** — `BlockTimeslot` is a recurring weekly template (day-of-week + hour), not tied to actual dates; the `calendar_exception` table (Settings → Calendar) tracks holidays/exam days/half-days for the first time, but that data isn't yet read by block generation, the solver, or the PDF reports, and the "current term" label is still display-only, not a scheduling boundary. Turning this into an enforced constraint requires resolving the larger architectural question of whether `BlockTimeslot` moves from a recurring weekly template to a dated multi-week calendar.
 
 ## Future Enhancements
 
+- [ ] Wire calendar exceptions into block generation/solving (e.g. exclude holiday dates, cap half-days at their `end_hour`)
 - [ ] Dynamic teacher/room assignment (currently pre-assigned)
 - [ ] Teacher workload balancing across weeks
 - [ ] Student preferences for elective courses
-- [ ] Multi-week scheduling patterns
+- [ ] Multi-week scheduling patterns (dated calendar instead of a recurring weekly template)
 - [ ] Calendar system integration (iCal/Google Calendar export)
 - [ ] Real-time constraint violation feedback during manual edits
 
