@@ -3,7 +3,6 @@ package com.example.domain;
 import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.ProblemFactCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
-import ai.timefold.solver.core.api.domain.valuerange.ValueRangeProvider;
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import java.util.List;
@@ -14,7 +13,10 @@ public class SchoolSchedule {
     @ProblemFactCollectionProperty
     private List<Teacher> teachers;
 
-    @ValueRangeProvider(id = "blockTimeslotRange")
+    // No @ValueRangeProvider here anymore: CourseBlockAssignment.
+    // getMatchingBlockTimeslots() is the timeslot value range now (entity-
+    // scoped, filtered by blockLength) - this list is still a problem fact
+    // (reporting, UI, the pool CourseBlockAssignment.allTimeslots filters).
     @ProblemFactCollectionProperty
     private List<BlockTimeslot> blockTimeslots;
 

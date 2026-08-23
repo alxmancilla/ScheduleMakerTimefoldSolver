@@ -38,6 +38,7 @@ public class DemoDataGenerator {
                         cba.setTeacher(null);
                         cba.setRoom(null);
                         cba.setTimeslot(null);
+                        cba.setAllTimeslots(blockTimeslots);
                 }
 
                 return SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses, groups,

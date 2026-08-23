@@ -19,37 +19,37 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     @Override
     public Constraint[] defineConstraints(ConstraintFactory constraintFactory) {
         return new Constraint[] {
-                // ========== TIER 1: Cheap HARD Constraints (forEach) - Fail Fast ==========
-                // These are evaluated first because they're:
-                // - Cheapest to evaluate (O(n) single-entity checks)
-                // - Most likely to fail (high selectivity)
-                // - Enable early exit (skip remaining constraints if violated)
+                // ========== Cheap HARD Constraints (forEach, single-entity) ==========
+                // Grouped here for readability (cheapest checks, most likely to be
+                // violated in a fresh/unsolved schedule). This is NOT a short-circuit
+                // order: Constraint Streams maintains every constraint as its own
+                // continuously-updated incremental network (closer to Drools/RETE
+                // forward-chaining) and recalculates only the tuples a changed
+                // variable actually affects, across ALL constraints - reordering this
+                // array doesn't skip or defer evaluation of the ones after it.
                 blockLengthMustMatchTimeslotLength(constraintFactory), // #0: CRITICAL - Block length must match
                                                                        // timeslot
                 teacherMustBeAvailable(constraintFactory), // #1: Most likely to fail (~30% rejection rate)
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
 
-                // ========== TIER 2: High-Selectivity HARD Pair Constraints ==========
-                // These detect the most common conflicts:
-                // - Optimized with Joiners (very few pairs evaluated)
-                // - High failure rate (detect double-bookings early)
+                // ========== High-Selectivity HARD Pair Constraints ==========
+                // Optimized with Joiners (very few pairs evaluated) - the pruning here
+                // is real (see Joiners.equal below), unlike the array-order comment above.
                 groupCannotHaveTwoCoursesAtSameTime(constraintFactory), // #4: ~70 pairs, very high selectivity
                 noTeacherDoubleBooking(constraintFactory), // #5: ~25 pairs, very high selectivity
                 noRoomDoubleBooking(constraintFactory), // #6: ~45 pairs, very high selectivity
 
-                // ========== TIER 3: Medium-Selectivity HARD Pair Constraints ==========
+                // ========== Whole-Day Aggregate HARD Constraints ==========
                 maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max blocks per course per group per
                                                                         // day (per-component via component_block_rule)
                 courseBlocksMustBeConsecutive(constraintFactory), // HARD: ALL course blocks MUST be consecutive
                 teacherMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
                 groupMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
 
-                // ========== TIER 4: SOFT Constraints - Quality Optimization ==========
-                // These optimize quality, evaluated last:
-                // - Don't affect feasibility (can be violated)
-                // - Evaluated only if all HARD constraints pass
-                // - Order by weight (highest priority first)
+                // ========== SOFT Constraints - Quality Optimization ==========
+                // Don't affect feasibility; ordered by weight (highest first) for
+                // readability only.
                 nonStandardRoomsShouldFinishBy2pm(constraintFactory), // SOFT (weight 10): Prefer non-standard rooms to
                                                                       // finish by 2pm
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance

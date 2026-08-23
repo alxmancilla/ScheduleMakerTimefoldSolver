@@ -10,12 +10,15 @@ import com.example.domain.SchoolSchedule;
 import com.example.domain.Teacher;
 
 /**
- * Move filter that rejects ChangeMove instances where:
- * 1. The timeslot length doesn't match the block length
- * 2. The teacher is not available for the entire block
+ * Move filter that rejects ChangeMove instances where the teacher is not
+ * available for the entire block.
  *
- * This filter ensures that the solver never creates assignments where
- * block_length != timeslot_length or where teachers are unavailable.
+ * Block-length matching doesn't need a filter here: CourseBlockAssignment's
+ * timeslot value range is entity-scoped (CourseBlockAssignment.
+ * getMatchingBlockTimeslots(), filtered by blockLength), so ChangeMoveSelector
+ * can't generate a length-mismatched move in the first place. Teacher
+ * availability isn't part of that value range (an unavailable slot is
+ * scored, not structurally excluded), so it's still filtered here.
  */
 public class MatchingLengthMoveFilter implements SelectionFilter<SchoolSchedule, Move<SchoolSchedule>> {
 
@@ -42,11 +45,6 @@ public class MatchingLengthMoveFilter implements SelectionFilter<SchoolSchedule,
 
         CourseBlockAssignment assignment = (CourseBlockAssignment) entity;
         BlockTimeslot timeslot = (BlockTimeslot) toPlanningValue;
-
-        // Reject the move if block length doesn't match timeslot length
-        if (assignment.getBlockLength() != timeslot.getLengthHours()) {
-            return false;
-        }
 
         // Reject the move if teacher is not available for the entire block
         Teacher teacher = assignment.getTeacher();

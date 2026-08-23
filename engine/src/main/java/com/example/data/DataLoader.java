@@ -470,6 +470,7 @@ public class DataLoader {
                         .orElseThrow(() -> new SQLException("Course not found: " + courseId));
 
                 CourseBlockAssignment assignment = new CourseBlockAssignment(id, group, course, blockLength);
+                assignment.setAllTimeslots(blockTimeslots);
 
                 // Assign teacher if available
                 String teacherId = rs.getString("teacher_id");

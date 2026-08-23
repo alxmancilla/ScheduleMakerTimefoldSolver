@@ -7,58 +7,42 @@
         <constraintProviderClass>com.example.solver.SchoolConstraintProvider</constraintProviderClass>
     </scoreDirectorFactory>
 
-    <!-- Phase 1: Custom Phase - Assign timeslots with matching lengths -->
-    <!-- This phase ensures that each block is assigned to a timeslot with matching length
-         BEFORE the construction heuristic runs. This prevents the construction heuristic
-         from creating invalid assignments. -->
-    <customPhase>
-        <customPhaseCommandClass>com.example.solver.MatchingLengthTimeslotAssigner</customPhaseCommandClass>
-        <termination>
-            <stepCountLimit>10000</stepCountLimit>
-        </termination>
-    </customPhase>
-
-    <!-- Phase 2: Construction Heuristic - ENABLED -->
+    <!-- Phase 1: Construction Heuristic -->
     <!-- FIRST_FIT_DECREASING: Assigns values to planning variables in decreasing difficulty order.
-         Uses BlockLengthDifficultyComparator to schedule longer blocks (4h, 3h) first,
-         leaving shorter blocks (1h, 2h) to fill gaps. This reduces fragmentation.
+         Uses BlockLengthDifficultyComparator to schedule scarce-availability teachers and longer
+         blocks (4h, 3h) first, leaving shorter blocks (1h, 2h) to fill gaps. This reduces
+         fragmentation.
 
-         IMPORTANT: Phase 1 pre-assigns timeslots with matching lengths, so Construction Heuristic
-         only needs to assign timeslots to remaining unassigned blocks (if any).
-         Move filters in Phase 4 ensure that Construction Heuristic respects block length constraints. -->
+         CourseBlockAssignment.getMatchingBlockTimeslots() (an entity-scoped, blockLength-filtered
+         @ValueRangeProvider) means every value this phase considers for a block already has the
+         right length - there is no separate pre-fill phase assigning most blocks before this one
+         runs, so the difficulty-first ordering above actually governs placement as designed. -->
     <constructionHeuristic>
         <constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>
     </constructionHeuristic>
 
-    <!-- Phase 3: Defragmentation Phase - Fix schedule fragmentation -->
-    <!-- This phase runs AFTER the construction heuristic to detect and fix fragmentation.
-         Fragmentation occurs when a day's schedule is filled with small blocks (e.g., 1-hour BASICAS)
-         that prevent larger blocks (e.g., 3-4 hour non-BASICAS) from being assigned to contiguous timeslots.
-         This phase:
-         1. Detects blocks with mismatched lengths (violations)
-         2. Finds suitable contiguous timeslots for these blocks
-         3. Moves conflicting smaller blocks to create space
-         4. Assigns the larger block to the cleared contiguous slot -->
-    <customPhase>
-        <customPhaseCommandClass>com.example.solver.BlockDefragmenter</customPhaseCommandClass>
-        <termination>
-            <stepCountLimit>5000</stepCountLimit>
-        </termination>
-    </customPhase>
-
-    <!-- Phase 4: Local Search (Improvement) -->
+    <!-- Phase 2: Local Search (Improvement) -->
     <!-- Uses multiple algorithms for better exploration:
          - Late Acceptance: Good for escaping local optima
          - Tabu Search: Prevents cycling back to recent solutions -->
     <localSearch>
+        <!-- Parallelize move evaluation across CPU cores (docker-compose provisions
+             4 for this service specifically). AUTO picks a thread count from the
+             available processors at startup. -->
+        <moveThreadCount>AUTO</moveThreadCount>
         <unionMoveSelector>
-            <!-- Change 1 variable (timeslot) -->
-            <!-- Filter to ensure block length matches timeslot length -->
+            <!-- Change 1 variable (timeslot). Candidate values already come from
+                 CourseBlockAssignment's entity-scoped, blockLength-filtered value
+                 range, so this can never generate a length-mismatched move; the
+                 filter below only has teacher availability left to reject. -->
             <changeMoveSelector>
                 <filterClass>com.example.solver.MatchingLengthMoveFilter</filterClass>
             </changeMoveSelector>
-            <!-- Swap assignments between two entities -->
-            <!-- Filter to prevent swaps between assignments with different block lengths -->
+            <!-- Swap assignments between two entities. Unlike ChangeMove, a swap
+                 doesn't consult either entity's own value range - it just trades
+                 whatever timeslot each one currently holds - so this filter is
+                 still the only thing preventing a swap from handing a block a
+                 wrong-length or teacher-unavailable timeslot. -->
             <swapMoveSelector>
                 <filterClass>com.example.solver.MatchingLengthSwapFilter</filterClass>
             </swapMoveSelector>

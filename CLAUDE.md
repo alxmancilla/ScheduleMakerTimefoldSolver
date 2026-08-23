@@ -100,7 +100,7 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 Loaded by `SchoolSolverConfig` from `solverConfig.xml`:
 - **Termination** (local-search phase): best score limit `0hard/0soft` OR 5 minutes total (`minutesSpentLimit`) OR 2 minutes without improvement (`unimprovedMinutesSpentLimit`)
 - **Acceptor**: Late Acceptance (`lateAcceptanceSize` 10000) + Tabu Search (`entityTabuSize` 7)
-- Custom phases before local search: `MatchingLengthTimeslotAssigner`, `FIRST_FIT_DECREASING` construction heuristic, then `BlockDefragmenter`
+- Phases: `FIRST_FIT_DECREASING` construction heuristic, then local search. `CourseBlockAssignment.timeslot`'s value range is entity-scoped (`CourseBlockAssignment.getMatchingBlockTimeslots()`, filtered to timeslots whose length matches the block's own `blockLength`) rather than the full timeslot list, so a length mismatch is structurally unreachable for movable assignments — no separate pre-fill phase or defragmentation phase is needed to police it. `MatchingLengthMoveFilter`/`MatchingLengthSwapFilter` still filter `ChangeMove`/`SwapMove` for teacher availability (not covered by the value range) and, for swap only, block length (swap doesn't consult either entity's own value range).
 - Constraint Streams API for declarative constraint modeling
 
 ### Data Generation
