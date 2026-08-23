@@ -1,6 +1,7 @@
 package com.example.web.security;
 
 import com.example.web.controller.EngineController;
+import com.example.web.repository.AppUserRepository;
 import com.example.web.service.EngineRunnerService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -35,6 +36,9 @@ public class EngineSecurityTest {
 
     @MockBean
     private EngineRunnerService engineRunnerService;
+
+    @MockBean
+    private AppUserRepository appUserRepository;
 
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean

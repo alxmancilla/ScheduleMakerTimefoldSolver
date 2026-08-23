@@ -2,9 +2,12 @@ package com.example.web.controller;
 
 import com.example.web.dto.EngineRunRequest;
 import com.example.web.dto.EngineStatusResponse;
+import com.example.web.entity.AppUserEntity;
+import com.example.web.repository.AppUserRepository;
 import com.example.web.service.EngineRunnerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,11 +25,18 @@ public class EngineController {
     @Autowired
     private EngineRunnerService engineRunnerService;
 
+    @Autowired
+    private AppUserRepository appUserRepository;
+
     @PostMapping("/run")
-    public EngineStatusResponse runEngine(@Valid @RequestBody(required = false) EngineRunRequest request) {
+    public EngineStatusResponse runEngine(@Valid @RequestBody(required = false) EngineRunRequest request,
+            Authentication authentication) {
         Integer minutesSpentLimit = request != null ? request.getMinutesSpentLimit() : null;
         Integer unimprovedMinutesSpentLimit = request != null ? request.getUnimprovedMinutesSpentLimit() : null;
-        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit)) {
+        String locale = appUserRepository.findById(authentication.getName())
+                .map(AppUserEntity::getPreferredLanguage)
+                .orElse(null);
+        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale)) {
             throw new IllegalArgumentException("The engine is already running");
         }
         return new EngineStatusResponse(engineRunnerService.getSnapshot());

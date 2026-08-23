@@ -380,12 +380,31 @@ public class DataLoader {
     }
 
     /**
-     * Load the complete dataset for block-based scheduling from the database.
+     * Load the complete dataset for block-based scheduling from the database,
+     * resolving assignments to the current schedule (see the single-arg
+     * overload below).
      *
      * @return SchoolSchedule with block timeslots and course block assignments
      * @throws SQLException if database access fails
      */
     public SchoolSchedule loadDataForBlockScheduling() throws SQLException {
+        return loadDataForBlockScheduling(null);
+    }
+
+    /**
+     * Load the complete dataset for block-based scheduling from the database.
+     *
+     * @param scheduleRunId null resolves assignments the same way the live
+     *                      Schedule View's default does (course_block_assignment_current:
+     *                      pinned rows keep their own input timeslot, everything else
+     *                      is the latest schedule_run). A specific id instead reads that
+     *                      run's own frozen schedule_run_result snapshot directly - the
+     *                      same "don't let a later edit change what a historical run
+     *                      appears to have used" guarantee ScheduleController relies on.
+     * @return SchoolSchedule with block timeslots and course block assignments
+     * @throws SQLException if database access fails
+     */
+    public SchoolSchedule loadDataForBlockScheduling(Integer scheduleRunId) throws SQLException {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             List<Teacher> teachers = loadTeachers(conn);
             List<Course> courses = loadCourses(conn);
@@ -399,7 +418,7 @@ public class DataLoader {
             List<BlockTimeslot> blockTimeslots = loadBlockTimeslots(conn);
             List<Group> groups = loadGroups(conn, rooms);
             List<CourseBlockAssignment> blockAssignments = loadCourseBlockAssignments(conn, groups, courses, teachers,
-                    rooms, blockTimeslots);
+                    rooms, blockTimeslots, scheduleRunId);
 
             System.out.println("Loaded from database (block-based scheduling):");
             System.out.println("  - " + teachers.size() + " teachers");
@@ -443,25 +462,45 @@ public class DataLoader {
      * assignments when available.
      */
     private List<CourseBlockAssignment> loadCourseBlockAssignments(Connection conn, List<Group> groups,
-            List<Course> courses, List<Teacher> teachers, List<Room> rooms, List<BlockTimeslot> blockTimeslots)
+            List<Course> courses, List<Teacher> teachers, List<Room> rooms, List<BlockTimeslot> blockTimeslots,
+            Integer scheduleRunId)
             throws SQLException {
         List<CourseBlockAssignment> assignments = new ArrayList<>();
 
-        // Reads through course_block_assignment_current rather than the raw table:
-        // pinned rows resolve to their own input block_timeslot_id, every other row
-        // resolves to the most recent schedule_run's result - which is also what
-        // gives the solver warm-starting (continuing from the last run's placements)
-        // without any extra seeding logic here.
-        String sql = "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_hint FROM course_block_assignment_current ORDER BY id";
+        // scheduleRunId == null reads through course_block_assignment_current rather
+        // than the raw table: pinned rows resolve to their own input block_timeslot_id,
+        // every other row resolves to the most recent schedule_run's result - which is
+        // also what gives the solver warm-starting (continuing from the last run's
+        // placements) without any extra seeding logic here. A specific scheduleRunId
+        // instead reads schedule_run_result directly for that run - both sources have
+        // the same column shape (assignment_id aliased to id), so the row-mapping loop
+        // below is identical either way.
+        String sql = scheduleRunId == null
+                ? "SELECT id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_hint FROM course_block_assignment_current ORDER BY id"
+                : "SELECT assignment_id AS id, group_id, course_id, block_length, teacher_id, room_name, block_timeslot_id, pinned, satisfies_room_type, preferred_room_hint FROM schedule_run_result WHERE schedule_run_id = ? ORDER BY assignment_id";
 
-        try (Statement stmt = conn.createStatement();
-                ResultSet rs = stmt.executeQuery(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            if (scheduleRunId != null) {
+                stmt.setInt(1, scheduleRunId);
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
                 String id = rs.getString("id");
                 String groupId = rs.getString("group_id");
                 String courseId = rs.getString("course_id");
                 int blockLength = rs.getInt("block_length");
+
+                // A schedule_run saved before the input-snapshot columns existed has
+                // NULL group_id/course_id in schedule_run_result (that historical detail
+                // was genuinely never captured) - skip rather than fail the whole load,
+                // since scheduleRunId == null (the default course_block_assignment_current
+                // path) never hits this: group_id/course_id there always come from the
+                // live, always-populated course_block_assignment table.
+                if (scheduleRunId != null && (groupId == null || courseId == null)) {
+                    System.out.println("Skipping assignment " + id + " for run #" + scheduleRunId
+                            + ": no input snapshot captured for this row (run predates that feature)");
+                    continue;
+                }
 
                 // Find corresponding group and course
                 Group group = groups.stream()
@@ -534,6 +573,7 @@ public class DataLoader {
                 }
 
                 assignments.add(assignment);
+            }
             }
         }
 

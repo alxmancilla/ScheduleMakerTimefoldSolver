@@ -164,7 +164,7 @@ export const deleteUser = (username) => api.delete(`/admin/users/${encodeURIComp
 // files - past runs aren't overwritten, so they stay around for comparison.
 export const listReports = () => api.get('/reports');
 export const getReportStatus = () => api.get('/reports/status');
-export const generateReports = () => api.post('/reports/generate');
+export const generateReports = (runId) => api.post('/reports/generate', null, { params: runId ? { runId } : {} });
 export const downloadReport = (runId, filename) =>
   api.get(`/reports/${encodeURIComponent(runId)}/${encodeURIComponent(filename)}`, { responseType: 'blob' });
 

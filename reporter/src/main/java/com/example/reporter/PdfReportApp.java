@@ -5,6 +5,10 @@ import com.example.data.DataLoader;
 import com.example.domain.SchoolSchedule;
 import com.example.util.PdfReporter;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
@@ -28,8 +32,29 @@ public class PdfReportApp {
         String username = System.getenv().getOrDefault("DB_USER", "mancilla");
         String password = System.getenv().getOrDefault("DB_PASSWORD", "");
 
+        // Optional: generate from a specific past schedule_run instead of the
+        // current schedule (unset means "current", same as before this existed).
+        String reportRunIdEnv = System.getenv("REPORT_RUN_ID");
+        Integer reportRunId = (reportRunIdEnv != null && !reportRunIdEnv.isBlank())
+                ? Integer.parseInt(reportRunIdEnv.trim())
+                : null;
+        if (reportRunId != null) {
+            System.out.println("Generating from schedule run #" + reportRunId + " (not the current schedule)");
+        }
+
         DataLoader dataLoader = new DataLoader(jdbcUrl, username, password);
-        SchoolSchedule schedule = dataLoader.loadDataForBlockScheduling();
+        SchoolSchedule schedule = dataLoader.loadDataForBlockScheduling(reportRunId);
+
+        // Term is a display-only label (not tied to any particular schedule_run -
+        // see school_term's own docs), so it's always the current value regardless
+        // of which run the schedule content above came from.
+        String termLabel = loadCurrentTermLabel(jdbcUrl, username, password);
+
+        // Report chrome language ("es" or anything else -> "en"); unset defaults to
+        // English, same as before this existed. This only covers PdfReporter's own
+        // fixed text (titles, labels, day names) - the violation detail sentences
+        // from BlockScheduleAnalyzer below are not covered by this yet.
+        String locale = System.getenv().getOrDefault("REPORT_LOCALE", "en");
 
         System.out.println();
         System.out.println("Schedule loaded from database:");
@@ -69,16 +94,17 @@ public class PdfReportApp {
         String base = "calendario";
         String reportTarget = System.getenv().getOrDefault("REPORT_TARGET", "all");
         if ("violations".equalsIgnoreCase(reportTarget)) {
-            PdfReporter.generateBlockViolationsPdf(schedule, violations, softViolations, base + "-incumplimientos.pdf");
+            PdfReporter.generateBlockViolationsPdf(schedule, violations, softViolations,
+                    base + "-incumplimientos.pdf", locale);
             System.out.println("PDF report written to:");
             System.out.println("  - " + base + "-incumplimientos.pdf");
         } else if ("schedules".equalsIgnoreCase(reportTarget)) {
-            PdfReporter.generateBlockSchedulePdfs(schedule, base);
+            PdfReporter.generateBlockSchedulePdfs(schedule, base, termLabel, locale);
             System.out.println("PDF reports written to:");
             System.out.println("  - " + base + "-por-maestro.pdf");
             System.out.println("  - " + base + "-por-grupo.pdf");
         } else {
-            PdfReporter.generateBlockReports(schedule, violations, softViolations, base);
+            PdfReporter.generateBlockReports(schedule, violations, softViolations, base, termLabel, locale);
             System.out.println("PDF reports written to:");
             System.out.println("  - " + base + "-incumplimientos.pdf");
             System.out.println("  - " + base + "-por-maestro.pdf");
@@ -86,5 +112,19 @@ public class PdfReportApp {
         }
         System.out.println();
         System.out.println("=== PDF Reporting Complete! ===");
+    }
+
+    /** The current term label (school_term is a singleton, display-only, id=1), or null if unset/unreachable. */
+    private static String loadCurrentTermLabel(String jdbcUrl, String username, String password) {
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery("SELECT label FROM school_term WHERE id = 1")) {
+            if (rs.next()) {
+                return rs.getString("label");
+            }
+        } catch (Exception e) {
+            System.out.println("Note: could not load the current term label for the report cover page: " + e.getMessage());
+        }
+        return null;
     }
 }

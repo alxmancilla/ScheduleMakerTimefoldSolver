@@ -16,6 +16,11 @@
 #   REPORT_TARGET         "all" (default) writes all three PDFs; "violations" writes
 #                         only calendario-incumplimientos.pdf; "schedules" writes only
 #                         the by-teacher/by-group PDFs (no violations report)
+#   REPORT_RUN_ID         Generate from a specific past schedule_run id instead of the
+#                         current schedule (default: current)
+#   REPORT_LOCALE         Report chrome language: "es" or "en" (default: en). Covers
+#                         PdfReporter's fixed text only (titles/labels/day names), not
+#                         the violation detail sentences from BlockScheduleAnalyzer.
 #   JAVA_OPTS            Extra JVM flags (e.g. -Xmx1g)
 #
 # Exit code is that of the JVM: non-zero on failure, so cron/orchestrators can

@@ -10,9 +10,65 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Map;
 
 public class PdfReporter {
+
+    /**
+     * Report chrome text (titles, labels, day names) in English and Spanish -
+     * a separate store from web-ui's en.json/es.json, since this module has no
+     * access to React/i18next or those files. Only the report's fixed chrome is
+     * covered here; violation detail sentences (built in BlockScheduleAnalyzer,
+     * shared with the web UI's own violation displays) are a separate, larger
+     * localization effort and are not covered by this map.
+     */
+    private static final Map<String, String> TEXT_EN = Map.ofEntries(
+            Map.entry("coverTeacherTitle", "Teacher Schedules"),
+            Map.entry("coverGroupTitle", "Group Schedules"),
+            Map.entry("term", "Term"),
+            Map.entry("generated", "Generated"),
+            Map.entry("teacherLabel", "Teacher"),
+            Map.entry("groupLabel", "Group"),
+            Map.entry("hour", "Hour"),
+            Map.entry("dayMonday", "Monday"),
+            Map.entry("dayTuesday", "Tuesday"),
+            Map.entry("dayWednesday", "Wednesday"),
+            Map.entry("dayThursday", "Thursday"),
+            Map.entry("dayFriday", "Friday"),
+            Map.entry("violationsTitle", "Block Schedule - Constraint Violations Report"),
+            Map.entry("score", "Score"),
+            Map.entry("hardViolations", "Hard Constraint Violations:"),
+            Map.entry("softViolations", "Soft Constraint Violations:"));
+
+    private static final Map<String, String> TEXT_ES = Map.ofEntries(
+            Map.entry("coverTeacherTitle", "Horarios de Maestros"),
+            Map.entry("coverGroupTitle", "Horarios de Grupos"),
+            Map.entry("term", "Periodo"),
+            Map.entry("generated", "Generado"),
+            Map.entry("teacherLabel", "Maestro"),
+            Map.entry("groupLabel", "Grupo"),
+            Map.entry("hour", "Hora"),
+            Map.entry("dayMonday", "Lunes"),
+            Map.entry("dayTuesday", "Martes"),
+            Map.entry("dayWednesday", "Miércoles"),
+            Map.entry("dayThursday", "Jueves"),
+            Map.entry("dayFriday", "Viernes"),
+            Map.entry("violationsTitle", "Reporte de Violaciones de Restricciones - Horario por Bloques"),
+            Map.entry("score", "Puntuación"),
+            Map.entry("hardViolations", "Violaciones de Restricciones Estrictas:"),
+            Map.entry("softViolations", "Violaciones de Restricciones Suaves:"));
+
+    /** Report chrome text for the given key, in the given locale ("es" or anything else -> "en"). */
+    private static String t(String key, String locale) {
+        Map<String, String> table = "es".equalsIgnoreCase(locale) ? TEXT_ES : TEXT_EN;
+        return table.get(key);
+    }
+
+    private static String[] dayNames(String locale) {
+        return new String[] { t("dayMonday", locale), t("dayTuesday", locale), t("dayWednesday", locale),
+                t("dayThursday", locale), t("dayFriday", locale) };
+    }
 
     /**
      * Generate a simple PDF report with score, constraint summaries and a short
@@ -86,6 +142,55 @@ public class PdfReporter {
     }
 
     /**
+     * A cover page (title, term label if set, generation date) added as page 1
+     * before the per-teacher/per-group schedule pages, centered on a LETTER page.
+     */
+    private static void addCoverPage(PDDocument doc, String title, String termLabel, String locale)
+            throws IOException {
+        PDPage page = new PDPage(PDRectangle.LETTER);
+        doc.addPage(page);
+
+        float pageWidth = page.getMediaBox().getWidth();
+        float pageHeight = page.getMediaBox().getHeight();
+
+        try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+            float titleFontSize = 26f;
+            float titleWidth = PDType1Font.HELVETICA_BOLD.getStringWidth(title) / 1000 * titleFontSize;
+            float titleY = pageHeight * 0.55f;
+
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA_BOLD, titleFontSize);
+            cs.newLineAtOffset((pageWidth - titleWidth) / 2, titleY);
+            cs.showText(title);
+            cs.endText();
+
+            float detailFontSize = 12f;
+            float detailY = titleY - 40;
+
+            if (termLabel != null && !termLabel.isBlank()) {
+                String termLine = t("term", locale) + ": " + termLabel;
+                float termWidth = PDType1Font.HELVETICA.getStringWidth(termLine) / 1000 * detailFontSize;
+                cs.beginText();
+                cs.setFont(PDType1Font.HELVETICA, detailFontSize);
+                cs.newLineAtOffset((pageWidth - termWidth) / 2, detailY);
+                cs.showText(termLine);
+                cs.endText();
+                detailY -= 18;
+            }
+
+            Locale javaLocale = "es".equalsIgnoreCase(locale) ? new Locale("es") : Locale.ENGLISH;
+            String dateLine = t("generated", locale) + ": " + java.time.LocalDate.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy", javaLocale));
+            float dateWidth = PDType1Font.HELVETICA.getStringWidth(dateLine) / 1000 * detailFontSize;
+            cs.beginText();
+            cs.setFont(PDType1Font.HELVETICA, detailFontSize);
+            cs.newLineAtOffset((pageWidth - dateWidth) / 2, detailY);
+            cs.showText(dateLine);
+            cs.endText();
+        }
+    }
+
+    /**
      * Helper method to draw a table cell with text
      */
     private static void drawCell(PDPageContentStream cs, float x, float y, float width, float height,
@@ -144,14 +249,16 @@ public class PdfReporter {
     public static void generateBlockReports(SchoolSchedule schedule,
             Map<String, Integer> hardViolations,
             Map<String, Integer> softViolations,
-            String baseName) throws IOException {
+            String baseName,
+            String termLabel,
+            String locale) throws IOException {
         String violationsPath = baseName + "-incumplimientos.pdf";
         String byTeacherPath = baseName + "-por-maestro.pdf";
         String byGroupPath = baseName + "-por-grupo.pdf";
 
-        generateBlockViolationsPdf(schedule, hardViolations, softViolations, violationsPath);
-        generateBlockScheduleByTeacherPdf(schedule, byTeacherPath);
-        generateBlockScheduleByGroupPdf(schedule, byGroupPath);
+        generateBlockViolationsPdf(schedule, hardViolations, softViolations, violationsPath, locale);
+        generateBlockScheduleByTeacherPdf(schedule, byTeacherPath, termLabel, locale);
+        generateBlockScheduleByGroupPdf(schedule, byGroupPath, termLabel, locale);
     }
 
     /**
@@ -162,12 +269,13 @@ public class PdfReporter {
      * on demand here, so it always reflects a specific solve rather than
      * whatever the schedule happens to look like when someone clicks the button.
      */
-    public static void generateBlockSchedulePdfs(SchoolSchedule schedule, String baseName) throws IOException {
+    public static void generateBlockSchedulePdfs(SchoolSchedule schedule, String baseName, String termLabel,
+            String locale) throws IOException {
         String byTeacherPath = baseName + "-por-maestro.pdf";
         String byGroupPath = baseName + "-por-grupo.pdf";
 
-        generateBlockScheduleByTeacherPdf(schedule, byTeacherPath);
-        generateBlockScheduleByGroupPdf(schedule, byGroupPath);
+        generateBlockScheduleByTeacherPdf(schedule, byTeacherPath, termLabel, locale);
+        generateBlockScheduleByGroupPdf(schedule, byGroupPath, termLabel, locale);
     }
 
     /**
@@ -179,7 +287,8 @@ public class PdfReporter {
     public static void generateBlockViolationsPdf(SchoolSchedule schedule,
             Map<String, Integer> hardViolations,
             Map<String, Integer> softViolations,
-            String outputPath) throws IOException {
+            String outputPath,
+            String locale) throws IOException {
         try (PDDocument doc = new PDDocument()) {
             PDPage page = new PDPage(PDRectangle.LETTER);
             doc.addPage(page);
@@ -195,17 +304,17 @@ public class PdfReporter {
                 cs.beginText();
                 cs.setFont(PDType1Font.HELVETICA_BOLD, 16);
                 cs.newLineAtOffset(margin, currentY);
-                cs.showText("Block Schedule - Constraint Violations Report");
+                cs.showText(t("violationsTitle", locale));
                 cs.newLineAtOffset(0, -leading * 1.5f);
                 currentY -= leading * 1.5f;
 
                 cs.setFont(PDType1Font.HELVETICA, 11);
-                cs.showText("Score: " + schedule.getScore());
+                cs.showText(t("score", locale) + ": " + schedule.getScore());
                 cs.newLineAtOffset(0, -leading);
                 currentY -= leading;
 
                 cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-                cs.showText("Hard Constraint Violations:");
+                cs.showText(t("hardViolations", locale));
                 cs.newLineAtOffset(0, -leading);
                 currentY -= leading;
                 cs.setFont(PDType1Font.HELVETICA, 11);
@@ -240,7 +349,7 @@ public class PdfReporter {
                 }
 
                 cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
-                cs.showText("Soft Constraint Violations:");
+                cs.showText(t("softViolations", locale));
                 cs.newLineAtOffset(0, -leading);
                 currentY -= leading;
                 cs.setFont(PDType1Font.HELVETICA, 11);
@@ -271,9 +380,11 @@ public class PdfReporter {
         }
     }
 
-    private static void generateBlockScheduleByTeacherPdf(SchoolSchedule schedule, String outputPath)
-            throws IOException {
+    private static void generateBlockScheduleByTeacherPdf(SchoolSchedule schedule, String outputPath,
+            String termLabel, String locale) throws IOException {
         try (PDDocument doc = new PDDocument()) {
+            addCoverPage(doc, t("coverTeacherTitle", locale), termLabel, locale);
+
             Map<String, java.util.List<CourseBlockAssignment>> byTeacher = new java.util.TreeMap<>();
             for (CourseBlockAssignment a : schedule.getCourseBlockAssignments()) {
                 String teacher = a.getTeacher() != null
@@ -301,7 +412,7 @@ public class PdfReporter {
                     cs.beginText();
                     cs.setFont(PDType1Font.HELVETICA_BOLD, 15);
                     cs.newLineAtOffset(margin, currentY);
-                    cs.showText("Calendario: " + teacherName);
+                    cs.showText(t("teacherLabel", locale) + ": " + teacherName);
                     cs.newLineAtOffset(0, -heading * 1.5f);
                     currentY -= heading * 1.5f;
                     cs.endText();
@@ -337,14 +448,14 @@ public class PdfReporter {
                     }
 
                     // Draw table
-                    String[] daysOfWeek = { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes" };
+                    String[] daysOfWeek = dayNames(locale);
                     float cellWidth = (pageWidth - 2 * margin - 50) / 5;
                     float cellHeight = 40;
                     float tableX = margin + 50;
                     float tableY = currentY - cellHeight - 5;
 
                     // Header row with days
-                    drawCell(cs, tableX - 50, tableY, 50, cellHeight, "Hora", 8, true);
+                    drawCell(cs, tableX - 50, tableY, 50, cellHeight, t("hour", locale), 8, true);
                     for (int i = 0; i < 5; i++) {
                         drawCell(cs, tableX + i * cellWidth, tableY, cellWidth, cellHeight, daysOfWeek[i], 8, true);
                     }
@@ -389,9 +500,11 @@ public class PdfReporter {
         }
     }
 
-    private static void generateBlockScheduleByGroupPdf(SchoolSchedule schedule, String outputPath)
-            throws IOException {
+    private static void generateBlockScheduleByGroupPdf(SchoolSchedule schedule, String outputPath,
+            String termLabel, String locale) throws IOException {
         try (PDDocument doc = new PDDocument()) {
+            addCoverPage(doc, t("coverGroupTitle", locale), termLabel, locale);
+
             Map<String, java.util.List<CourseBlockAssignment>> byGroup = new java.util.TreeMap<>();
             for (CourseBlockAssignment a : schedule.getCourseBlockAssignments()) {
                 String group = a.getGroup() != null ? a.getGroup().getName() : "UNASSIGNED";
@@ -417,7 +530,7 @@ public class PdfReporter {
                     cs.beginText();
                     cs.setFont(PDType1Font.HELVETICA_BOLD, 15);
                     cs.newLineAtOffset(margin, currentY);
-                    cs.showText("Calendario: " + groupName);
+                    cs.showText(t("groupLabel", locale) + ": " + groupName);
                     cs.newLineAtOffset(0, -heading * 1.5f);
                     currentY -= heading * 1.5f;
                     cs.endText();
@@ -452,14 +565,14 @@ public class PdfReporter {
                     }
 
                     // Draw table
-                    String[] daysOfWeek = { "Lunes", "Martes", "Miércoles", "Jueves", "Viernes" };
+                    String[] daysOfWeek = dayNames(locale);
                     float cellWidth = (pageWidth - 2 * margin - 50) / 5;
                     float cellHeight = 40;
                     float tableX = margin + 50;
                     float tableY = currentY - cellHeight - 5;
 
                     // Header row with days
-                    drawCell(cs, tableX - 50, tableY, 50, cellHeight, "Hora", 8, true);
+                    drawCell(cs, tableX - 50, tableY, 50, cellHeight, t("hour", locale), 8, true);
                     for (int i = 0; i < 5; i++) {
                         drawCell(cs, tableX + i * cellWidth, tableY, cellWidth, cellHeight, daysOfWeek[i], 8, true);
                     }

@@ -78,7 +78,7 @@ public class EngineRunnerService {
      * @return true if this call started a run, false if one was already in progress
      */
     public boolean tryStart() {
-        return tryStart(null, null);
+        return tryStart(null, null, null);
     }
 
     /**
@@ -90,6 +90,19 @@ public class EngineRunnerService {
      * @return true if this call started a run, false if one was already in progress
      */
     public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit) {
+        return tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, null);
+    }
+
+    /**
+     * Starts the engine subprocess if one isn't already running.
+     *
+     * @param minutesSpentLimit           overrides solverConfig.xml's time budget if non-null
+     * @param unimprovedMinutesSpentLimit overrides solverConfig.xml's give-up-if-stuck budget if non-null
+     * @param locale                      language for the automatic post-solve compliance snapshot's
+     *                                     report chrome ("es" or anything else -> "en"); null means "en"
+     * @return true if this call started a run, false if one was already in progress
+     */
+    public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale) {
         synchronized (lock) {
             if (state == State.RUNNING) {
                 return false;
@@ -100,11 +113,11 @@ public class EngineRunnerService {
             exitCode = null;
             logLines.clear();
         }
-        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit));
+        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit, locale));
         return true;
     }
 
-    private void runProcess(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit) {
+    private void runProcess(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale) {
         Integer resultCode = null;
         try {
             ProcessBuilder builder = new ProcessBuilder("bash", "scripts/run-engine.sh");
@@ -128,7 +141,7 @@ public class EngineRunnerService {
             }
             resultCode = process.waitFor();
             if (resultCode == 0) {
-                generateComplianceSnapshot();
+                generateComplianceSnapshot(locale);
             }
         } catch (IOException e) {
             appendLog("ERROR: failed to start engine process: " + e.getMessage());
@@ -154,7 +167,7 @@ public class EngineRunnerService {
      * engine run's own state to FAILED - the solve itself already succeeded and
      * was persisted; only the compliance snapshot is missing.
      */
-    private void generateComplianceSnapshot() {
+    private void generateComplianceSnapshot(String locale) {
         String runId = ReportRunnerService.RUN_ID_FORMAT.format(LocalDateTime.now());
         File runDir = new File(getAdminReportsDir(), runId);
         appendLog("Generating admin-only compliance snapshot...");
@@ -165,6 +178,9 @@ public class EngineRunnerService {
             builder.directory(new File(workingDir));
             builder.environment().put("REPORTER_OUTPUT_DIR", runDir.getAbsolutePath());
             builder.environment().put("REPORT_TARGET", "violations");
+            if (locale != null) {
+                builder.environment().put("REPORT_LOCALE", locale);
+            }
             builder.redirectErrorStream(true);
             Process process = builder.start();
 

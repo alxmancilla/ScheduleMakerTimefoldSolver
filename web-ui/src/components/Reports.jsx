@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { listReports, getReportStatus, generateReports, downloadReport } from '../api';
+import { listReports, getReportStatus, generateReports, downloadReport, getScheduleRuns } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 
 const STATUS_POLL_MS = 3000;
@@ -23,12 +23,27 @@ function Reports() {
   const [error, setError] = useState(null);
   const [openingFile, setOpeningFile] = useState(null);
   const [genError, setGenError] = useState(null);
+  // Which schedule_run to generate the by-teacher/by-group PDFs from - distinct
+  // from `runs` above (past PDF-generation batches). '' means "latest" (no
+  // runId sent - the current schedule), same default as the Schedule tab.
+  const [scheduleRuns, setScheduleRuns] = useState([]);
+  const [selectedScheduleRunId, setSelectedScheduleRunId] = useState('');
   const pollRef = useRef(null);
 
   useEffect(() => {
     loadAll();
+    loadScheduleRuns();
     return () => stopPolling();
   }, []);
+
+  const loadScheduleRuns = async () => {
+    try {
+      const response = await getScheduleRuns();
+      setScheduleRuns(response.data);
+    } catch (err) {
+      // Non-critical: the run picker just defaults to "latest" only.
+    }
+  };
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -85,7 +100,7 @@ function Reports() {
   const handleGenerate = async () => {
     setGenError(null);
     try {
-      const response = await generateReports();
+      const response = await generateReports(selectedScheduleRunId || undefined);
       setStatus(response.data);
       startPolling();
     } catch (err) {
@@ -115,11 +130,33 @@ function Reports() {
   return (
     <div>
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <h2>{t('reports.title')}</h2>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={loadAll}>↻ {t('reports.refresh')}</button>
             <WriteOnly>
+              <label htmlFor="reportScheduleRun" style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                {t('reports.scheduleRun')}
+              </label>
+              <select
+                id="reportScheduleRun"
+                value={selectedScheduleRunId}
+                onChange={(e) => setSelectedScheduleRunId(e.target.value)}
+                disabled={status?.state === 'RUNNING'}
+                style={{ padding: '8px', minWidth: '220px' }}
+              >
+                <option value="">{t('reports.latestScheduleRun')}</option>
+                {scheduleRuns.map((run) => (
+                  <option key={run.id} value={run.id}>
+                    {t('reports.scheduleRunOption', {
+                      id: run.id,
+                      timestamp: formatTimestamp(run.createdAt),
+                      hard: run.hardScore,
+                      soft: run.softScore,
+                    })}
+                  </option>
+                ))}
+              </select>
               <button
                 className="btn btn-success"
                 onClick={handleGenerate}

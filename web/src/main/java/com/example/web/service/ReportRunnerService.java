@@ -75,11 +75,36 @@ public class ReportRunnerService {
     }
 
     /**
-     * Starts the reporter subprocess if one isn't already running.
+     * Starts the reporter subprocess if one isn't already running, generating
+     * from the current schedule.
      *
      * @return true if this call started a run, false if one was already in progress
      */
     public boolean tryStart() {
+        return tryStart(null, null);
+    }
+
+    /**
+     * Starts the reporter subprocess if one isn't already running, optionally
+     * generating from a specific past schedule_run instead of the current
+     * schedule. Null scheduleRunId means "current", same as before this
+     * parameter existed.
+     *
+     * @return true if this call started a run, false if one was already in progress
+     */
+    public boolean tryStart(Integer scheduleRunId) {
+        return tryStart(scheduleRunId, null);
+    }
+
+    /**
+     * Starts the reporter subprocess if one isn't already running.
+     *
+     * @param scheduleRunId null means "current schedule"
+     * @param locale        report chrome language ("es" or anything else -> "en");
+     *                      null means "en", same as before this parameter existed
+     * @return true if this call started a run, false if one was already in progress
+     */
+    public boolean tryStart(Integer scheduleRunId, String locale) {
         synchronized (lock) {
             if (state == State.RUNNING) {
                 return false;
@@ -91,11 +116,11 @@ public class ReportRunnerService {
             currentRunId = RUN_ID_FORMAT.format(startedAt);
             logLines.clear();
         }
-        executor.submit(this::runProcess);
+        executor.submit(() -> runProcess(scheduleRunId, locale));
         return true;
     }
 
-    private void runProcess() {
+    private void runProcess(Integer scheduleRunId, String locale) {
         Integer resultCode = null;
         try {
             File runDir = new File(getReportsDir(), currentRunId);
@@ -105,6 +130,12 @@ public class ReportRunnerService {
             builder.directory(new File(workingDir));
             builder.environment().put("REPORTER_OUTPUT_DIR", runDir.getAbsolutePath());
             builder.environment().put("REPORT_TARGET", "schedules");
+            if (locale != null) {
+                builder.environment().put("REPORT_LOCALE", locale);
+            }
+            if (scheduleRunId != null) {
+                builder.environment().put("REPORT_RUN_ID", String.valueOf(scheduleRunId));
+            }
             builder.redirectErrorStream(true);
             Process process = builder.start();
 

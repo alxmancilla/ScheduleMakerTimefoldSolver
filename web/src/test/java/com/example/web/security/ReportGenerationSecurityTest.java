@@ -1,6 +1,7 @@
 package com.example.web.security;
 
 import com.example.web.controller.ReportGenerationController;
+import com.example.web.repository.AppUserRepository;
 import com.example.web.service.ReportRunnerService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -14,6 +15,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,12 +38,16 @@ public class ReportGenerationSecurityTest {
     @MockBean
     private ReportRunnerService reportRunnerService;
 
+    @MockBean
+    private AppUserRepository appUserRepository;
+
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean
     private AppUserDetailsService appUserDetailsService;
 
     private void stubRunningStart() {
-        when(reportRunnerService.tryStart()).thenReturn(true);
+        when(appUserRepository.findById("user")).thenReturn(Optional.empty());
+        when(reportRunnerService.tryStart(null, null)).thenReturn(true);
         when(reportRunnerService.getSnapshot())
                 .thenReturn(new ReportRunnerService.Snapshot(ReportRunnerService.State.RUNNING, null, null, null, null, List.of()));
     }
