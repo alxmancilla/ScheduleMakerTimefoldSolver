@@ -122,12 +122,12 @@
       "name": "Nombre:",
       "abbreviation": "Abreviatura:",
       "semester": "Semestre:",
-      "component": "Componente:",
+      "designation": "Designación:",
       "roomRequirement": "Requisito de Aula:",
       "requiredHoursPerWeek": "Horas Requeridas por Semana:",
       "active": "Activo:"
     },
-    "componentPlaceholder": "p. ej. BASICAS, TPROG, TEM",
+    "designationPlaceholder": "-- Seleccione una designación --",
     "roomRequirements": {
       "title": "Requisitos de Aula (dobles)",
       "description": "Para cursos que necesitan dividir sus horas entre varios tipos de aula (p. ej. 4h en centro de cómputo + 1h en aula estándar). Deje vacío para usar solo el Requisito de Aula único de arriba.",
@@ -475,7 +475,7 @@
     },
     "blockRules": {
       "title": "Reglas de Bloques",
-      "description": "Define el tamaño de bloque preferido (1-4h) usado para descomponer las horas semanales de un curso al generar bloques, y el máximo de bloques por día que el solucionador permite para el mismo curso/grupo, por componente de curso. Un componente sin regla aquí usa por defecto bloques de 2h y 2 bloques/día.",
+      "description": "Define el tamaño de bloque preferido (1-4h) usado para descomponer las horas semanales de un curso al generar bloques, y el máximo de bloques por día que el solucionador permite para el mismo curso/grupo, por designación de curso. Una designación sin regla aquí usa por defecto bloques de 2h y 2 bloques/día.",
       "addRule": "+ Agregar Regla",
       "editRule": "Editar Regla de Bloque",
       "newRule": "Nueva Regla de Bloque",
@@ -485,20 +485,51 @@
       "confirmDelete": "¿Restablecer {{component}} a los valores por defecto (bloques de 2h, 2 bloques/día)?",
       "savedMessage": "Regla de bloque guardada",
       "deletedMessage": "Regla de bloque restablecida al valor por defecto",
-      "none": "No hay reglas de bloques personalizadas — todos los componentes usan el tamaño de bloque por defecto de 2h y 2 bloques/día.",
+      "none": "No hay reglas de bloques personalizadas — todas las designaciones usan el tamaño de bloque por defecto de 2h y 2 bloques/día.",
       "resetToDefault": "Restablecer por Defecto",
       "saving": "Guardando...",
       "sizeHint": "Los bloques se empaquetan de forma voraz a este tamaño, con un bloque final más pequeño para las horas restantes.",
       "maxBlocksPerDayHint": "El solucionador no colocará más de este número de bloques del mismo curso, para el mismo grupo, en un solo día.",
       "fields": {
-        "component": "Componente:",
+        "component": "Designación:",
         "preferredBlockSize": "Tamaño de Bloque Preferido (horas):",
         "maxBlocksPerDay": "Máximo de Bloques por Día:"
       },
       "table": {
-        "component": "Componente",
+        "component": "Designación",
         "preferredBlockSize": "Tamaño de Bloque Preferido",
         "maxBlocksPerDay": "Máx. Bloques/Día"
+      }
+    },
+    "calendar": {
+      "title": "Calendario",
+      "description": "Registra los días festivos, de examen y medios días del ciclo escolar. Por ahora es solo un registro informativo — todavía no se usa al generar bloques ni en el solucionador.",
+      "addException": "+ Agregar Excepción",
+      "editException": "Editar Excepción de Calendario",
+      "newException": "Nueva Excepción de Calendario",
+      "loadFailedPrefix": "Error al cargar las excepciones de calendario: ",
+      "saveFailedPrefix": "Error al guardar la excepción de calendario: ",
+      "deleteFailedPrefix": "Error al eliminar la excepción de calendario: ",
+      "confirmDelete": "¿Eliminar la excepción de calendario del {{date}}?",
+      "savedMessage": "Excepción de calendario guardada",
+      "deletedMessage": "Excepción de calendario eliminada",
+      "none": "Aún no hay excepciones de calendario configuradas.",
+      "saving": "Guardando...",
+      "fields": {
+        "date": "Fecha:",
+        "type": "Tipo:",
+        "label": "Etiqueta:",
+        "endHour": "Las Clases Terminan A Las:"
+      },
+      "types": {
+        "HOLIDAY": "Día Festivo",
+        "HALF_DAY": "Medio Día",
+        "EXAM_DAY": "Día de Examen"
+      },
+      "table": {
+        "date": "Fecha",
+        "type": "Tipo",
+        "label": "Etiqueta"
       }
     }
   },

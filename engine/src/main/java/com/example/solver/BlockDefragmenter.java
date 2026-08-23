@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
  * schedule fragmentation.
  * 
  * Fragmentation occurs when a day's schedule is filled with small blocks (e.g.,
- * 1-hour BASICAS)
- * that prevent larger blocks (e.g., 3-4 hour non-BASICAS) from being assigned
+ * 1-hour Core)
+ * that prevent larger blocks (e.g., 3-4 hour non-Core) from being assigned
  * to contiguous timeslots.
  * 
  * This phase:
@@ -56,7 +56,7 @@ public class BlockDefragmenter implements PhaseCommand<SchoolSchedule> {
 
             logger.info("Attempting to fix: {} {} {} (block_length={}, timeslot_length={})",
                     violation.getGroup().getId(),
-                    violation.getCourse().getComponent(),
+                    violation.getCourse().getDesignation(),
                     violation.getCourse().getName(),
                     violation.getBlockLength(),
                     violation.getTimeslot() != null ? violation.getTimeslot().getLengthHours() : "null");

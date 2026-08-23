@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  getCourses, createCourse, updateCourse, deleteCourse, getCourseComponents,
+  getCourses, createCourse, updateCourse, deleteCourse, getCourseDesignations,
   getCourseRoomRequirements, createCourseRoomRequirement, updateCourseRoomRequirement, deleteCourseRoomRequirement,
   getCourseBlockTemplates, createCourseBlockTemplate, updateCourseBlockTemplate, deleteCourseBlockTemplate,
   getCourseIdsWithRoomRequirements,
@@ -31,7 +31,7 @@ function Courses() {
   const confirmAction = useConfirm();
   const [courses, setCourses] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [components, setComponents] = useState([]);
+  const [designations, setDesignations] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [groups, setGroups] = useState([]);
   const [timeslots, setTimeslots] = useState([]);
@@ -68,7 +68,7 @@ function Courses() {
 
   useEffect(() => {
     loadCourses();
-    loadComponents();
+    loadDesignations();
     loadRooms();
     loadGroups();
     loadTimeslots();
@@ -84,12 +84,12 @@ function Courses() {
     }
   };
 
-  const loadComponents = async () => {
+  const loadDesignations = async () => {
     try {
-      const response = await getCourseComponents();
-      setComponents(response.data);
+      const response = await getCourseDesignations();
+      setDesignations(response.data);
     } catch (err) {
-      // Non-critical: the datalist just won't have suggestions.
+      // Designation dropdown will just be empty until this succeeds.
     }
   };
 
@@ -163,7 +163,7 @@ function Courses() {
       name: formData.get('name'),
       abbreviation: formData.get('abbreviation'),
       semester: parseInt(formData.get('semester')),
-      component: formData.get('component'),
+      designation: formData.get('designation'),
       roomRequirement: formData.get('roomRequirement'),
       requiredHoursPerWeek: parseInt(formData.get('requiredHoursPerWeek')),
       active: formData.get('active') === 'true',
@@ -178,7 +178,7 @@ function Courses() {
       setShowForm(false);
       setEditingCourse(null);
       loadCourses();
-      loadComponents();
+      loadDesignations();
       showToast(t('courses.savedMessage'));
     } catch (err) {
       const data = err.response?.data;
@@ -505,26 +505,22 @@ function Courses() {
                   {fieldErrors.semester && <div className="error">{fieldErrors.semester}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.component')}</label>
-                  <input
-                    type="text"
-                    name="component"
-                    list="component-options"
-                    defaultValue={editingCourse?.component || ''}
-                    maxLength={20}
+                  <label>{t('courses.fields.designation')}</label>
+                  <select
+                    name="designation"
+                    defaultValue={editingCourse?.designation || ''}
                     required
-                    placeholder={t('courses.componentPlaceholder')}
-                  />
-                  <datalist id="component-options">
-                    {components.map((c) => (
-                      <option key={c} value={c} />
+                  >
+                    <option value="" disabled>{t('courses.designationPlaceholder')}</option>
+                    {designations.map((d) => (
+                      <option key={d} value={d}>{d}</option>
                     ))}
-                  </datalist>
-                  {fieldErrors.component && <div className="error">{fieldErrors.component}</div>}
+                  </select>
+                  {fieldErrors.designation && <div className="error">{fieldErrors.designation}</div>}
                 </div>
                 <div className="form-group">
                   <label>{t('courses.fields.roomRequirement')}</label>
-                  <select name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'estándar'}>
+                  <select name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'Standard'}>
                     {ROOM_TYPES.map((type) => (
                       <option key={type} value={type}>{type}</option>
                     ))}

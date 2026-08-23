@@ -42,6 +42,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max blocks per course per group per
                                                                         // day (per-component via component_block_rule)
                 courseBlocksMustBeConsecutive(constraintFactory), // HARD: ALL course blocks MUST be consecutive
+                teacherMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
+                groupMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
 
                 // ========== TIER 4: SOFT Constraints - Quality Optimization ==========
                 // These optimize quality, evaluated last:
@@ -61,10 +63,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
                 // ========== COMMENTED OUT CONSTRAINTS ==========
                 // Uncomment these if needed:
-                // mustFinishBy2pm(constraintFactory), // SOFT: Prefer non-BASICAS courses in
+                // mustFinishBy2pm(constraintFactory), // SOFT: Prefer non-Core courses in
                 // non-standard rooms to finish by 2pm
                 // limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // SOFT:
-                // concentrate non-BASICAS
+                // concentrate non-Core
                 // groupCoursesInSameRoomByType(constraintFactory), // HARD: same room type
                 // consistency
                 // balanceTeacherWorkload(constraintFactory), // SOFT: balance workload
@@ -191,7 +193,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // HARD: Room type must match the block's satisfiesRoomType field
         // This supports dual room requirements where different blocks of the same
         // course
-        // can require different room types (e.g., 4h in CC + 1h in estándar)
+        // can require different room types (e.g., 4h in Specialized - Computer Lab + 1h in Standard)
         return constraintFactory
                 .forEach(CourseBlockAssignment.class)
                 .filter(assignment -> {
@@ -237,11 +239,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // - Reduced operational costs (utilities, supervision)
         //
         // Non-standard room types:
-        // - centro de cómputo (Computer Centers: CC 1, CC 2, CC 3)
-        // - taller (General Workshop: AULA 4)
-        // - mixto (LQ1, LMICRO, TEM1-3, TE1, TPIAL - also satisfy estándar/taller)
+        // - Specialized - Computer Lab (Computer Centers: CC 1, CC 2, CC 3)
+        // - Specialized - Workshop (General Workshop: AULA 4)
+        // - Mixed (LQ1, LMICRO, TEM1-3, TE1, TPIAL - also satisfy Standard/Specialized - Workshop)
         //
-        // Standard rooms (estándar) can run until 3pm (15:00) for flexibility.
+        // Standard rooms can run until 3pm (15:00) for flexibility.
         //
         // Exemptions:
         // - Pinned assignments are exempt (they are fixed from the database)
@@ -278,7 +280,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Check if room is non-standard
                     String roomType = assignment.getRoom().getType();
                     boolean isNonStandard = (roomType != null
-                            && !roomType.equalsIgnoreCase("estándar"));
+                            && !roomType.equalsIgnoreCase("Standard"));
 
                     return isNonStandard; // Penalize if non-standard room after 2pm
                 })
@@ -287,7 +289,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     // A component with no row in component_block_rule falls back to this,
-    // matching the old default cap for non-BASICAS courses.
+    // matching the old default cap for non-Core courses.
     private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
 
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
@@ -365,6 +367,86 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         return breaks;
     }
 
+    // Half the 8h (7:00-15:00) school day - a teacher/group scheduled this many
+    // consecutive hours with zero idle time between blocks must get a break
+    // before continuing. Pinned blocks are excluded from the run (same
+    // convention as nonStandardRoomsShouldFinishBy2pm/groupPreferredRoomConstraint)
+    // so legacy pinned data can't block solver convergence; only movable blocks
+    // are enforced.
+    private static final int MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK = 4;
+
+    private Constraint teacherMustHaveBreakAfterConsecutiveHours(ConstraintFactory constraintFactory) {
+        // HARD: A teacher scheduled MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK straight
+        // hours (blocks with zero idle time between them, same day) must get a
+        // break before continuing - minimizeTeacherIdleGaps only minimizes gaps
+        // toward zero, it never required one to exist in the first place.
+        return constraintFactory
+                .forEach(CourseBlockAssignment.class)
+                .filter(a -> !a.isPinned() && a.getTeacher() != null && a.getTimeslot() != null)
+                .groupBy(
+                        CourseBlockAssignment::getTeacher,
+                        a -> a.getTimeslot().getDayOfWeek(),
+                        ConstraintCollectors.toList())
+                .filter((teacher, day, blocks) -> longestConsecutiveRunHours(blocks) > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                .penalize(HardSoftScore.ONE_HARD,
+                        (teacher, day, blocks) -> longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                .asConstraint("Teacher must have a break after consecutive hours");
+    }
+
+    private Constraint groupMustHaveBreakAfterConsecutiveHours(ConstraintFactory constraintFactory) {
+        // HARD: Same rule as teacherMustHaveBreakAfterConsecutiveHours, for
+        // student groups instead of teachers.
+        return constraintFactory
+                .forEach(CourseBlockAssignment.class)
+                .filter(a -> !a.isPinned() && a.getGroup() != null && a.getTimeslot() != null)
+                .groupBy(
+                        CourseBlockAssignment::getGroup,
+                        a -> a.getTimeslot().getDayOfWeek(),
+                        ConstraintCollectors.toList())
+                .filter((group, day, blocks) -> longestConsecutiveRunHours(blocks) > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                .penalize(HardSoftScore.ONE_HARD,
+                        (group, day, blocks) -> longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                .asConstraint("Group must have a break after consecutive hours");
+    }
+
+    /**
+     * The longest run of occupied hours (merging touching or overlapping
+     * blocks into one span) once sorted by start hour, tie-broken by id for a
+     * deterministic total order. A gap of any size - even one hour - starts a
+     * new run. Uses interval-merge (track [runStart, runEnd), extend on
+     * overlap/touch) rather than summing block lengths: mid-search the solver
+     * freely explores states where two blocks for the same teacher/group
+     * overlap (the double-booking constraint hasn't resolved it yet), and
+     * summing lengths would double-count that overlap - which also made the
+     * result depend on which of two equal-start-hour blocks the (otherwise
+     * unstable-for-ties) sort visited first, silently violating Timefold's
+     * requirement that a constraint be a pure, order-independent function of
+     * the group's contents. The explicit id tie-break plus interval-merge
+     * fixes both the correctness and the determinism.
+     */
+    static int longestConsecutiveRunHours(java.util.List<CourseBlockAssignment> blocks) {
+        java.util.List<CourseBlockAssignment> sorted = new java.util.ArrayList<>(blocks);
+        sorted.sort(java.util.Comparator
+                .comparingInt((CourseBlockAssignment a) -> a.getTimeslot().getStartHour())
+                .thenComparing(CourseBlockAssignment::getId));
+        int longest = 0;
+        int runStart = -1;
+        int runEnd = -1;
+        for (CourseBlockAssignment assignment : sorted) {
+            BlockTimeslot timeslot = assignment.getTimeslot();
+            int start = timeslot.getStartHour();
+            int end = start + timeslot.getLengthHours();
+            if (runEnd == -1 || start > runEnd) {
+                runStart = start;
+                runEnd = end;
+            } else {
+                runEnd = Math.max(runEnd, end);
+            }
+            longest = Math.max(longest, runEnd - runStart);
+        }
+        return longest;
+    }
+
     // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================
     // The following constraints are for hour-based scheduling and are no longer
     // used.
@@ -414,10 +496,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (assignment.getGroup() == null || assignment.getRoom() == null) {
                         return false;
                     }
-                    // Only apply to blocks that don't require the "mixto" room type (those
-                    // must get an actual mixto room)
+                    // Only apply to blocks that don't require the "Mixed" room type (those
+                    // must get an actual Mixed room)
                     if (assignment.getSatisfiesRoomType() != null &&
-                            "mixto".equalsIgnoreCase(assignment.getSatisfiesRoomType())) {
+                            "Mixed".equalsIgnoreCase(assignment.getSatisfiesRoomType())) {
                         return false;
                     }
                     // Check if group has a preferred room

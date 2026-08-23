@@ -5,7 +5,8 @@ import {
   runEngine, getEngineStatus, generateBlocks,
   listAdminReports, downloadAdminReport,
   getTerm, updateTerm, getAuditLog,
-  getComponentBlockRules, setComponentBlockRule, deleteComponentBlockRule, getCourseComponents,
+  getComponentBlockRules, setComponentBlockRule, deleteComponentBlockRule, getCourseDesignations,
+  getCalendarExceptions, setCalendarException, deleteCalendarException,
 } from '../api';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
@@ -27,6 +28,8 @@ const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 const BLOCK_SIZES = [1, 2, 3, 4];
 const EMPTY_BLOCK_RULE_FORM = { component: '', preferredBlockSize: 2, maxBlocksPerDay: 2 };
+const CALENDAR_EXCEPTION_TYPES = ['HOLIDAY', 'HALF_DAY', 'EXAM_DAY'];
+const EMPTY_CALENDAR_EXCEPTION_FORM = { date: '', type: 'HOLIDAY', label: '', endHour: 12 };
 
 const SETTINGS_TABS = [
   { key: 'term', labelKey: 'settings.term.title' },
@@ -34,6 +37,7 @@ const SETTINGS_TABS = [
   { key: 'complianceSnapshots', labelKey: 'settings.complianceSnapshots.title' },
   { key: 'generateBlocks', labelKey: 'settings.generateBlocks.title' },
   { key: 'blockRules', labelKey: 'settings.blockRules.title' },
+  { key: 'calendar', labelKey: 'settings.calendar.title' },
   { key: 'timeslots', labelKey: 'settings.timeslots.title' },
   { key: 'auditLog', labelKey: 'settings.auditLog.title' },
 ];
@@ -69,11 +73,18 @@ function Settings() {
 
   const [blockRules, setBlockRules] = useState([]);
   const [blockRulesError, setBlockRulesError] = useState(null);
-  const [courseComponents, setCourseComponents] = useState([]);
+  const [courseDesignations, setCourseDesignations] = useState([]);
   const [showBlockRuleForm, setShowBlockRuleForm] = useState(false);
   const [editingBlockRuleComponent, setEditingBlockRuleComponent] = useState(null);
   const [blockRuleForm, setBlockRuleForm] = useState(EMPTY_BLOCK_RULE_FORM);
   const [savingBlockRule, setSavingBlockRule] = useState(false);
+
+  const [calendarExceptions, setCalendarExceptions] = useState([]);
+  const [calendarExceptionsError, setCalendarExceptionsError] = useState(null);
+  const [showCalendarExceptionForm, setShowCalendarExceptionForm] = useState(false);
+  const [editingCalendarExceptionDate, setEditingCalendarExceptionDate] = useState(null);
+  const [calendarExceptionForm, setCalendarExceptionForm] = useState(EMPTY_CALENDAR_EXCEPTION_FORM);
+  const [savingCalendarException, setSavingCalendarException] = useState(false);
 
   const [activeTab, setActiveTab] = useState('term');
 
@@ -81,7 +92,8 @@ function Settings() {
     loadTimeslots();
     loadEngineStatus();
     loadBlockRules();
-    loadCourseComponents();
+    loadCourseDesignations();
+    loadCalendarExceptions();
     loadAdminReports();
     loadTerm();
     loadAuditLog();
@@ -215,16 +227,16 @@ function Settings() {
     }
   };
 
-  const loadCourseComponents = async () => {
+  const loadCourseDesignations = async () => {
     try {
-      const response = await getCourseComponents();
-      setCourseComponents(response.data);
+      const response = await getCourseDesignations();
+      setCourseDesignations(response.data);
     } catch (err) {
       // Non-critical: the "add rule" component dropdown just won't have options.
     }
   };
 
-  const unconfiguredComponents = courseComponents.filter(
+  const unconfiguredComponents = courseDesignations.filter(
     (c) => !blockRules.some((r) => r.component === c)
   );
 
@@ -272,6 +284,70 @@ function Settings() {
       showToast(t('settings.blockRules.deletedMessage'));
     } catch (err) {
       setBlockRulesError(err.response?.data?.message || t('settings.blockRules.deleteFailedPrefix') + err.message);
+    }
+  };
+
+  const loadCalendarExceptions = async () => {
+    try {
+      const response = await getCalendarExceptions();
+      setCalendarExceptions(response.data);
+      setCalendarExceptionsError(null);
+    } catch (err) {
+      setCalendarExceptionsError(t('settings.calendar.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const handleAddCalendarException = () => {
+    setEditingCalendarExceptionDate(null);
+    setCalendarExceptionForm(EMPTY_CALENDAR_EXCEPTION_FORM);
+    setCalendarExceptionsError(null);
+    setShowCalendarExceptionForm(true);
+  };
+
+  const handleEditCalendarException = (exception) => {
+    setEditingCalendarExceptionDate(exception.exceptionDate);
+    setCalendarExceptionForm({
+      date: exception.exceptionDate,
+      type: exception.type,
+      label: exception.label || '',
+      endHour: exception.endHour || 12,
+    });
+    setCalendarExceptionsError(null);
+    setShowCalendarExceptionForm(true);
+  };
+
+  const handleCancelCalendarException = () => {
+    setShowCalendarExceptionForm(false);
+    setEditingCalendarExceptionDate(null);
+    setCalendarExceptionsError(null);
+  };
+
+  const handleSubmitCalendarException = async (e) => {
+    e.preventDefault();
+    setSavingCalendarException(true);
+    setCalendarExceptionsError(null);
+    try {
+      const endHour = calendarExceptionForm.type === 'HALF_DAY' ? calendarExceptionForm.endHour : null;
+      await setCalendarException(calendarExceptionForm.date, calendarExceptionForm.type,
+          calendarExceptionForm.label || null, endHour);
+      handleCancelCalendarException();
+      loadCalendarExceptions();
+      showToast(t('settings.calendar.savedMessage'));
+    } catch (err) {
+      setCalendarExceptionsError(err.response?.data?.message || t('settings.calendar.saveFailedPrefix') + err.message);
+    } finally {
+      setSavingCalendarException(false);
+    }
+  };
+
+  const handleDeleteCalendarException = async (date) => {
+    if (!(await confirmAction(t('settings.calendar.confirmDelete', { date })))) return;
+    try {
+      await deleteCalendarException(date);
+      loadCalendarExceptions();
+      showToast(t('settings.calendar.deletedMessage'));
+    } catch (err) {
+      setCalendarExceptionsError(err.response?.data?.message || t('settings.calendar.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -660,6 +736,117 @@ function Settings() {
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDeleteBlockRule(rule.component)}>
                       {t('settings.blockRules.resetToDefault')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      </div>
+      )}
+
+      {activeTab === 'calendar' && (
+      <div role="tabpanel" id="settings-panel-calendar" aria-labelledby="settings-tab-calendar">
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('settings.calendar.title')}</h3>
+          <button className="btn btn-success" onClick={handleAddCalendarException}>
+            {t('settings.calendar.addException')}
+          </button>
+        </div>
+        <p style={{ marginTop: '8px', color: '#7f8c8d', fontSize: '13px' }}>
+          {t('settings.calendar.description')}
+        </p>
+        {calendarExceptionsError && <div className="error">{calendarExceptionsError}</div>}
+      </div>
+
+      {showCalendarExceptionForm && (
+        <div className="card">
+          <h3>{editingCalendarExceptionDate ? t('settings.calendar.editException') : t('settings.calendar.newException')}</h3>
+          <form onSubmit={handleSubmitCalendarException}>
+            <div className="form-group">
+              <label>{t('settings.calendar.fields.date')}</label>
+              {editingCalendarExceptionDate ? (
+                <input type="text" value={calendarExceptionForm.date} disabled />
+              ) : (
+                <input
+                  type="date"
+                  value={calendarExceptionForm.date}
+                  onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, date: e.target.value })}
+                  required
+                />
+              )}
+            </div>
+            <div className="form-group">
+              <label>{t('settings.calendar.fields.type')}</label>
+              <select
+                value={calendarExceptionForm.type}
+                onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, type: e.target.value })}
+              >
+                {CALENDAR_EXCEPTION_TYPES.map((type) => (
+                  <option key={type} value={type}>{t(`settings.calendar.types.${type}`)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>{t('settings.calendar.fields.label')}</label>
+              <input
+                type="text"
+                value={calendarExceptionForm.label}
+                onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, label: e.target.value })}
+                maxLength={200}
+              />
+            </div>
+            {calendarExceptionForm.type === 'HALF_DAY' && (
+              <div className="form-group">
+                <label>{t('settings.calendar.fields.endHour')}</label>
+                <select
+                  value={calendarExceptionForm.endHour}
+                  onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, endHour: parseInt(e.target.value, 10) })}
+                >
+                  {START_HOURS.map((h) => (
+                    <option key={h} value={h}>{formatHour(h)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="submit" className="btn btn-primary" disabled={savingCalendarException || !calendarExceptionForm.date}>
+                {savingCalendarException ? t('settings.calendar.saving') : t('common.save')}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancelCalendarException}>{t('common.cancel')}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="card">
+        {calendarExceptions.length === 0 ? (
+          <p style={{ color: '#7f8c8d' }}>{t('settings.calendar.none')}</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>{t('settings.calendar.table.date')}</th>
+                <th>{t('settings.calendar.table.type')}</th>
+                <th>{t('settings.calendar.table.label')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calendarExceptions.map((exception) => (
+                <tr key={exception.exceptionDate}>
+                  <td>{exception.exceptionDate}{exception.type === 'HALF_DAY' && exception.endHour ? ` (${formatHour(exception.endHour)})` : ''}</td>
+                  <td>{t(`settings.calendar.types.${exception.type}`)}</td>
+                  <td>{exception.label || '-'}</td>
+                  <td>
+                    <button className="btn btn-primary" onClick={() => handleEditCalendarException(exception)} style={{ marginRight: '5px' }}>
+                      {t('common.edit')}
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDeleteCalendarException(exception.exceptionDate)}>
+                      {t('common.delete')}
                     </button>
                   </td>
                 </tr>

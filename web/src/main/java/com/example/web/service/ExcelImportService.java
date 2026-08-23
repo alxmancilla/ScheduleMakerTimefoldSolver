@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 public class ExcelImportService {
 
     private static final Set<String> VALID_ROOM_TYPES = Set.of(
-            "estándar", "mixto", "taller", "centro de cómputo");
+            "Standard", "Mixed", "Specialized - Workshop", "Specialized - Computer Lab");
     private static final Pattern ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
 
     @Autowired
@@ -265,7 +265,7 @@ public class ExcelImportService {
             String name = stringOf(row.getCell(1));
             String abbreviation = stringOf(row.getCell(2));
             Integer semester = intOf(row.getCell(3));
-            String component = stringOf(row.getCell(4));
+            String designation = stringOf(row.getCell(4));
             String roomRequirement = stringOf(row.getCell(5));
             Integer requiredHours = intOf(row.getCell(6));
             Boolean active = booleanOf(row.getCell(7));
@@ -284,8 +284,8 @@ public class ExcelImportService {
             if (semester == null || semester < 1 || semester > 12) {
                 errors.add(location + ": semester must be between 1 and 12");
             }
-            if (isBlank(component) || component.length() > 20) {
-                errors.add(location + ": component is required (max 20 characters)");
+            if (isBlank(designation) || designation.length() > 20) {
+                errors.add(location + ": designation is required (max 20 characters)");
             }
             if (isBlank(roomRequirement)) {
                 errors.add(location + ": room_requirement is required");
@@ -296,7 +296,7 @@ public class ExcelImportService {
                 errors.add(location + ": required_hours_per_week must be between 1 and 40");
             }
 
-            rows.add(new CourseRow(id, name, abbreviation, semester, component, roomRequirement, requiredHours,
+            rows.add(new CourseRow(id, name, abbreviation, semester, designation, roomRequirement, requiredHours,
                     active == null || active));
         }
         return rows;
@@ -309,7 +309,7 @@ public class ExcelImportService {
             entity.setName(r.name);
             entity.setAbbreviation(r.abbreviation);
             entity.setSemester(r.semester);
-            entity.setComponent(r.component);
+            entity.setDesignation(r.designation);
             entity.setRoomRequirement(r.roomRequirement);
             entity.setRequiredHoursPerWeek(r.requiredHours);
             entity.setActive(r.active);
@@ -318,7 +318,7 @@ public class ExcelImportService {
         return rows.size();
     }
 
-    private record CourseRow(String id, String name, String abbreviation, Integer semester, String component,
+    private record CourseRow(String id, String name, String abbreviation, Integer semester, String designation,
             String roomRequirement, Integer requiredHours, boolean active) {
     }
 

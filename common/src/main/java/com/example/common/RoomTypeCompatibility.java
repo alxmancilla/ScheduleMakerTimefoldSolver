@@ -6,14 +6,19 @@ package com.example.common;
  * copies (engine's {@code Room.capabilitiesFor()} and web's own
  * {@code RoomTypeCompatibility}), which had to be edited in lockstep on
  * every change to the rule (three times, across the "laboratorio" ->
- * "dual" -> "mixto" renames alone). Both {@code engine} and {@code web}
- * depend on this module and call this one method instead.
+ * "dual" -> "mixto" -> "Mixed" renames alone). Both {@code engine} and
+ * {@code web} depend on this module and call this one method instead.
  *
  * <p>Convention: a room satisfies a requirement of its own type, and a
- * {@code mixto} room additionally satisfies {@code estándar} and
- * {@code taller} (it's equipped for both a regular class and a workshop),
- * but never the reverse - a plain {@code estándar} or {@code taller} room
- * does not satisfy a {@code mixto} requirement.
+ * {@code Mixed} room additionally satisfies {@code Standard} and
+ * {@code Specialized - Workshop} (it's equipped for both a regular class
+ * and a workshop), but never the reverse - a plain {@code Standard} or
+ * {@code Specialized - Workshop} room does not satisfy a {@code Mixed}
+ * requirement. Notably, {@code Mixed} does NOT satisfy
+ * {@code Specialized - Computer Lab} - that one stays a strictly separate,
+ * non-interchangeable room type (deliberately not merged with
+ * {@code Specialized - Workshop} despite the shared "Specialized" label
+ * prefix; that prefix is a UI grouping convenience only).
  *
  * <p>A {@code null} requirement or a {@code null} room type is treated as
  * satisfied ("nothing to check against"): every real caller that has an
@@ -34,6 +39,7 @@ public final class RoomTypeCompatibility {
             return true;
         }
         return roomType.equals(requirement)
-                || ("mixto".equals(roomType) && ("estándar".equals(requirement) || "taller".equals(requirement)));
+                || ("Mixed".equals(roomType)
+                        && ("Standard".equals(requirement) || "Specialized - Workshop".equals(requirement)));
     }
 }

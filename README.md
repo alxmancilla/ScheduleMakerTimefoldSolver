@@ -55,7 +55,7 @@ if one is set, regardless of the group's preference.
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (9 hard, 8 soft).
+test run (11 hard, 8 soft).
 
 #### Hard Constraints (must be satisfied)
 1. **Block Length Must Match Timeslot Length**
@@ -67,6 +67,8 @@ test run (9 hard, 8 soft).
 7. **Group Cannot Have Two Courses at Same Time**
 8. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
 9. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
+10. **Teacher Must Have a Break After Consecutive Hours** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
+11. **Group Must Have a Break After Consecutive Hours** — same rule, for student groups
 
 #### Soft Constraints (weighted quality preferences)
 1. **Non-Standard Rooms Should Finish by 2pm** (weight 10) — labs/workshops/computer centers
@@ -75,7 +77,7 @@ test run (9 hard, 8 soft).
 4. **Minimize Group Idle Gaps** (weight 3/hour, adjacent-pair only)
 5. **Prefer Block's Specified Room** (weight 3) — `preferred_room_hint`
 6. **Minimize Teacher Idle Gaps** (weight 2/hour, availability-aware, adjacent-pair only)
-7. **Prefer Group's Preferred Room** (weight 2) — excludes `mixto`-required blocks
+7. **Prefer Group's Preferred Room** (weight 2) — excludes `Mixed`-required blocks
 8. **Minimize Teacher Building Changes** (weight 1)
 
 ## Features
@@ -86,7 +88,7 @@ test run (9 hard, 8 soft).
 - Per-component block-sizing and max-blocks-per-day rules (`component_block_rule`), configurable from Settings → Block Rules instead of hardcoded
 - Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's preferred room are applied automatically wherever a more specific override doesn't already provide one
 - Optional room-capacity awareness (`room.capacity` vs. `student_group.student_count`)
-- 4 room types: estándar, mixto (doubles as estándar or taller), taller, centro de cómputo
+- 4 room types: Standard, Mixed (doubles as Standard or Specialized - Workshop), Specialized - Workshop, Specialized - Computer Lab
 - PostgreSQL-backed: schema, reporting views, and data loading scripts
 - Three PDF reports (violations, by-teacher, by-group) via Constraint Streams-based analysis
 
@@ -317,7 +319,6 @@ sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 - [ ] Dynamic teacher/room assignment (currently pre-assigned)
 - [ ] Teacher workload balancing across weeks
 - [ ] Student preferences for elective courses
-- [ ] Mandatory lunch break / minimum rest-period constraints
 - [ ] Multi-week scheduling patterns
 - [ ] Calendar system integration (iCal/Google Calendar export)
 - [ ] Real-time constraint violation feedback during manual edits
@@ -328,7 +329,7 @@ sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 2. **A rule needed by both `engine` and `web`**: put it in `common/` instead of writing it twice — that's the whole reason the module exists (see `RoomTypeCompatibility` for the pattern)
 3. **Schema**: update `database/schema_block_scheduling.sql` (fresh-install shape) and add a corresponding file under `database/migrations/` for existing databases
 4. **Dataset**: modify `database/datasets/load_final_dataset_blocks.sql`, then reload it
-5. **A hand-maintained set of valid string values reused across several columns** (like room type or course component): make it a lookup table with FKs into it instead — see `room_type`/`course_component` for the pattern. Turns a rename into one `UPDATE` and turns a typo into a loud FK violation instead of a silent orphaned value.
+5. **A hand-maintained set of valid string values reused across several columns** (like room type or course designation): make it a lookup table with FKs into it instead — see `room_type`/`course_designation` for the pattern. Turns a rename into one `UPDATE` and turns a typo into a loud FK violation instead of a silent orphaned value.
 6. **Test**: `mvn test` (all four modules) for unit tests; see [Compile & Test](#compile--test) for the Testcontainers-backed integration layer (requires Docker) — add to it when a change relies on real DB behavior (a constraint, cascade, or JPQL null-handling) a mock can't verify. Run a solver pass too if you touched constraints
 7. **Web API/UI**: see [Project Structure](#project-structure) for where each concern lives (`web/.../controller`, `entity`, `dto`, `security`; `web-ui/src/components`, `api.js`, `i18n/{en,es}.json`)
 

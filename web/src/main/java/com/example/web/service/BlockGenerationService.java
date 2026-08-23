@@ -56,14 +56,15 @@ import java.util.Map;
  *
  * Within tiers 2/3, each portion's hours are decomposed by greedily packing
  * component_block_rule's preferred block size for the course's component
- * (e.g. BASICAS=1 -> every block is 1h), falling back to DEFAULT_BLOCK_SIZE
+ * (e.g. Core=1 -> every block is 1h), falling back to DEFAULT_BLOCK_SIZE
  * for any component with no configured rule.
  *
  * Room defaulting: whenever a generated block would otherwise have no room
  * (no block-template preferredRoomName, no room-requirement
  * defaultPreferredRoom) and the group has a preferredRoomName whose type
- * satisfies the block's satisfiesRoomType - the same estándar/taller/mixto
- * compatibility convention as engine's Room.satisfiesRequirement() - the
+ * satisfies the block's satisfiesRoomType - the same Standard/Specialized -
+ * Workshop/Mixed compatibility convention as engine's
+ * Room.satisfiesRequirement() - the
  * group's preferred room is used as roomName directly, since room is never
  * solver-assigned. A group's preferred room never overrides a more specific
  * room already supplied by a template or room requirement.
@@ -136,14 +137,14 @@ public class BlockGenerationService {
         int blockIndex = 0;
         int created = 0;
         if (requirements.isEmpty()) {
-            for (int length : decomposeHours(course.getRequiredHoursPerWeek(), course.getComponent())) {
+            for (int length : decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation())) {
                 saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null, defaultTeacherId);
                 blockIndex++;
                 created++;
             }
         } else {
             for (CourseRoomRequirementEntity requirement : requirements) {
-                for (int length : decomposeHours(requirement.getHoursRequired(), course.getComponent())) {
+                for (int length : decomposeHours(requirement.getHoursRequired(), course.getDesignation())) {
                     saveBlock(group, course, blockIndex, length, requirement.getRoomType(),
                             requirement.getDefaultPreferredRoom(), defaultTeacherId);
                     blockIndex++;

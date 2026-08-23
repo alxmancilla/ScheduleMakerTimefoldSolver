@@ -16,36 +16,49 @@ import static org.junit.Assert.assertTrue;
 public class RoomTypeCompatibilityTest {
 
     @Test
-    public void mixtoSatisfiesMixtoEstandarAndTaller() {
-        assertTrue("mixto must satisfy mixto", RoomTypeCompatibility.satisfies("mixto", "mixto"));
-        assertTrue("mixto must double as a regular classroom", RoomTypeCompatibility.satisfies("mixto", "estándar"));
-        assertTrue("mixto must double as a workshop", RoomTypeCompatibility.satisfies("mixto", "taller"));
+    public void mixedSatisfiesMixedStandardAndSpecializedWorkshop() {
+        assertTrue("Mixed must satisfy Mixed", RoomTypeCompatibility.satisfies("Mixed", "Mixed"));
+        assertTrue("Mixed must double as a regular classroom", RoomTypeCompatibility.satisfies("Mixed", "Standard"));
+        assertTrue("Mixed must double as a workshop",
+                RoomTypeCompatibility.satisfies("Mixed", "Specialized - Workshop"));
     }
 
     @Test
-    public void estandarSatisfiesEstandarButNotMixtoOrTaller() {
-        assertTrue(RoomTypeCompatibility.satisfies("estándar", "estándar"));
-        assertFalse("estándar must NOT satisfy mixto", RoomTypeCompatibility.satisfies("estándar", "mixto"));
-        assertFalse("estándar must NOT satisfy taller", RoomTypeCompatibility.satisfies("estándar", "taller"));
+    public void mixedDoesNotSatisfySpecializedComputerLab() {
+        assertFalse("Mixed must NOT satisfy Specialized - Computer Lab - that stays strictly separate",
+                RoomTypeCompatibility.satisfies("Mixed", "Specialized - Computer Lab"));
     }
 
     @Test
-    public void tallerSatisfiesTallerButNotMixtoOrEstandar() {
-        assertTrue(RoomTypeCompatibility.satisfies("taller", "taller"));
-        assertFalse("taller must NOT satisfy mixto", RoomTypeCompatibility.satisfies("taller", "mixto"));
-        assertFalse("taller must NOT satisfy estándar", RoomTypeCompatibility.satisfies("taller", "estándar"));
+    public void standardSatisfiesStandardButNotMixedOrSpecializedWorkshop() {
+        assertTrue(RoomTypeCompatibility.satisfies("Standard", "Standard"));
+        assertFalse("Standard must NOT satisfy Mixed", RoomTypeCompatibility.satisfies("Standard", "Mixed"));
+        assertFalse("Standard must NOT satisfy Specialized - Workshop",
+                RoomTypeCompatibility.satisfies("Standard", "Specialized - Workshop"));
     }
 
     @Test
-    public void centroDeComputoSatisfiesOnlyItself() {
-        assertTrue(RoomTypeCompatibility.satisfies("centro de cómputo", "centro de cómputo"));
-        assertFalse(RoomTypeCompatibility.satisfies("centro de cómputo", "estándar"));
-        assertFalse(RoomTypeCompatibility.satisfies("centro de cómputo", "mixto"));
+    public void specializedWorkshopSatisfiesOnlyItself() {
+        assertTrue(RoomTypeCompatibility.satisfies("Specialized - Workshop", "Specialized - Workshop"));
+        assertFalse("Specialized - Workshop must NOT satisfy Mixed",
+                RoomTypeCompatibility.satisfies("Specialized - Workshop", "Mixed"));
+        assertFalse("Specialized - Workshop must NOT satisfy Standard",
+                RoomTypeCompatibility.satisfies("Specialized - Workshop", "Standard"));
+    }
+
+    @Test
+    public void specializedComputerLabSatisfiesOnlyItself() {
+        assertTrue(RoomTypeCompatibility.satisfies("Specialized - Computer Lab", "Specialized - Computer Lab"));
+        assertFalse(RoomTypeCompatibility.satisfies("Specialized - Computer Lab", "Standard"));
+        assertFalse(RoomTypeCompatibility.satisfies("Specialized - Computer Lab", "Mixed"));
+        assertFalse("Specialized - Computer Lab and Specialized - Workshop stay non-interchangeable "
+                + "despite sharing a label prefix",
+                RoomTypeCompatibility.satisfies("Specialized - Computer Lab", "Specialized - Workshop"));
     }
 
     @Test
     public void unknownRoomTypeSatisfiesOnlyItself() {
-        assertFalse(RoomTypeCompatibility.satisfies("estándar", "nonexistent"));
+        assertFalse(RoomTypeCompatibility.satisfies("Standard", "nonexistent"));
     }
 
     @Test
@@ -54,8 +67,8 @@ public class RoomTypeCompatibilityTest {
         // every real hard-constraint caller already guards on a non-null requirement
         // before calling in, so this permissive default only ever reaches the
         // room-defaulting callers, where it's the behavior they rely on.
-        assertTrue(RoomTypeCompatibility.satisfies("estándar", null));
-        assertTrue(RoomTypeCompatibility.satisfies(null, "estándar"));
+        assertTrue(RoomTypeCompatibility.satisfies("Standard", null));
+        assertTrue(RoomTypeCompatibility.satisfies(null, "Standard"));
         assertTrue(RoomTypeCompatibility.satisfies(null, null));
     }
 }

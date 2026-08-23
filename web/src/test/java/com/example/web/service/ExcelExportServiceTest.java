@@ -128,13 +128,13 @@ public class ExcelExportServiceTest {
         teacher.addAvailability(1, 7);
         when(teacherRepository.findAll()).thenReturn(List.of(teacher));
 
-        RoomEntity room = new RoomEntity("R1", "Building A", "estándar");
+        RoomEntity room = new RoomEntity("R1", "Building A", "Standard");
         when(roomRepository.findAll()).thenReturn(List.of(room));
 
-        CourseEntity course = new CourseEntity("C1", "Math", "estándar", 5);
+        CourseEntity course = new CourseEntity("C1", "Math", "Standard", 5);
         course.setAbbreviation("MATH");
         course.setSemester(2);
-        course.setComponent("BASICAS");
+        course.setDesignation("Core");
         course.setActive(true);
         when(courseRepository.findAll()).thenReturn(List.of(course));
 

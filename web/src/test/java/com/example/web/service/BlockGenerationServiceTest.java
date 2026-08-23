@@ -73,12 +73,12 @@ public class BlockGenerationServiceTest {
         when(teacherRepository.findById(anyString())).thenReturn(Optional.empty());
     }
 
-    private CourseEntity course(String id, String name, int hours, String component, String roomReq) {
+    private CourseEntity course(String id, String name, int hours, String designation, String roomReq) {
         CourseEntity c = new CourseEntity();
         c.setId(id);
         c.setName(name);
         c.setRequiredHoursPerWeek(hours);
-        c.setComponent(component);
+        c.setDesignation(designation);
         c.setRoomRequirement(roomReq);
         return c;
     }

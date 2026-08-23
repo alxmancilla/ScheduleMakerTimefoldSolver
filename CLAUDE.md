@@ -65,14 +65,14 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 - `Teacher` - Has stable `id`, qualifications (Set<String>), per-day availability map (`Map<DayOfWeek, Set<Integer>>`), and `maxHoursPerWeek` workload limit
 - `Course` - Has `id`, name, `roomRequirement` (legacy single requirement), `roomRequirements` (List for dual requirements), `blockTemplates` (List for custom block decomposition), and `requiredHoursPerWeek`
 - `Group` - Student group with assigned courses and optional `preferredRoom`
-- `Room` - Classroom with `type` (estándar, mixto, taller, centro de cómputo) and `building` designation. `satisfiesRequirement(req)` delegates to `common`'s `RoomTypeCompatibility.satisfies()` (the single shared implementation of this rule, also used directly by `web`): a `mixto` room also satisfies `estándar` and `taller` requirements (it's equipped for both a regular class and a workshop), while every other type satisfies only itself. A plain `estándar` or `taller` room does NOT satisfy a `mixto` requirement. (`taller electromecánica`/`taller electrónica` were retired in favor of retyping their rooms into this type, first named `laboratorio` then `dual` before settling on `mixto` — same rooms/behavior throughout, just renamed twice to avoid confusing terminology.) The 4 valid room-type values live in the `room_type` lookup table (DB-level, not a Java enum — every Java/JS field storing a room type is still a plain `String`); `room.type`, `course.room_requirement`, `course_room_requirement.room_type`, `course_block_template.room_type`, and `course_block_assignment.satisfies_room_type` all FK into it with `ON UPDATE CASCADE`, so renaming a room type is a single `UPDATE room_type SET name = ...` rather than editing a `CHECK` constraint by hand. Likewise, course components (BASICAS, TEM, TCOM, ...) live in the `course_component` lookup table, FK'd from `course.component` and `component_block_rule.component` — kept as a separate bare list rather than reusing `component_block_rule` as the FK target, since a component with no `component_block_rule` row deliberately falls back to code defaults (see below) and forcing every component to have a row there would break that.
+- `Room` - Classroom with `type` (Standard, Mixed, Specialized - Workshop, Specialized - Computer Lab) and `building` designation. `satisfiesRequirement(req)` delegates to `common`'s `RoomTypeCompatibility.satisfies()` (the single shared implementation of this rule, also used directly by `web`): a `Mixed` room also satisfies `Standard` and `Specialized - Workshop` requirements (it's equipped for both a regular class and a workshop), while every other type satisfies only itself — notably `Specialized - Computer Lab` stays strictly separate from `Specialized - Workshop` despite the shared "Specialized" label prefix (that prefix is a UI grouping convenience only, not a compatibility relationship). A plain `Standard` or `Specialized - Workshop` room does NOT satisfy a `Mixed` requirement. (`taller electromecánica`/`taller electrónica` were retired in favor of retyping their rooms into this type, first named `laboratorio` then `dual`, then `mixto`, before settling on `Mixed` — same rooms/behavior throughout, just renamed several times to avoid confusing terminology.) The 4 valid room-type values live in the `room_type` lookup table (DB-level, not a Java enum — every Java/JS field storing a room type is still a plain `String`); `room.type`, `course.room_requirement`, `course_room_requirement.room_type`, `course_block_template.room_type`, and `course_block_assignment.satisfies_room_type` all FK into it with `ON UPDATE CASCADE`, so renaming a room type is a single `UPDATE room_type SET name = ...` rather than editing a `CHECK` constraint by hand. Likewise, course designations (Core, Elective, TEM, TCOM, ...) live in the `course_designation` lookup table, FK'd from `course.designation` and `component_block_rule.component` — kept as a separate bare list rather than reusing `component_block_rule` as the FK target, since a designation with no `component_block_rule` row deliberately falls back to code defaults (see below) and forcing every designation to have a row there would break that. (`component_block_rule`/`.component` themselves keep that name — a distinct, not-yet-renamed feature that happens to be keyed by the same values.)
 - `BlockTimeslot` - Specific day (`DayOfWeek`), start hour (int, 7-14), and length in hours (int, 1-4)
 - `RoomRequirement` - Dual room requirements with `courseId`, `roomType`, `hoursRequired`, `priority`, `defaultPreferredRoom`
 - `BlockTemplate` - Custom block decomposition with `courseId`, `groupId`, `blockIndex`, `blockLength`, `roomType`, `preferredRoomName`, `preferredDay`, `pinAssignment`, `preferredTimeslotId`
 
 ### Constraint System (Block-Based Scheduling)
 
-**Hard Constraints** (9 total in `SchoolConstraintProvider`):
+**Hard Constraints** (11 total in `SchoolConstraintProvider`):
 1. `blockLengthMustMatchTimeslotLength` - Block length must match timeslot length
 2. `teacherMustBeQualified` - Teacher must have qualification matching course name
 3. `teacherMustBeAvailable` - Teacher must be available for entire block duration (checks per-day availability map)
@@ -82,15 +82,18 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 7. `groupCannotHaveTwoCoursesAtSameTime` - Student group cannot have overlapping blocks
 8. `maxTwoBlocksPerCoursePerGroupPerDay` - Maximum blocks per course per group per day, capped at `course.getMaxBlocksPerDay()` (per-component, via the `component_block_rule` table / Settings > Block Rules), falling back to a code default of 2 for a component with no configured rule. Mirrored in `BlockScheduleAnalyzer`.
 9. `courseBlocksMustBeConsecutive` - All course blocks on same day must be consecutive
+10. `teacherMustHaveBreakAfterConsecutiveHours` - A teacher scheduled `MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK` (4h) straight, back-to-back with zero idle time, must get a break before continuing. Pinned blocks excluded from the run (legacy pinned data can't block solver convergence). Mirrored in `BlockScheduleAnalyzer`.
+11. `groupMustHaveBreakAfterConsecutiveHours` - Same rule as above, for student groups instead of teachers.
 
-**Soft Constraints** (7 total, quality optimization):
+**Soft Constraints** (8 total, quality optimization):
 1. `nonStandardRoomsShouldFinishBy2pm` (weight 10) - Non-standard rooms (CC, TEM, TE, AULA 4, LQ, LMICRO) should finish by 14:00. SOFT in the constraint provider **and** reported as SOFT by `BlockScheduleAnalyzer` (both exclude pinned assignments).
 2. `teacherMaxHoursPerWeek` (weight 5) - Minimize teacher workload violations
-3. `minimizeGroupIdleGaps` (weight 3) - Minimize idle time between blocks for student groups. Penalizes only ADJACENT block pairs (via `forEachUniquePair` + `ifNotExists`) so idle hours are counted once per gap, not re-counted by non-adjacent pairs. `BlockScheduleAnalyzer` mirrors this by grouping per (group, day), sorting, and summing adjacent-block gaps.
-4. `preferBlockSpecifiedRoom` (weight 3) - Prefer room specified in `assignment.getPreferredRoomHint()` field
-5. `groupPreferredRoomConstraint` (weight 2) - Groups prefer their pre-assigned room (excludes `mixto`-required blocks using `getSatisfiesRoomType()`)
-6. `minimizeTeacherIdleGaps` (weight 2) - Reduce gaps between blocks for same teacher on same day. Availability-aware (only counts idle hours the teacher is actually available) and penalizes only ADJACENT block pairs (via `forEachUniquePair` + `ifNotExists`) to avoid re-counting the same idle hours across non-adjacent pairs.
-7. `minimizeTeacherBuildingChanges` (weight 1) - Reduce building switches for teachers on same day
+3. `roomCapacityShouldFitGroupSize` (weight 4) - Group's `studentCount` shouldn't exceed the assigned room's `capacity`; only checked when both values are known.
+4. `minimizeGroupIdleGaps` (weight 3) - Minimize idle time between blocks for student groups. Penalizes only ADJACENT block pairs (via `forEachUniquePair` + `ifNotExists`) so idle hours are counted once per gap, not re-counted by non-adjacent pairs. `BlockScheduleAnalyzer` mirrors this by grouping per (group, day), sorting, and summing adjacent-block gaps.
+5. `preferBlockSpecifiedRoom` (weight 3) - Prefer room specified in `assignment.getPreferredRoomHint()` field
+6. `groupPreferredRoomConstraint` (weight 2) - Groups prefer their pre-assigned room (excludes `Mixed`-required blocks using `getSatisfiesRoomType()`)
+7. `minimizeTeacherIdleGaps` (weight 2) - Reduce gaps between blocks for same teacher on same day. Availability-aware (only counts idle hours the teacher is actually available) and penalizes only ADJACENT block pairs (via `forEachUniquePair` + `ifNotExists`) to avoid re-counting the same idle hours across non-adjacent pairs.
+8. `minimizeTeacherBuildingChanges` (weight 1) - Reduce building switches for teachers on same day
 
 ### Solver Configuration
 
@@ -146,9 +149,9 @@ Loaded by `SchoolSolverConfig` from `solverConfig.xml`:
 
 ### Room Assignment
 - **CRITICAL**: Always use `assignment.getSatisfiesRoomType()` instead of `course.getRoomRequirement()` for dual room requirement support
-- Blocks requiring the `mixto` room type (`satisfiesRoomType = "mixto"`) must use an actual `mixto` room; `estándar`/`taller` blocks may additionally use a `mixto` room (it doubles as either), but never the reverse.
-- The `groupPreferredRoomConstraint` is soft (weight 2) and excludes `mixto`-required blocks to reduce infeasibility
-- Dual room requirements allow courses to specify multiple room types (e.g., 4h in CC + 1h in estándar)
+- Blocks requiring the `Mixed` room type (`satisfiesRoomType = "Mixed"`) must use an actual `Mixed` room; `Standard`/`Specialized - Workshop` blocks may additionally use a `Mixed` room (it doubles as either), but never the reverse. `Specialized - Computer Lab` stays strictly separate - never satisfied by `Mixed`.
+- The `groupPreferredRoomConstraint` is soft (weight 2) and excludes `Mixed`-required blocks to reduce infeasibility
+- Dual room requirements allow courses to specify multiple room types (e.g., 4h in Specialized - Computer Lab + 1h in Standard)
 - Each block has its own room type requirement via `satisfiesRoomType` field
 
 ### Timefold Requirements
@@ -162,7 +165,7 @@ Loaded by `SchoolSolverConfig` from `solverConfig.xml`:
 The system supports **dual room requirements** where a single course can require different room types for different blocks. This is implemented through database tables and domain model fields.
 
 ### Database Tables
-- `course_room_requirement` - Allows courses to specify multiple room types with different hour allocations (e.g., 4h in CC + 1h in estándar)
+- `course_room_requirement` - Allows courses to specify multiple room types with different hour allocations (e.g., 4h in Specialized - Computer Lab + 1h in Standard)
 - `course_block_template` - Allows explicit specification of how a course should be decomposed into blocks
 
 ### CourseBlockAssignment Fields

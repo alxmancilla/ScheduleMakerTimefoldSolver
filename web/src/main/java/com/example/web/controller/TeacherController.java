@@ -89,7 +89,7 @@ public class TeacherController {
      * compatible - so setting/changing required_room_name fixes blocks that
      * were assigned before the requirement existed, not just future ones.
      * Leaves a block's room untouched if the type isn't compatible (e.g. a
-     * lab-required block for a teacher whose required room is estándar), same
+     * lab-required block for a teacher whose required room is Standard), same
      * as BlockGenerationService's own defaulting.
      */
     private void backfillRequiredRoom(TeacherEntity teacher) {

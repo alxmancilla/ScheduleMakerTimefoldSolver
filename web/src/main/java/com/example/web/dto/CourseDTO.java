@@ -32,9 +32,9 @@ public class CourseDTO {
     @Max(value = 12, message = "Semester must be between 1 and 12")
     private Integer semester;
 
-    @NotBlank(message = "Component is required")
-    @Size(max = 20, message = "Component must not exceed 20 characters")
-    private String component;
+    @NotBlank(message = "Designation is required")
+    @Size(max = 20, message = "Designation must not exceed 20 characters")
+    private String designation;
 
     @Size(max = 100, message = "Room requirement must not exceed 100 characters")
     private String roomRequirement;
@@ -83,12 +83,12 @@ public class CourseDTO {
         this.semester = semester;
     }
 
-    public String getComponent() {
-        return component;
+    public String getDesignation() {
+        return designation;
     }
 
-    public void setComponent(String component) {
-        this.component = component;
+    public void setDesignation(String designation) {
+        this.designation = designation;
     }
 
     public String getRoomRequirement() {

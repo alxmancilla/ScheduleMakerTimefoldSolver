@@ -68,7 +68,7 @@ export const updateCourse = (id, course) => api.put(`/courses/${id}`, course);
 export const deleteCourse = (id) => api.delete(`/courses/${id}`);
 export const searchCourses = (query) => api.get(`/courses/search?query=${query}`);
 export const getActiveCourses = () => api.get('/courses/active');
-export const getCourseComponents = () => api.get('/courses/components');
+export const getCourseDesignations = () => api.get('/courses/designations');
 export const getCourseIdsWithRoomRequirements = () => api.get('/courses/with-room-requirements');
 
 // Course room requirements (dual room requirements: a course's hours split
@@ -223,6 +223,16 @@ export const setComponentBlockRule = (component, preferredBlockSize, maxBlocksPe
   });
 export const deleteComponentBlockRule = (component) =>
   api.delete(`/admin/component-block-rules/${encodeURIComponent(component)}`);
+
+// Admin: calendar exceptions (holidays, half-days, exam days). Record-keeping
+// only for now - not yet read by block generation or the solver, since
+// block_timeslot has no calendar-date concept at all (pure recurring weekly
+// template). See database/migrations/add_calendar_exception.sql.
+export const getCalendarExceptions = () => api.get('/admin/calendar-exceptions');
+export const setCalendarException = (date, type, label, endHour) =>
+  api.put(`/admin/calendar-exceptions/${encodeURIComponent(date)}`, { type, label, endHour });
+export const deleteCalendarException = (date) =>
+  api.delete(`/admin/calendar-exceptions/${encodeURIComponent(date)}`);
 
 // Schedule
 export const getScheduleView = () => api.get('/schedule/view');

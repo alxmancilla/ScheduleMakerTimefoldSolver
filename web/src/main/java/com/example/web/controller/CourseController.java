@@ -1,9 +1,11 @@
 package com.example.web.controller;
 
 import com.example.web.dto.CourseDTO;
+import com.example.web.entity.CourseDesignationEntity;
 import com.example.web.entity.CourseEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.CourseDesignationRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.CourseRoomRequirementRepository;
 import jakarta.validation.Valid;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
 
 @RestController
@@ -27,6 +30,9 @@ public class CourseController {
 
     @Autowired
     private CourseRoomRequirementRepository roomRequirementRepository;
+
+    @Autowired
+    private CourseDesignationRepository courseDesignationRepository;
 
     @GetMapping
     public List<CourseEntity> getAllCourses() {
@@ -50,16 +56,23 @@ public class CourseController {
     }
 
     /**
-     * Distinct component values already in use, for the UI to offer as
-     * autocomplete suggestions. The column is free text (not a DB enum) so new
-     * values are still allowed, but constraint logic elsewhere does an exact,
-     * case-sensitive match on specific values (e.g. "BASICAS" in
-     * SchoolConstraintProvider) - reusing an existing value via autocomplete
-     * avoids the silent constraint mismatch a typo would cause.
+     * Every valid designation value (course_designation lookup table), for the
+     * UI to populate a dropdown - not just values already in use by some
+     * course, so a genuinely new designation can still be selected.
+     * component_block_rule (preferred block size / max blocks per day, see
+     * BlockGenerationService and SchoolConstraintProvider) is keyed by this
+     * same value, exact and case-sensitive, so reusing one from this list
+     * instead of a free-typed value avoids silently creating an orphaned,
+     * unconfigured category. course.designation has an FK into this same
+     * table, so this list is always exactly the set of values a course can
+     * legally have.
      */
-    @GetMapping("/components")
-    public List<String> getDistinctComponents() {
-        return courseRepository.findDistinctComponents();
+    @GetMapping("/designations")
+    public List<String> getDesignations() {
+        return courseDesignationRepository.findAll().stream()
+                .map(CourseDesignationEntity::getName)
+                .sorted(Comparator.naturalOrder())
+                .toList();
     }
 
     /**
@@ -114,7 +127,7 @@ public class CourseController {
         course.setName(request.getName());
         course.setAbbreviation(request.getAbbreviation());
         course.setSemester(request.getSemester());
-        course.setComponent(request.getComponent());
+        course.setDesignation(request.getDesignation());
         course.setRoomRequirement(request.getRoomRequirement());
         course.setRequiredHoursPerWeek(request.getRequiredHoursPerWeek());
         if (request.getActive() != null) {

@@ -7,7 +7,7 @@ import java.util.Objects;
 public class Room {
     private final String name;
     private final String building;
-    private final String type; // 'estándar', 'mixto', 'taller', 'centro de cómputo'
+    private final String type; // 'Standard', 'Mixed', 'Specialized - Workshop', 'Specialized - Computer Lab'
 
     // Optional seating capacity. Null when unknown/not tracked, in which case
     // the room-capacity soft constraint is skipped for this room.
@@ -42,10 +42,10 @@ public class Room {
 
     /**
      * Whether this room satisfies a room-type requirement, per the shared
-     * convention-seeded rule in {@link RoomTypeCompatibility} (a mixto room
-     * also satisfies estándar and taller; every other type satisfies only
-     * itself). Delegates rather than reimplementing so engine and web can
-     * never drift on this rule again.
+     * convention-seeded rule in {@link RoomTypeCompatibility} (a Mixed room
+     * also satisfies Standard and Specialized - Workshop; every other type
+     * satisfies only itself). Delegates rather than reimplementing so engine
+     * and web can never drift on this rule again.
      */
     public boolean satisfiesRequirement(String requirement) {
         return RoomTypeCompatibility.satisfies(type, requirement);

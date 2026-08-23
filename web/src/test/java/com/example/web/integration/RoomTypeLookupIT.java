@@ -36,16 +36,16 @@ class RoomTypeLookupIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void deletingARoomTypeStillInUseIsBlocked() {
-        roomRepository.save(new RoomEntity("R1", "EDIFICIO 1", "estándar"));
+        roomRepository.save(new RoomEntity("R1", "EDIFICIO 1", "Standard"));
         testEntityManager.flush();
 
         assertThrows(RuntimeException.class,
-                () -> entityManager.createNativeQuery("DELETE FROM room_type WHERE name = 'estándar'").executeUpdate());
+                () -> entityManager.createNativeQuery("DELETE FROM room_type WHERE name = 'Standard'").executeUpdate());
     }
 
     @Test
     void roomWithAValidLookupTypeSucceeds() {
-        RoomEntity saved = roomRepository.save(new RoomEntity("R1", "EDIFICIO 1", "mixto"));
+        RoomEntity saved = roomRepository.save(new RoomEntity("R1", "EDIFICIO 1", "Mixed"));
         testEntityManager.flush();
 
         assertThat(saved.getName()).isEqualTo("R1");

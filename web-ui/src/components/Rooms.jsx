@@ -123,7 +123,7 @@ function Rooms() {
             </div>
             <div className="form-group">
               <label>{t('rooms.fields.type')}</label>
-              <select name="type" defaultValue={editingRoom?.type || 'estándar'}>
+              <select name="type" defaultValue={editingRoom?.type || 'Standard'}>
                 {ROOM_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}

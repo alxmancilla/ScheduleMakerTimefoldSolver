@@ -9,7 +9,7 @@ public class Course {
     private final String name;
     private final String abbreviation;
     private final Integer semester; // 1-12
-    private final String component; // 'BASICAS', 'TADHR','TEM'
+    private final String designation; // 'Core', 'Elective', 'TEM'
     private final int requiredHoursPerWeek;
     private final String roomRequirement; // 'standard', 'science_lab' (legacy - use roomRequirements instead)
     private final Boolean active;
@@ -18,18 +18,18 @@ public class Course {
     private List<RoomRequirement> roomRequirements;
     private List<BlockTemplate> blockTemplates;
 
-    // Per-component HARD limit on how many blocks of this course may land on the
+    // Per-designation HARD limit on how many blocks of this course may land on the
     // same day for the same group, sourced from component_block_rule. Null until
     // DataLoader populates it; the solver falls back to a code default when null.
     private Integer maxBlocksPerDay;
 
-    public Course(String id, String name, String abbreviation, Integer semester, String component,
+    public Course(String id, String name, String abbreviation, Integer semester, String designation,
             String roomRequirement, int requiredHoursPerWeek, Boolean active) {
         this.id = id;
         this.name = name;
         this.abbreviation = abbreviation;
         this.semester = semester;
-        this.component = component;
+        this.designation = designation;
         this.roomRequirement = roomRequirement;
         this.requiredHoursPerWeek = requiredHoursPerWeek;
         this.active = active;
@@ -63,8 +63,8 @@ public class Course {
         return semester;
     }
 
-    public String getComponent() {
-        return component;
+    public String getDesignation() {
+        return designation;
     }
 
     public String getRoomRequirement() {

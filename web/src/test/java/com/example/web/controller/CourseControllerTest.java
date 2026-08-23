@@ -1,7 +1,9 @@
 package com.example.web.controller;
 
+import com.example.web.entity.CourseDesignationEntity;
 import com.example.web.entity.CourseEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.CourseDesignationRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.CourseRoomRequirementRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,6 +62,9 @@ public class CourseControllerTest {
     @MockBean
     private CourseRoomRequirementRepository roomRequirementRepository;
 
+    @MockBean
+    private CourseDesignationRepository courseDesignationRepository;
+
     private CourseEntity course;
 
     @Before
@@ -72,7 +77,7 @@ public class CourseControllerTest {
         body.put("id", "C1");
         body.put("name", "Mathematics");
         body.put("abbreviation", "MATH");
-        body.put("component", "BASICAS");
+        body.put("designation", "Core");
         body.put("semester", 2);
         body.put("requiredHoursPerWeek", 5);
         return body;
@@ -251,15 +256,16 @@ public class CourseControllerTest {
         verify(courseRepository, never()).delete(any(CourseEntity.class));
     }
 
-    // ---- GET /components ----
+    // ---- GET /designations ----
 
     @Test
-    public void getDistinctComponents_returnsList() throws Exception {
-        when(courseRepository.findDistinctComponents()).thenReturn(List.of("BASICAS", "TPROG"));
-        mockMvc.perform(get("/api/courses/components"))
+    public void getDesignations_returnsSortedList() throws Exception {
+        when(courseDesignationRepository.findAll())
+                .thenReturn(List.of(new CourseDesignationEntity("TPROG"), new CourseDesignationEntity("Core")));
+        mockMvc.perform(get("/api/courses/designations"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0]").value("BASICAS"))
+                .andExpect(jsonPath("$[0]").value("Core"))
                 .andExpect(jsonPath("$[1]").value("TPROG"));
     }
 

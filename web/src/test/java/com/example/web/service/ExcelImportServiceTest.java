@@ -89,12 +89,12 @@ public class ExcelImportServiceTest {
 
             Sheet rooms = wb.createSheet("Rooms");
             addRow(rooms, 0, "name", "building", "type");
-            addRow(rooms, 1, "A1", "Main", "estándar");
+            addRow(rooms, 1, "A1", "Main", "Standard");
 
             Sheet courses = wb.createSheet("Courses");
-            addRow(courses, 0, "id", "name", "abbreviation", "semester", "component", "room_requirement",
+            addRow(courses, 0, "id", "name", "abbreviation", "semester", "designation", "room_requirement",
                     "required_hours_per_week", "active");
-            addRow(courses, 1, "C1", "Mathematics", "MATH", 2, "BASICAS", "estándar", 4, true);
+            addRow(courses, 1, "C1", "Mathematics", "MATH", 2, "Core", "Standard", 4, true);
 
             Sheet groups = wb.createSheet("Groups");
             addRow(groups, 0, "id", "name", "preferred_room_name");
@@ -161,9 +161,9 @@ public class ExcelImportServiceTest {
     public void courseIdTooLong_failsValidation() throws IOException {
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
             Sheet courses = wb.createSheet("Courses");
-            addRow(courses, 0, "id", "name", "abbreviation", "semester", "component", "room_requirement",
+            addRow(courses, 0, "id", "name", "abbreviation", "semester", "designation", "room_requirement",
                     "required_hours_per_week", "active");
-            addRow(courses, 1, "TOOLONG", "Mathematics", "MATH", 2, "BASICAS", "estándar", 4, true);
+            addRow(courses, 1, "TOOLONG", "Mathematics", "MATH", 2, "Core", "Standard", 4, true);
 
             ExcelImportService.ImportResult result = service.importFromExcel(toStream(wb));
 

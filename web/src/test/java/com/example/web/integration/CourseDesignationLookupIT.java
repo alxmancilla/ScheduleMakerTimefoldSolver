@@ -11,13 +11,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Before this session, course.component had no constraint at all - a typo
- * silently created a new, disconnected component with no block rule and no
- * way to catch the mistake. Proves the new course_component lookup table
- * (database/migrations/add_room_type_and_course_component_lookup_tables.sql)
- * now makes that fail loudly instead.
+ * Before this session, course.designation (then named course.component) had
+ * no constraint at all - a typo silently created a new, disconnected
+ * designation with no block rule and no way to catch the mistake. Proves the
+ * course_designation lookup table (database/migrations/
+ * add_room_type_and_course_component_lookup_tables.sql,
+ * rename_course_component_to_designation.sql) now makes that fail loudly
+ * instead.
  */
-class CourseComponentLookupIT extends AbstractPostgresIntegrationTest {
+class CourseDesignationLookupIT extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private CourseRepository courseRepository;
@@ -25,22 +27,22 @@ class CourseComponentLookupIT extends AbstractPostgresIntegrationTest {
     private TestEntityManager testEntityManager;
 
     @Test
-    void courseWithAComponentNotInTheLookupTableIsRejected() {
-        CourseEntity course = new CourseEntity("C1", "Course 1", "estándar", 2);
+    void courseWithADesignationNotInTheLookupTableIsRejected() {
+        CourseEntity course = new CourseEntity("C1", "Course 1", "Standard", 2);
         course.setAbbreviation("C1");
         course.setSemester(1);
-        course.setComponent("TYPO_COMPONENT");
+        course.setDesignation("TYPO_DESIGNATION");
         courseRepository.save(course);
 
         assertThrows(DataIntegrityViolationException.class, testEntityManager::flush);
     }
 
     @Test
-    void courseWithAValidLookupComponentSucceeds() {
-        CourseEntity course = new CourseEntity("C1", "Course 1", "estándar", 2);
+    void courseWithAValidLookupDesignationSucceeds() {
+        CourseEntity course = new CourseEntity("C1", "Course 1", "Standard", 2);
         course.setAbbreviation("C1");
         course.setSemester(1);
-        course.setComponent("BASICAS");
+        course.setDesignation("Core");
         CourseEntity saved = courseRepository.save(course);
         testEntityManager.flush();
 

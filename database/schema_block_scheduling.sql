@@ -148,24 +148,24 @@ INSERT INTO room_type (name) VALUES
     ('mixto');
 
 -- ============================================================================
--- COURSE COMPONENT TABLE
+-- COURSE DESIGNATION TABLE
 -- ============================================================================
--- Bare reference list of valid course component values. Referenced by FK
--- from course.component and component_block_rule.component, so a typo'd
--- component fails loudly (FK violation) instead of silently creating an
+-- Bare reference list of valid course designation values. Referenced by FK
+-- from course.designation and component_block_rule.component, so a typo'd
+-- designation fails loudly (FK violation) instead of silently creating an
 -- orphaned, unconfigured category. Kept separate from component_block_rule
--- itself: that table only holds a row for components with a NON-default
--- block rule, and a component with no row deliberately falls back to code
--- defaults - FK'ing course.component straight at component_block_rule would
--- force a row to exist for every component and destroy that behavior.
-CREATE TABLE course_component (
+-- itself: that table only holds a row for designations with a NON-default
+-- block rule, and a designation with no row deliberately falls back to code
+-- defaults - FK'ing course.designation straight at component_block_rule
+-- would force a row to exist for every designation and destroy that behavior.
+CREATE TABLE course_designation (
     name VARCHAR(20) PRIMARY KEY
 );
 
-COMMENT ON TABLE course_component IS 'Valid course component category values (BASICAS, TEM, TCOM, etc.).';
+COMMENT ON TABLE course_designation IS 'Valid course designation category values (Core, Elective, TEM, TCOM, etc.).';
 
-INSERT INTO course_component (name) VALUES
-    ('BASICAS'), ('DIGITAL'), ('TCOM'), ('TCSEG'), ('TELE'),
+INSERT INTO course_designation (name) VALUES
+    ('Core'), ('Elective'), ('Digital'), ('Specialized'), ('TCOM'), ('TCSEG'), ('TELE'),
     ('TEM'), ('TIA'), ('TPIA'), ('TPROG'), ('TRH');
 
 -- ============================================================================
@@ -179,12 +179,12 @@ CREATE TABLE course (
     room_requirement VARCHAR(50) NOT NULL,
     required_hours_per_week INTEGER NOT NULL,
     semester INTEGER NOT NULL,
-    component VARCHAR(20) NOT NULL,
+    designation VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     active BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT fk_course_room_requirement FOREIGN KEY (room_requirement) REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_course_component FOREIGN KEY (component) REFERENCES course_component(name) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_course_designation FOREIGN KEY (designation) REFERENCES course_designation(name) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT check_course_required_hours CHECK (required_hours_per_week > 0),
     CONSTRAINT check_course_semester CHECK (semester BETWEEN 1 AND 12)
 );
@@ -192,7 +192,7 @@ CREATE TABLE course (
 CREATE INDEX idx_course_name ON course(name);
 CREATE INDEX idx_course_room_requirement ON course(room_requirement);
 CREATE INDEX idx_course_semester ON course(semester);
-CREATE INDEX idx_course_component ON course(component);
+CREATE INDEX idx_course_designation ON course(designation);
 CREATE INDEX idx_course_active ON course(active) WHERE active = TRUE;
 
 COMMENT ON TABLE course IS 'Courses offered in the curriculum';
@@ -202,7 +202,7 @@ COMMENT ON COLUMN course.abbreviation IS 'Short abbreviation for display';
 COMMENT ON COLUMN course.room_requirement IS 'Type of room required. References room_type(name).';
 COMMENT ON COLUMN course.required_hours_per_week IS 'Number of hours per week this course needs';
 COMMENT ON COLUMN course.semester IS 'Semester number (1-12)';
-COMMENT ON COLUMN course.component IS 'Course component category. References course_component(name).';
+COMMENT ON COLUMN course.designation IS 'Course designation category. References course_designation(name).';
 COMMENT ON COLUMN course.active IS 'Whether this course is currently active in the curriculum';
 
 -- ============================================================================
@@ -532,7 +532,7 @@ SELECT
     c.abbreviation AS course_abbreviation,
     c.required_hours_per_week,
     c.semester,
-    c.component,
+    c.designation,
     c.room_requirement,
     t.id AS teacher_id,
     CONCAT(t.name, ' ', t.last_name) AS teacher_name,
@@ -564,7 +564,7 @@ LEFT JOIN course_block_assignment cba ON sg.id = cba.group_id AND c.id = cba.cou
 LEFT JOIN teacher t ON cba.teacher_id = t.id
 LEFT JOIN block_timeslot bt ON cba.block_timeslot_id = bt.id
 GROUP BY sg.id, sg.name, c.id, c.name, c.abbreviation, c.required_hours_per_week,
-         c.semester, c.component, c.room_requirement, t.id, t.name, t.last_name
+         c.semester, c.designation, c.room_requirement, t.id, t.name, t.last_name
 ORDER BY sg.name, c.name, teacher_name;
 
 COMMENT ON VIEW v_group_course_teachers IS 'Shows courses and their assigned teachers for each student group with scheduling status and block lengths array (block-based)';
@@ -826,17 +826,43 @@ CREATE TABLE IF NOT EXISTS component_block_rule (
     CONSTRAINT check_preferred_block_size CHECK (preferred_block_size BETWEEN 1 AND 4),
     CONSTRAINT check_max_blocks_per_day CHECK (max_blocks_per_day BETWEEN 1 AND 4),
     CONSTRAINT fk_component_block_rule_component FOREIGN KEY (component)
-        REFERENCES course_component(name) ON DELETE CASCADE ON UPDATE CASCADE
+        REFERENCES course_designation(name) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 INSERT INTO component_block_rule (component, preferred_block_size, max_blocks_per_day)
-VALUES ('BASICAS', 1, 1)
+VALUES ('Core', 1, 1)
 ON CONFLICT (component) DO NOTHING;
 
 COMMENT ON TABLE component_block_rule IS 'Preferred block size (1-4h) and max blocks per day (1-4) per course component, used by BlockGenerationService and the solver respectively. A component with no row here defaults to size 2 / max 2 per day in code.';
-COMMENT ON COLUMN component_block_rule.component IS 'Matches course.component (e.g. BASICAS, TEM, TCS).';
+COMMENT ON COLUMN component_block_rule.component IS 'Matches course.designation (e.g. Core, TEM, TCS).';
 COMMENT ON COLUMN component_block_rule.preferred_block_size IS 'Blocks are packed greedily at this size, with a trailing remainder block if hours don''t divide evenly.';
 COMMENT ON COLUMN component_block_rule.max_blocks_per_day IS 'HARD limit on how many blocks of this component''s courses may land on the same day for the same group.';
+
+-- ============================================================================
+-- CALENDAR EXCEPTIONS TABLE
+-- ============================================================================
+-- Record-keeping only (v1): tracks the school's holiday/exam/half-day dates,
+-- surfaced in Settings > Calendar. block_timeslot is a pure recurring weekly
+-- template with no date concept at all (day-of-week + hour, not tied to any
+-- actual calendar date), so this table does NOT yet gate block generation or
+-- the solver - it exists so the term's calendar is tracked in the system for
+-- the first time. Wiring it into generation/solving is a separate, larger
+-- change (turning the single recurring week into a dated, multi-week
+-- calendar) deferred until that architectural question is settled.
+CREATE TABLE IF NOT EXISTS calendar_exception (
+    exception_date DATE PRIMARY KEY,
+    type VARCHAR(20) NOT NULL CHECK (type IN ('HOLIDAY', 'HALF_DAY', 'EXAM_DAY')),
+    label VARCHAR(200),
+    end_hour INTEGER CHECK (end_hour IS NULL OR end_hour BETWEEN 7 AND 15),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE calendar_exception IS 'School calendar exceptions (holidays, exam days, half-days) - record-keeping only, not yet read by block generation or the solver.';
+COMMENT ON COLUMN calendar_exception.exception_date IS 'The specific calendar date this exception applies to.';
+COMMENT ON COLUMN calendar_exception.type IS 'HOLIDAY (no classes), HALF_DAY (classes end early, see end_hour), or EXAM_DAY (informational only).';
+COMMENT ON COLUMN calendar_exception.label IS 'Optional human-readable description (e.g. "Día de la Independencia").';
+COMMENT ON COLUMN calendar_exception.end_hour IS 'Only meaningful for HALF_DAY: the hour classes end that day (7-15).';
 
 -- ============================================================================
 -- END OF SCHEMA

@@ -159,7 +159,7 @@ public class DataLoader {
      */
     private List<Course> loadCourses(Connection conn) throws SQLException {
         List<Course> courses = new ArrayList<>();
-        String sql = "SELECT id, name, abbreviation, semester, component, room_requirement, required_hours_per_week, active FROM course";
+        String sql = "SELECT id, name, abbreviation, semester, designation, room_requirement, required_hours_per_week, active FROM course";
 
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
@@ -169,12 +169,12 @@ public class DataLoader {
                 String name = rs.getString("name");
                 String abbreviation = rs.getString("abbreviation");
                 int semester = rs.getInt("semester");
-                String component = rs.getString("component");
+                String designation = rs.getString("designation");
                 String roomRequirement = rs.getString("room_requirement");
                 int requiredHours = rs.getInt("required_hours_per_week");
                 Boolean active = rs.getBoolean("active");
 
-                courses.add(new Course(id, name, abbreviation, semester, component, roomRequirement, requiredHours,
+                courses.add(new Course(id, name, abbreviation, semester, designation, roomRequirement, requiredHours,
                         active));
             }
         }
@@ -372,7 +372,7 @@ public class DataLoader {
         }
 
         for (com.example.domain.Course course : courses) {
-            Integer maxBlocksPerDay = maxBlocksPerDayByComponent.get(course.getComponent());
+            Integer maxBlocksPerDay = maxBlocksPerDayByComponent.get(course.getDesignation());
             if (maxBlocksPerDay != null) {
                 course.setMaxBlocksPerDay(maxBlocksPerDay);
             }

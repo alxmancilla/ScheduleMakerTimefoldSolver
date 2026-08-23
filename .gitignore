@@ -46,6 +46,12 @@ database/migrations/*
 !database/migrations/rename_assignment_preferred_room_to_hint.sql
 !database/migrations/add_room_rename_cascade.sql
 !database/migrations/add_room_type_and_course_component_lookup_tables.sql
+!database/migrations/rename_basicas_to_core_add_elective.sql
+!database/migrations/rename_course_component_to_designation.sql
+!database/migrations/rename_room_types_to_readable_labels.sql
+!database/migrations/rename_digital_add_specialized_designation.sql
+!database/migrations/consolidate_non_core_digital_designations_to_specialized.sql
+!database/migrations/add_calendar_exception.sql
 md_files/
 
 # Build artifacts

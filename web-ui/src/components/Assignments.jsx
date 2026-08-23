@@ -44,13 +44,14 @@ function Assignments() {
   const [preferredRoomHint, setPreferredRoomHint] = useState('');
 
   // Mirrors Room.satisfiesRequirement() (engine domain model): a room satisfies a
-  // requirement of its own type, and a mixto room additionally satisfies estándar
-  // and taller (it's equipped for both), but never the reverse.
+  // requirement of its own type, and a Mixed room additionally satisfies Standard
+  // and Specialized - Workshop (it's equipped for both), but never the reverse.
+  // Specialized - Computer Lab stays strictly separate - not satisfied by Mixed.
   const roomMatchesType = (room, requiredType) => {
     if (!requiredType) return true;
     if (!room) return false;
     return room.type === requiredType
-      || (room.type === 'mixto' && (requiredType === 'estándar' || requiredType === 'taller'));
+      || (room.type === 'Mixed' && (requiredType === 'Standard' || requiredType === 'Specialized - Workshop'));
   };
   const roomsMatchingType = (requiredType) => rooms.filter((r) => roomMatchesType(r, requiredType));
 

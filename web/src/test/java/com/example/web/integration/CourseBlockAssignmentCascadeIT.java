@@ -36,12 +36,12 @@ class CourseBlockAssignmentCascadeIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void deletingARoomSetsNullOnReferencingAssignmentColumns() {
-        roomRepository.save(new RoomEntity("R1", "EDIFICIO 1", "estándar"));
+        roomRepository.save(new RoomEntity("R1", "EDIFICIO 1", "Standard"));
         studentGroupRepository.save(new StudentGroupEntity("G1", "Group 1"));
-        CourseEntity course = new CourseEntity("C1", "Course 1", "estándar", 2);
+        CourseEntity course = new CourseEntity("C1", "Course 1", "Standard", 2);
         course.setAbbreviation("C1");
         course.setSemester(1);
-        course.setComponent("BASICAS");
+        course.setDesignation("Core");
         courseRepository.save(course);
 
         CourseBlockAssignmentEntity assignment = new CourseBlockAssignmentEntity();

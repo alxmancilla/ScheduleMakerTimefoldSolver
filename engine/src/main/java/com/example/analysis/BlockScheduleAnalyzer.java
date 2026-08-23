@@ -26,6 +26,40 @@ public final class BlockScheduleAnalyzer {
         return configured != null ? configured : DEFAULT_MAX_BLOCKS_PER_DAY;
     }
 
+    // Mirrors SchoolConstraintProvider.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK.
+    private static final int MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK = 4;
+
+    /**
+     * The longest run of occupied hours (merging touching or overlapping
+     * blocks into one span) once sorted by start hour, tie-broken by id for a
+     * deterministic total order - see SchoolConstraintProvider's copy of this
+     * method for why interval-merge (not summing lengths) and the id
+     * tie-break both matter. Independent recomputation, not shared code, per
+     * this analyzer's own convention.
+     */
+    private static int longestConsecutiveRunHours(List<CourseBlockAssignment> blocks) {
+        List<CourseBlockAssignment> sorted = new ArrayList<>(blocks);
+        sorted.sort(Comparator
+                .comparingInt((CourseBlockAssignment a) -> a.getTimeslot().getStartHour())
+                .thenComparing(CourseBlockAssignment::getId));
+        int longest = 0;
+        int runStart = -1;
+        int runEnd = -1;
+        for (CourseBlockAssignment assignment : sorted) {
+            BlockTimeslot timeslot = assignment.getTimeslot();
+            int start = timeslot.getStartHour();
+            int end = start + timeslot.getLengthHours();
+            if (runEnd == -1 || start > runEnd) {
+                runStart = start;
+                runEnd = end;
+            } else {
+                runEnd = Math.max(runEnd, end);
+            }
+            longest = Math.max(longest, runEnd - runStart);
+        }
+        return longest;
+    }
+
     /**
      * Analyze hard constraint violations for block-based schedule.
      * Returns a map of constraint name to violation count.
@@ -194,6 +228,47 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Course blocks must be consecutive", courseBlocksNonConsecutive);
+
+        // Teacher/group must have a break after consecutive hours (HARD) - Count
+        // Mirrors SchoolConstraintProvider's MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK
+        // rule: group unpinned blocks by (subject, day), find the longest
+        // back-to-back run, penalty is the excess over the threshold - matching
+        // the solver's own penalty magnitude, not just a violation count.
+        Map<Object, List<CourseBlockAssignment>> teacherDayBlocks = new java.util.HashMap<>();
+        Map<Object, List<CourseBlockAssignment>> groupDayBlocks = new java.util.HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getTimeslot() == null) {
+                continue;
+            }
+            if (a.getTeacher() != null) {
+                teacherDayBlocks
+                        .computeIfAbsent(java.util.Arrays.asList(a.getTeacher(), a.getTimeslot().getDayOfWeek()),
+                                k -> new java.util.ArrayList<>())
+                        .add(a);
+            }
+            if (a.getGroup() != null) {
+                groupDayBlocks
+                        .computeIfAbsent(java.util.Arrays.asList(a.getGroup(), a.getTimeslot().getDayOfWeek()),
+                                k -> new java.util.ArrayList<>())
+                        .add(a);
+            }
+        }
+        int teacherBreakViolations = 0;
+        for (List<CourseBlockAssignment> blocks : teacherDayBlocks.values()) {
+            int excess = longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
+            if (excess > 0) {
+                teacherBreakViolations += excess;
+            }
+        }
+        result.put("Teacher must have a break after consecutive hours", teacherBreakViolations);
+        int groupBreakViolations = 0;
+        for (List<CourseBlockAssignment> blocks : groupDayBlocks.values()) {
+            int excess = longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
+            if (excess > 0) {
+                groupBreakViolations += excess;
+            }
+        }
+        result.put("Group must have a break after consecutive hours", groupBreakViolations);
 
         // NOTE: "Non-standard rooms should finish by 2pm" is a SOFT constraint in
         // SchoolConstraintProvider (weight 10), so it is reported by
@@ -379,6 +454,56 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Course blocks must be consecutive", courseBlocksNonConsecutiveDetails);
 
+        // Teacher/group must have a break after consecutive hours (HARD) - Detailed
+        Map<Object, List<CourseBlockAssignment>> teacherDayBlocksDetail = new HashMap<>();
+        Map<Object, List<CourseBlockAssignment>> groupDayBlocksDetail = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getTimeslot() == null) {
+                continue;
+            }
+            if (a.getTeacher() != null) {
+                teacherDayBlocksDetail
+                        .computeIfAbsent(Arrays.asList(a.getTeacher(), a.getTimeslot().getDayOfWeek()),
+                                k -> new ArrayList<>())
+                        .add(a);
+            }
+            if (a.getGroup() != null) {
+                groupDayBlocksDetail
+                        .computeIfAbsent(Arrays.asList(a.getGroup(), a.getTimeslot().getDayOfWeek()),
+                                k -> new ArrayList<>())
+                        .add(a);
+            }
+        }
+        List<String> teacherBreakDetails = new ArrayList<>();
+        for (Map.Entry<Object, List<CourseBlockAssignment>> entry : teacherDayBlocksDetail.entrySet()) {
+            List<CourseBlockAssignment> blocks = entry.getValue();
+            int run = longestConsecutiveRunHours(blocks);
+            if (run > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK) {
+                @SuppressWarnings("unchecked")
+                List<Object> key = (List<Object>) (List<?>) entry.getKey();
+                Teacher teacher = (Teacher) key.get(0);
+                DayOfWeek day = (DayOfWeek) key.get(1);
+                teacherBreakDetails.add(String.format("%s %s on %s (%dh straight, limit=%dh)",
+                        teacher.getName(), teacher.getLastName(), formatDay(day), run,
+                        MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
+            }
+        }
+        details.put("Teacher must have a break after consecutive hours", teacherBreakDetails);
+        List<String> groupBreakDetails = new ArrayList<>();
+        for (Map.Entry<Object, List<CourseBlockAssignment>> entry : groupDayBlocksDetail.entrySet()) {
+            List<CourseBlockAssignment> blocks = entry.getValue();
+            int run = longestConsecutiveRunHours(blocks);
+            if (run > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK) {
+                @SuppressWarnings("unchecked")
+                List<Object> key = (List<Object>) (List<?>) entry.getKey();
+                com.example.domain.Group group = (com.example.domain.Group) key.get(0);
+                DayOfWeek day = (DayOfWeek) key.get(1);
+                groupBreakDetails.add(String.format("%s on %s (%dh straight, limit=%dh)",
+                        group.getName(), formatDay(day), run, MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
+            }
+        }
+        details.put("Group must have a break after consecutive hours", groupBreakDetails);
+
         // NOTE: "Non-standard rooms should finish by 2pm" is a SOFT constraint in
         // SchoolConstraintProvider (weight 10), so its details are reported by
         // analyzeSoftConstraintViolationsDetailed, not here.
@@ -477,7 +602,7 @@ public final class BlockScheduleAnalyzer {
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null && a.getTimeslot() != null) {
                 String roomType = a.getRoom().getType();
-                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("Standard"));
                 if (isNonStandard) {
                     int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
                     if (endHour > 14) {
@@ -511,7 +636,7 @@ public final class BlockScheduleAnalyzer {
             if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
                 var preferredRoom = a.getGroup().getPreferredRoom();
                 if (preferredRoom != null &&
-                        !(a.getSatisfiesRoomType() != null && "mixto".equalsIgnoreCase(a.getSatisfiesRoomType()))
+                        !(a.getSatisfiesRoomType() != null && "Mixed".equalsIgnoreCase(a.getSatisfiesRoomType()))
                         &&
                         !preferredRoom.equals(a.getRoom())) {
                     preferredRoomViolations++;
@@ -684,7 +809,7 @@ public final class BlockScheduleAnalyzer {
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null && a.getTimeslot() != null) {
                 String roomType = a.getRoom().getType();
-                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("estándar"));
+                boolean isNonStandard = (roomType != null && !roomType.equalsIgnoreCase("Standard"));
                 if (isNonStandard) {
                     int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
                     if (endHour > 14) {

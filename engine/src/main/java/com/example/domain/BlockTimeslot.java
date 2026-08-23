@@ -42,10 +42,6 @@ public class BlockTimeslot {
         return dayOfWeek.toString() + " " + getStartTime().toString() + "-" + getEndTime().toString();
     }
 
-    public boolean isLunchTime() {
-        return startHour == 12; // Lunch is 12-1
-    }
-
     public LocalTime getEndTime() {
         return getStartTime().plusHours(lengthHours);
     }

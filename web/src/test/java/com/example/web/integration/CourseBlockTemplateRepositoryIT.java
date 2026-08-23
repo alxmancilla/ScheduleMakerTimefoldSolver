@@ -36,20 +36,20 @@ class CourseBlockTemplateRepositoryIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void wildcardAndGroupSpecificTemplatesBothApplyButOtherGroupsTemplatesDoNot() {
-        CourseEntity course = new CourseEntity("C1", "Course 1", "estándar", 4);
+        CourseEntity course = new CourseEntity("C1", "Course 1", "Standard", 4);
         course.setAbbreviation("C1");
         course.setSemester(1);
-        course.setComponent("BASICAS");
+        course.setDesignation("Core");
         courseRepository.save(course);
         studentGroupRepository.save(new StudentGroupEntity("G1", "Group 1"));
         studentGroupRepository.save(new StudentGroupEntity("G2", "Group 2"));
 
         CourseBlockTemplateEntity wildcard = new CourseBlockTemplateEntity(
-                "C1", null, 1, 2, "estándar", null, null, false, null);
+                "C1", null, 1, 2, "Standard", null, null, false, null);
         CourseBlockTemplateEntity forG1 = new CourseBlockTemplateEntity(
-                "C1", "G1", 2, 2, "estándar", null, null, false, null);
+                "C1", "G1", 2, 2, "Standard", null, null, false, null);
         CourseBlockTemplateEntity forG2 = new CourseBlockTemplateEntity(
-                "C1", "G2", 3, 2, "estándar", null, null, false, null);
+                "C1", "G2", 3, 2, "Standard", null, null, false, null);
         templateRepository.save(wildcard);
         templateRepository.save(forG1);
         templateRepository.save(forG2);

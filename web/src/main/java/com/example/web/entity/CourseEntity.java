@@ -20,8 +20,8 @@ public class CourseEntity {
     @Column(name = "semester", nullable = false)
     private Integer semester;
     
-    @Column(name = "component", length = 20, nullable = false)
-    private String component;
+    @Column(name = "designation", length = 20, nullable = false)
+    private String designation;
     
     @Column(name = "room_requirement", length = 100)
     private String roomRequirement;
@@ -93,12 +93,12 @@ public class CourseEntity {
         this.semester = semester;
     }
     
-    public String getComponent() {
-        return component;
+    public String getDesignation() {
+        return designation;
     }
-    
-    public void setComponent(String component) {
-        this.component = component;
+
+    public void setDesignation(String designation) {
+        this.designation = designation;
     }
     
     public String getRoomRequirement() {

@@ -141,7 +141,7 @@ public class ExcelExportService {
         header.createCell(1).setCellValue("name");
         header.createCell(2).setCellValue("abbreviation");
         header.createCell(3).setCellValue("semester");
-        header.createCell(4).setCellValue("component");
+        header.createCell(4).setCellValue("designation");
         header.createCell(5).setCellValue("room_requirement");
         header.createCell(6).setCellValue("required_hours_per_week");
         header.createCell(7).setCellValue("active");
@@ -157,7 +157,7 @@ public class ExcelExportService {
             row.createCell(1).setCellValue(course.getName());
             row.createCell(2).setCellValue(course.getAbbreviation());
             row.createCell(3).setCellValue(course.getSemester());
-            row.createCell(4).setCellValue(course.getComponent());
+            row.createCell(4).setCellValue(course.getDesignation());
             row.createCell(5).setCellValue(course.getRoomRequirement());
             row.createCell(6).setCellValue(course.getRequiredHoursPerWeek());
             row.createCell(7).setCellValue(Boolean.TRUE.equals(course.getActive()));
