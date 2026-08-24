@@ -334,7 +334,8 @@ CREATE TABLE IF NOT EXISTS course_block_assignment (
     CONSTRAINT fk_block_assignment_timeslot FOREIGN KEY (block_timeslot_id) REFERENCES block_timeslot(id) ON DELETE SET NULL,
     CONSTRAINT fk_block_assignment_room FOREIGN KEY (room_name) REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT check_block_assignment_length CHECK (block_length BETWEEN 1 AND 4),
-    CONSTRAINT check_block_assignment_pinned_requires_timeslot CHECK (pinned = FALSE OR block_timeslot_id IS NOT NULL)
+    CONSTRAINT check_block_assignment_pinned_requires_timeslot CHECK (pinned = FALSE OR block_timeslot_id IS NOT NULL),
+    CONSTRAINT check_block_assignment_pinned_requires_room CHECK (pinned = FALSE OR room_name IS NOT NULL)
     -- Note: No unique constraint on (group_id, course_id) because a course can have multiple blocks
     -- For example: A 5-hour course might be split into a 3-hour block and a 2-hour block
 );

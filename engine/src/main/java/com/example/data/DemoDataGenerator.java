@@ -33,12 +33,17 @@ public class DemoDataGenerator {
                 List<Group> groups = generateGroups(rooms);
                 List<CourseBlockAssignment> blockAssignments = generateCourseBlockAssignments(groups, courses);
 
-                // Clear teacher, room, and timeslot assignments (solver will assign them)
+                // Clear teacher, room, and timeslot assignments (solver will assign them).
+                // A group with a preferred room still ends up "room-fixed" (see
+                // CourseBlockAssignment.isRoomFixed()) even starting from null - its value
+                // range is derived from Group.getPreferredRoom() directly, not from this
+                // field, so clearing it here doesn't affect that.
                 for (CourseBlockAssignment cba : blockAssignments) {
                         cba.setTeacher(null);
                         cba.setRoom(null);
                         cba.setTimeslot(null);
                         cba.setAllTimeslots(blockTimeslots);
+                        cba.setAllRooms(rooms);
                 }
 
                 return SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses, groups,

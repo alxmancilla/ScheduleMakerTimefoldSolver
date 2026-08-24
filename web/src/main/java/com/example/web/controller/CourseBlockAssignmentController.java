@@ -115,6 +115,10 @@ public class CourseBlockAssignmentController {
         assignment.setSatisfiesRoomType(request.getSatisfiesRoomType());
         assignment.setPreferredRoomHint(request.getPreferredRoomHint());
         applyTeacherRequiredRoom(assignment);
+        if (Boolean.TRUE.equals(assignment.getPinned()) && assignment.getRoomName() == null) {
+            throw new IllegalArgumentException(
+                    "Cannot pin assignment '" + assignment.getId() + "' without a room: pinned blocks must have roomName set.");
+        }
     }
 
     /**

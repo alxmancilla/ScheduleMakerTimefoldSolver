@@ -15,6 +15,10 @@ public class Teacher {
     private java.util.Map<DayOfWeek, java.util.Set<Integer>> availabilityPerDay = new java.util.HashMap<>();
     // Maximum teaching hours per week for this teacher. Default will be 20.
     private int maxHoursPerWeek = 40;
+    // Optional room this teacher must always use, overriding the group's
+    // preferred room. Mirrors teacher.required_room_name (see
+    // database/schema_block_scheduling.sql).
+    private String requiredRoomName;
 
     public Teacher(String id, String name, String lastName, Set<String> qualifications, Set<DayOfWeek> availableDays,
             int startHour, int endHour) {
@@ -96,6 +100,14 @@ public class Teacher {
 
     public String getId() {
         return id;
+    }
+
+    public String getRequiredRoomName() {
+        return requiredRoomName;
+    }
+
+    public void setRequiredRoomName(String requiredRoomName) {
+        this.requiredRoomName = requiredRoomName;
     }
 
     /**

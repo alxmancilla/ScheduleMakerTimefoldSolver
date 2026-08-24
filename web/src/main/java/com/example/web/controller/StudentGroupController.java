@@ -1,14 +1,19 @@
 package com.example.web.controller;
 
+import com.example.common.RoomTypeCompatibility;
 import com.example.web.dto.StudentGroupDTO;
+import com.example.web.entity.CourseBlockAssignmentEntity;
+import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.RoomRepository;
 import com.example.web.repository.StudentGroupRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +28,9 @@ public class StudentGroupController {
 
     @Autowired
     private CourseBlockAssignmentRepository assignmentRepository;
+
+    @Autowired
+    private RoomRepository roomRepository;
 
     @GetMapping
     public List<StudentGroupEntity> getAllGroups() {
@@ -53,13 +61,45 @@ public class StudentGroupController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public StudentGroupEntity updateGroup(@PathVariable String id, @Valid @RequestBody StudentGroupDTO request) {
         StudentGroupEntity group = groupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Group", id));
         group.setName(request.getName());
         group.setPreferredRoomName(request.getPreferredRoomName());
         group.setStudentCount(request.getStudentCount());
-        return groupRepository.save(group);
+        StudentGroupEntity saved = groupRepository.save(group);
+        backfillPreferredRoom(saved);
+        return saved;
+    }
+
+    /**
+     * When a group has a preferred room, forces it onto every existing
+     * (non-pinned) block already assigned to that group whose room type is
+     * compatible - so setting/changing preferred_room_name fixes blocks that
+     * were assigned before the preference existed or changed, not just future
+     * ones. Leaves a block's room untouched if the type isn't compatible, same
+     * as BlockGenerationService's own defaulting. Mirrors
+     * TeacherController.backfillRequiredRoom for the group-level preference.
+     */
+    private void backfillPreferredRoom(StudentGroupEntity group) {
+        String preferredRoomName = group.getPreferredRoomName();
+        if (preferredRoomName == null) {
+            return;
+        }
+        RoomEntity preferredRoom = roomRepository.findById(preferredRoomName).orElse(null);
+        if (preferredRoom == null) {
+            return;
+        }
+        for (CourseBlockAssignmentEntity block : assignmentRepository.findByGroupId(group.getId())) {
+            if (Boolean.TRUE.equals(block.getPinned()) || preferredRoomName.equals(block.getRoomName())) {
+                continue;
+            }
+            if (RoomTypeCompatibility.satisfies(preferredRoom.getType(), block.getSatisfiesRoomType())) {
+                block.setRoomName(preferredRoomName);
+                assignmentRepository.save(block);
+            }
+        }
     }
 
     @DeleteMapping("/{id}")

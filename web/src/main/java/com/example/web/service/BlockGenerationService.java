@@ -116,7 +116,7 @@ public class BlockGenerationService {
                     skippedExisting++;
                     continue;
                 }
-                created += generateBlocksForGroupCourse(group, course, groupCourse.getDefaultTeacherId());
+                created += generateBlocksForGroupCourse(group, course, groupCourse.getDefaultTeacherId(), warnings);
             }
         }
 
@@ -142,11 +142,12 @@ public class BlockGenerationService {
     }
 
     /** Decomposes and saves the blocks for one (group, course) pair; returns how many blocks were created. */
-    private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId) {
+    private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId,
+            List<String> warnings) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());
         if (!templates.isEmpty()) {
             for (CourseBlockTemplateEntity template : templates) {
-                saveTemplateBlock(group, course, template, defaultTeacherId);
+                saveTemplateBlock(group, course, template, defaultTeacherId, warnings);
             }
             return templates.size();
         }
@@ -194,7 +195,7 @@ public class BlockGenerationService {
     }
 
     private void saveTemplateBlock(StudentGroupEntity group, CourseEntity course, CourseBlockTemplateEntity template,
-            String defaultTeacherId) {
+            String defaultTeacherId, List<String> warnings) {
         CourseBlockAssignmentEntity block = new CourseBlockAssignmentEntity();
         block.setId(group.getId() + "_" + course.getId() + "_" + template.getBlockIndex());
         block.setGroupId(group.getId());
@@ -207,7 +208,18 @@ public class BlockGenerationService {
                 : defaultRoomFor(group, template.getRoomType(), defaultTeacherId));
         block.setTeacherId(defaultTeacherId);
         block.setBlockTimeslotId(template.getPreferredTimeslotId());
-        block.setPinned(Boolean.TRUE.equals(template.getPinAssignment()));
+        boolean wantsPin = Boolean.TRUE.equals(template.getPinAssignment());
+        if (wantsPin && block.getRoomName() == null) {
+            // Pinned rows must have a room (check_block_assignment_pinned_requires_room).
+            // No room could be resolved (no template preferredRoomName, no compatible
+            // teacher/group default), so leave this block unpinned rather than fail the
+            // whole generation batch or fabricate a room - same "leave it for manual
+            // assignment" philosophy defaultRoomFor already uses for the room itself.
+            warnings.add(block.getId() + ": template requested pinning but no compatible room could be resolved; "
+                    + "left unpinned - assign a room manually, then pin it.");
+        } else {
+            block.setPinned(wantsPin);
+        }
         assignmentRepository.save(block);
     }
 

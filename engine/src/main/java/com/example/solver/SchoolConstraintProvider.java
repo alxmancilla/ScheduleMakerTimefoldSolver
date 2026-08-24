@@ -14,6 +14,22 @@ import com.example.domain.CourseBlockAssignment;
 import com.example.domain.BlockTimeslot;
 import com.example.domain.Teacher;
 
+/**
+ * Every constraint here uses forEachIncludingUnassigned/ifNotExistsIncludingUnassigned
+ * (never the plain forEach/forEachUniquePair/ifNotExists) for CourseBlockAssignment.
+ * room is @PlanningVariable(allowsUnassigned = true) (some entities' room is
+ * legitimately still undecided - see CourseBlockAssignment.getMatchingRooms()),
+ * and Timefold's plain forEach()-family methods silently exclude any entity
+ * with a null value for ANY genuine planning variable, not just the ones a
+ * given constraint actually reads. Confirmed empirically: with plain forEach,
+ * a roomless entity vanished even from constraints that never reference room
+ * at all (teacherMustBeQualified, groupCannotHaveTwoCoursesAtSameTime,
+ * groupMustHaveBreakAfterConsecutiveHours), silently under-counting real
+ * violations. The *IncludingUnassigned variants restore normal visibility;
+ * forEachUniquePair's "unique pair, no self-pairs" behavior is replicated
+ * manually via forEachIncludingUnassigned(...).join(forEachIncludingUnassigned(...),
+ * Joiners.lessThan(getId), ...the constraint's own joiners...).
+ */
 public class SchoolConstraintProvider implements ConstraintProvider {
 
     @Override
@@ -32,6 +48,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 teacherMustBeAvailable(constraintFactory), // #1: Most likely to fail (~30% rejection rate)
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
+                teacherRequiredRoomMustBeUsed(constraintFactory), // #3b: Pinned blocks only - see method doc
 
                 // ========== High-Selectivity HARD Pair Constraints ==========
                 // Optimized with Joiners (very few pairs evaluated) - the pruning here
@@ -80,6 +97,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
     // ==================== HARD CONSTRAINTS ====================
 
+    /** A block's day of week, or null if it has no timeslot yet - shared join key for every day-scoped pair constraint below. */
+    private static DayOfWeek dayOfWeekOrNull(CourseBlockAssignment a) {
+        return a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null;
+    }
+
     /**
      * Helper method to check if two block timeslots overlap.
      * Blocks overlap if they are on the same day and their time ranges intersect.
@@ -119,7 +141,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
      */
     private Constraint blockLengthMustMatchTimeslotLength(ConstraintFactory constraintFactory) {
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> {
                     if (assignment.getTimeslot() == null) {
                         return false; // Unassigned timeslots are handled elsewhere
@@ -136,7 +158,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
     private Constraint teacherMustBeQualified(ConstraintFactory constraintFactory) {
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> !assignment.isPinned() // Exclude pinned assignments
                         && assignment.getTeacher() != null
                         && !assignment.getTeacher().isQualifiedFor(assignment.getCourse().getName()))
@@ -147,7 +169,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     private Constraint teacherMustBeAvailable(ConstraintFactory constraintFactory) {
         // UPDATED: Check teacher availability for entire block duration
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> !assignment.isPinned()) // Exclude pinned assignments
                 .filter(assignment -> assignment.getTeacher() != null && assignment.getTimeslot() != null
                         && !assignment.getTeacher().isAvailableForBlock(assignment.getTimeslot()))
@@ -159,9 +181,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // UPDATED: Uses block overlap detection instead of exact timeslot matching
         // OPTIMIZED: Uses Joiners to pre-filter pairs by teacher and day
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
                         Joiners.equal(CourseBlockAssignment::getTeacher),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
                         && a1.getTeacher() != null // Guard: Joiners.equal joins null==null; two unassigned
                                                    // blocks are not a double-booking (a2 is non-null via the join)
@@ -176,9 +200,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // UPDATED: Uses block overlap detection instead of exact timeslot matching
         // OPTIMIZED: Uses Joiners to pre-filter pairs by room and day
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
                         Joiners.equal(CourseBlockAssignment::getRoom),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
                         && a1.getRoom() != null // Guard: Joiners.equal joins null==null; two unassigned
                                                 // blocks are not a double-booking (a2 is non-null via the join)
@@ -195,7 +221,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // course
         // can require different room types (e.g., 4h in Specialized - Computer Lab + 1h in Standard)
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> {
                     // Exclude pinned assignments (they are fixed from database)
                     if (assignment.isPinned()) {
@@ -214,13 +240,38 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Room type must satisfy course requirement");
     }
 
+    /**
+     * HARD, data-integrity constraint (like blockLengthMustMatchTimeslotLength):
+     * NOT excluded for pinned assignments, because pinned rows are exactly the
+     * case this exists to catch. A non-pinned block's room is already
+     * structurally guaranteed correct by CourseBlockAssignment.getMatchingRooms()
+     * (its room value range collapses to the teacher's required room whenever
+     * one applies), so this can only ever fire for a pinned row in practice.
+     * TeacherController.backfillRequiredRoom() explicitly skips pinned blocks
+     * when a teacher's required room changes, so a pinned row can silently
+     * drift out of sync with its teacher's current requirement - with nothing
+     * else to report that.
+     */
+    private Constraint teacherRequiredRoomMustBeUsed(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .filter(a -> a.getTeacher() != null
+                        && a.getTeacher().getRequiredRoomName() != null
+                        && a.getRoom() != null
+                        && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName()))
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("Teacher's required room must be used");
+    }
+
     private Constraint groupCannotHaveTwoCoursesAtSameTime(ConstraintFactory constraintFactory) {
         // UPDATED: Uses block overlap detection instead of exact timeslot matching
         // OPTIMIZED: Uses Joiners to pre-filter pairs by group and day
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
                         Joiners.equal(CourseBlockAssignment::getGroup),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
                         && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
@@ -257,7 +308,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // WEIGHT: 10 (Very high priority - strong preference but not absolute
         // requirement)
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> {
                     // Skip if no timeslot or room assigned
                     if (assignment.getTimeslot() == null || assignment.getRoom() == null)
@@ -299,7 +350,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // per course component via component_block_rule (Settings > Block Rules);
         // a component with no configured rule falls back to DEFAULT_MAX_BLOCKS_PER_DAY.
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
                 .groupBy(
                         CourseBlockAssignment::getGroup,
@@ -333,7 +384,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // pairwise check, where a valid 7-8 / 8-9 / 9-10 sequence would still yield a
         // non-consecutive pair between 7-8 and 9-10.
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
                 .groupBy(
                         CourseBlockAssignment::getGroup,
@@ -381,7 +432,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // break before continuing - minimizeTeacherIdleGaps only minimizes gaps
         // toward zero, it never required one to exist in the first place.
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTeacher() != null && a.getTimeslot() != null)
                 .groupBy(
                         CourseBlockAssignment::getTeacher,
@@ -397,7 +448,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // HARD: Same rule as teacherMustHaveBreakAfterConsecutiveHours, for
         // student groups instead of teachers.
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getGroup() != null && a.getTimeslot() != null)
                 .groupBy(
                         CourseBlockAssignment::getGroup,
@@ -487,7 +538,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // This reduces room changes for students and improves familiarity
         // WEIGHT: 2 (Medium priority - operational efficiency)
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> {
                     // Exclude pinned assignments
                     if (assignment.isPinned()) {
@@ -522,7 +573,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // WEIGHT: 4 (meaningful operational concern, but must never block
         // feasibility since this data may be incomplete for existing rooms/groups)
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> {
                     if (assignment.getRoom() == null || assignment.getGroup() == null) {
                         return false;
@@ -543,9 +594,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // Reduces teacher travel time and improves satisfaction
         // WEIGHT: 1 (Low priority - nice to have)
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
                         Joiners.equal(CourseBlockAssignment::getTeacher),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> {
                     // Exclude pinned assignments
                     if (a1.isPinned() || a2.isPinned()) {
@@ -588,7 +641,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // represent real teaching hours that count toward the teacher's workload limit.
         // WEIGHT: 5 (Highest priority - legal/union requirement)
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> a.getTeacher() != null && a.getTimeslot() != null) // Include ALL assignments
                 .groupBy(CourseBlockAssignment::getTeacher,
                         ConstraintCollectors.sum(CourseBlockAssignment::getBlockLength))
@@ -609,15 +662,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // actually available during it (otherwise the gap is unavoidable).
         // WEIGHT: 2 (Medium priority - teacher satisfaction)
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
                         Joiners.equal(CourseBlockAssignment::getTeacher),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
                         && a1.getTeacher() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && availableGapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same teacher lies in
                 // the [earlierEnd, laterStart] span between a1 and a2.
-                .ifNotExists(CourseBlockAssignment.class,
+                .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getTeacher(), CourseBlockAssignment::getTeacher),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
@@ -635,15 +690,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // WEIGHT: 3 (High priority - student schedule quality, higher than teacher
         // gaps)
         return constraintFactory
-                .forEachUniquePair(CourseBlockAssignment.class,
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
                         Joiners.equal(CourseBlockAssignment::getGroup),
-                        Joiners.equal(a -> a.getTimeslot() != null ? a.getTimeslot().getDayOfWeek() : null))
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
                         && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && gapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same group lies in
                 // the [earlierEnd, laterStart] span between a1 and a2.
-                .ifNotExists(CourseBlockAssignment.class,
+                .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
@@ -733,7 +790,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
         // assignments
         // WEIGHT: 3 (High priority - operational strategy for specialized rooms)
         return constraintFactory
-                .forEach(CourseBlockAssignment.class)
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(assignment -> {
                     // Exclude pinned assignments (they already have fixed rooms)
                     if (assignment.isPinned()) {

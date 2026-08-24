@@ -6,17 +6,26 @@ import ai.timefold.solver.core.impl.heuristic.selector.common.decorator.Selectio
 import ai.timefold.solver.core.impl.heuristic.selector.move.generic.SwapMove;
 import com.example.domain.BlockTimeslot;
 import com.example.domain.CourseBlockAssignment;
+import com.example.domain.Room;
 import com.example.domain.SchoolSchedule;
 import com.example.domain.Teacher;
+
+import java.util.Objects;
 
 /**
  * Move filter that rejects SwapMove instances where:
  * 1. The two assignments have different block lengths
  * 2. Either teacher would be unavailable after the swap
+ * 3. Either assignment's room is "fixed" and the swap would actually change it
  *
  * This prevents swapping a 3-hour block with a 1-hour block, which would
  * create block length mismatches after the swap, and ensures teachers
- * remain available for their assigned timeslots.
+ * remain available for their assigned timeslots. SwapMove exchanges every
+ * genuine planning variable between the two entities at once (including
+ * room, now that it's a second planning variable on CourseBlockAssignment),
+ * and unlike ChangeMove it doesn't consult either entity's own value range -
+ * so a room-fixed entity's singleton room range on its own doesn't stop a
+ * swap from handing it a different room.
  */
 public class MatchingLengthSwapFilter implements SelectionFilter<SchoolSchedule, Move<SchoolSchedule>> {
 
@@ -42,6 +51,16 @@ public class MatchingLengthSwapFilter implements SelectionFilter<SchoolSchedule,
         // Reject if block lengths don't match
         if (leftAssignment.getBlockLength() != rightAssignment.getBlockLength()) {
             return false;
+        }
+
+        // Reject if the swap would actually change a room-fixed assignment's room
+        // (a no-op swap, e.g. both already in the same room, is harmless and allowed).
+        Room leftRoom = leftAssignment.getRoom();
+        Room rightRoom = rightAssignment.getRoom();
+        if (!Objects.equals(leftRoom, rightRoom)) {
+            if (leftAssignment.isRoomFixed() || rightAssignment.isRoomFixed()) {
+                return false;
+            }
         }
 
         // After swap, left assignment will have right's timeslot and vice versa

@@ -2,6 +2,7 @@ package com.example.web.controller;
 
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.RoomRepository;
 import com.example.web.repository.StudentGroupRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
@@ -55,6 +56,9 @@ public class StudentGroupControllerTest {
 
     @MockBean
     private CourseBlockAssignmentRepository assignmentRepository;
+
+    @MockBean
+    private RoomRepository roomRepository;
 
     private StudentGroupEntity group;
 
@@ -175,6 +179,76 @@ public class StudentGroupControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
         verify(groupRepository, never()).save(any(StudentGroupEntity.class));
+    }
+
+    private com.example.web.entity.CourseBlockAssignmentEntity block(String id, String satisfiesRoomType,
+            String roomName, boolean pinned) {
+        com.example.web.entity.CourseBlockAssignmentEntity block = new com.example.web.entity.CourseBlockAssignmentEntity();
+        block.setId(id);
+        block.setGroupId("G1");
+        block.setCourseId("C1");
+        block.setBlockLength(2);
+        block.setSatisfiesRoomType(satisfiesRoomType);
+        block.setRoomName(roomName);
+        block.setPinned(pinned);
+        return block;
+    }
+
+    @Test
+    public void updateGroup_setsPreferredRoom_backfillsCompatibleExistingBlock() throws Exception {
+        when(groupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(groupRepository.save(any(StudentGroupEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.findById("ROOM1"))
+                .thenReturn(Optional.of(new com.example.web.entity.RoomEntity("ROOM1", "Building A", "estándar")));
+        com.example.web.entity.CourseBlockAssignmentEntity existing = block("A1", "estándar", null, false);
+        when(assignmentRepository.findByGroupId("G1")).thenReturn(List.of(existing));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("preferredRoomName", "ROOM1");
+        mockMvc.perform(put("/api/groups/G1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.preferredRoomName").value("ROOM1"));
+
+        verify(assignmentRepository).save(existing);
+        org.junit.Assert.assertEquals("ROOM1", existing.getRoomName());
+    }
+
+    @Test
+    public void updateGroup_setsPreferredRoom_skipsIncompatibleBlock() throws Exception {
+        when(groupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(groupRepository.save(any(StudentGroupEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.findById("ROOM1"))
+                .thenReturn(Optional.of(new com.example.web.entity.RoomEntity("ROOM1", "Building A", "estándar")));
+        // A mixto-required block can't be forced into a plain estándar room.
+        com.example.web.entity.CourseBlockAssignmentEntity existing = block("A1", "mixto", null, false);
+        when(assignmentRepository.findByGroupId("G1")).thenReturn(List.of(existing));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("preferredRoomName", "ROOM1");
+        mockMvc.perform(put("/api/groups/G1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+
+        verify(assignmentRepository, never()).save(existing);
+    }
+
+    @Test
+    public void updateGroup_setsPreferredRoom_skipsPinnedBlock() throws Exception {
+        when(groupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(groupRepository.save(any(StudentGroupEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(roomRepository.findById("ROOM1"))
+                .thenReturn(Optional.of(new com.example.web.entity.RoomEntity("ROOM1", "Building A", "estándar")));
+        com.example.web.entity.CourseBlockAssignmentEntity pinned = block("A1", "estándar", "ROOM2", true);
+        when(assignmentRepository.findByGroupId("G1")).thenReturn(List.of(pinned));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("preferredRoomName", "ROOM1");
+        mockMvc.perform(put("/api/groups/G1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+
+        verify(assignmentRepository, never()).save(pinned);
     }
 
     @Test

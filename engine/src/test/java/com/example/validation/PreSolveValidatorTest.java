@@ -144,4 +144,13 @@ public class PreSolveValidatorTest {
         assertFalse(r.isValid());
         assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("no timeslot")));
     }
+
+    @Test
+    public void missingRoomIsReported() {
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, null, qualifiedAvailableTeacher(), "estándar");
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("no room")));
+    }
 }

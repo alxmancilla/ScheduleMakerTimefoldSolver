@@ -48,6 +48,7 @@ public class ConstraintConsistencyTest {
                                 "No teacher double-booking",
                                 "No room double-booking",
                                 "Room type must satisfy course requirement",
+                                "Teacher's required room must be used",
                                 "Group cannot have two courses at same time",
                                 "Maximum blocks per course per group per day",
                                 "Course blocks must be consecutive",
@@ -131,13 +132,13 @@ public class ConstraintConsistencyTest {
                 int softCount = BlockScheduleAnalyzer
                                 .analyzeSoftConstraintViolations(dummySchedule).size();
 
-                // Expected counts (as of 2026-08-22: added "Teacher/Group must have a
-                // break after consecutive hours", HARD)
-                assertEquals("Expected 11 HARD constraints", 11, hardCount);
+                // Expected counts (as of 2026-08-23: added "Teacher's required room must
+                // be used", HARD)
+                assertEquals("Expected 12 HARD constraints", 12, hardCount);
                 assertEquals("Expected 8 SOFT constraints", 8, softCount);
 
-                // Total should be 19 (11 hard + 8 soft)
-                assertEquals("Total constraint count mismatch", 19, hardCount + softCount);
+                // Total should be 20 (12 hard + 8 soft)
+                assertEquals("Total constraint count mismatch", 20, hardCount + softCount);
         }
 
         /**

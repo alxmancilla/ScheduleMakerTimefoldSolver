@@ -39,8 +39,17 @@ public class CourseBlockAssignment {
     // after the fact.
     private List<BlockTimeslot> allTimeslots;
 
-    // @PlanningVariable(valueRangeProviderRefs = { "roomRange" })
+    @PlanningVariable(valueRangeProviderRefs = { "matchingRoomRange" }, allowsUnassigned = true)
     private Room room;
+
+    // Not a planning variable or shadow variable - the full room pool, set once
+    // by the data-loading path (DataLoader/DemoDataGenerator), mirroring
+    // allTimeslots above. getMatchingRooms() below filters it down per entity:
+    // to a singleton (this entity's own current room) when the room is "fixed"
+    // (see isRoomFixed()), or to the full type-compatible list otherwise - so a
+    // fixed entity's room is structurally unreachable to change, the same way
+    // a block-length mismatch is structurally unreachable for timeslot.
+    private List<Room> allRooms;
 
     // NEW: Support for dual room requirements and custom block decomposition
     private String satisfiesRoomType; // Which room requirement this block satisfies
@@ -142,6 +151,73 @@ public class CourseBlockAssignment {
 
     public void setRoom(Room room) {
         this.room = room;
+    }
+
+    public List<Room> getAllRooms() {
+        return allRooms;
+    }
+
+    public void setAllRooms(List<Room> allRooms) {
+        this.allRooms = allRooms;
+    }
+
+    /**
+     * Whether this block's room has already been decided outside the solver:
+     * true when the group has a preferred room, or the teacher has a required
+     * room (which overrides the group's preference - see
+     * BlockGenerationService.defaultRoomFor() in the web module for the same
+     * priority order). Used both by getMatchingRooms() below (to collapse the
+     * room value range to a singleton) and by BlockLengthDifficultyComparator
+     * (to schedule fixed-room blocks before movable ones).
+     */
+    public boolean isRoomFixed() {
+        return (group != null && group.getPreferredRoom() != null)
+                || (teacher != null && teacher.getRequiredRoomName() != null);
+    }
+
+    /**
+     * This block's valid room candidates. When isRoomFixed() is true, the
+     * range collapses to a singleton derived from stable, solver-untouched
+     * facts - group.getPreferredRoom() (already a resolved Room reference)
+     * or teacher.getRequiredRoomName() (resolved against allRooms by name) -
+     * deliberately NOT this entity's own current room field. Timefold's
+     * construction heuristic nulls a variable before consulting its own
+     * value-range provider to decide what to assign it, so a fixed-branch
+     * that read `room` here would always see null and return an empty range,
+     * permanently unassigning every fixed block (confirmed empirically: an
+     * earlier version of this method did exactly that and left ~400 fixed
+     * blocks roomless after one real solve). Otherwise every room whose type
+     * satisfies this block's requirement.
+     */
+    @ValueRangeProvider(id = "matchingRoomRange")
+    public List<Room> getMatchingRooms() {
+        if (allRooms == null) {
+            return Collections.emptyList();
+        }
+        // Teacher's required room takes precedence over the group's preferred
+        // room (matches BlockGenerationService.defaultRoomFor()'s priority in
+        // the web module: teacher's required room > group's preferred room).
+        if (teacher != null && teacher.getRequiredRoomName() != null) {
+            for (Room candidate : allRooms) {
+                if (candidate.getName().equals(teacher.getRequiredRoomName())) {
+                    return Collections.singletonList(candidate);
+                }
+            }
+            return Collections.emptyList();
+        }
+        if (group != null && group.getPreferredRoom() != null) {
+            return Collections.singletonList(group.getPreferredRoom());
+        }
+        if (satisfiesRoomType == null) {
+            return allRooms;
+        }
+        List<Room> matching = new ArrayList<>();
+        for (Room candidate : allRooms) {
+            if (candidate.satisfiesRequirement(satisfiesRoomType)) {
+                matching.add(candidate);
+            }
+        }
+        return matching;
     }
 
     public boolean isPinned() {

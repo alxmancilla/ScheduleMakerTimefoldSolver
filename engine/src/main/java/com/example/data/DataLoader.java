@@ -62,7 +62,7 @@ public class DataLoader {
         Map<String, Teacher> teacherMap = new HashMap<>();
 
         // Load basic teacher info
-        String sql = "SELECT id, name, last_name, max_hours_per_week FROM teacher ORDER BY max_hours_per_week, id";
+        String sql = "SELECT id, name, last_name, max_hours_per_week, required_room_name FROM teacher ORDER BY max_hours_per_week, id";
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
 
@@ -71,11 +71,13 @@ public class DataLoader {
                 String name = rs.getString("name");
                 String lastName = rs.getString("last_name");
                 int maxHours = rs.getInt("max_hours_per_week");
+                String requiredRoomName = rs.getString("required_room_name");
 
                 // Create teacher with empty qualifications and availability (will be populated
                 // below)
                 Teacher teacher = new Teacher(id, name, lastName, new HashSet<>(),
                         new HashMap<>(), maxHours);
+                teacher.setRequiredRoomName(requiredRoomName);
                 teacherMap.put(id, teacher);
             }
         }
@@ -149,6 +151,7 @@ public class DataLoader {
                     oldTeacher.getQualifications(),
                     availability,
                     oldTeacher.getMaxHoursPerWeek());
+            newTeacher.setRequiredRoomName(oldTeacher.getRequiredRoomName());
 
             teacherMap.put(teacherId, newTeacher);
         }
@@ -515,6 +518,7 @@ public class DataLoader {
 
                 CourseBlockAssignment assignment = new CourseBlockAssignment(id, group, course, blockLength);
                 assignment.setAllTimeslots(blockTimeslots);
+                assignment.setAllRooms(rooms);
 
                 // Assign teacher if available
                 String teacherId = rs.getString("teacher_id");
@@ -554,6 +558,32 @@ public class DataLoader {
 
                 boolean pinned = rs.getBoolean("pinned");
                 assignment.setPinned(pinned);
+
+                // A non-pinned "room-fixed" block's room must always match its
+                // group's preferred room / teacher's required room, not whatever
+                // room_name happens to be sitting on this row - that value can be
+                // stale relative to a preference that was set/changed after this
+                // row was created (course_block_assignment is pure input; nothing
+                // retroactively fixes it), and the solver's construction heuristic
+                // never touches an already-non-null variable, so a stale value
+                // would otherwise survive every future solve unnoticed. Pinned
+                // rows are deliberately left alone here - see
+                // teacherRequiredRoomMustBeUsed, which reports this as a hard
+                // violation instead of silently rewriting locked-in data.
+                if (!pinned && assignment.isRoomFixed()) {
+                    // Teacher's required room takes precedence over the group's
+                    // preferred room - matches getMatchingRooms()'s own priority.
+                    if (assignment.getTeacher() != null && assignment.getTeacher().getRequiredRoomName() != null) {
+                        String requiredRoomName = assignment.getTeacher().getRequiredRoomName();
+                        Room requiredRoom = rooms.stream()
+                                .filter(r -> r.getName().equals(requiredRoomName))
+                                .findFirst()
+                                .orElse(null);
+                        assignment.setRoom(requiredRoom);
+                    } else if (group.getPreferredRoom() != null) {
+                        assignment.setRoom(group.getPreferredRoom());
+                    }
+                }
 
                 // NEW: Load room requirement fields
                 String satisfiesRoomType = rs.getString("satisfies_room_type");

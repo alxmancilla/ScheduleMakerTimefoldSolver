@@ -110,6 +110,31 @@ public class BlockGenerationServiceTest {
     }
 
     @Test
+    public void template_pinRequestedButNoRoomResolvable_savedUnpinnedWithWarning() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+
+        CourseBlockTemplateEntity template = new CourseBlockTemplateEntity("C1", null, 0, 2, "estándar",
+                null, null, true, null);
+        when(blockTemplateRepository.findApplicableTemplates("C1", "G1")).thenReturn(List.of(template));
+        // No group.preferredRoomName, no teacher, so defaultRoomFor() has nothing to resolve.
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("no compatible room could be resolved"));
+
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository).save(captor.capture());
+        assertEquals(Boolean.FALSE, captor.getValue().getPinned());
+    }
+
+    @Test
     public void nonBasicasFiveHours_decomposesIntoTwoTwoOne() {
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
         group.addCourse("Welding");

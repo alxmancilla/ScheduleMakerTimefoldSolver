@@ -19,13 +19,30 @@ import com.example.domain.Teacher;
  * - Teachers with no assigned teacher are scheduled last (treated as infinite
  * availability)
  *
- * 2. BLOCK LENGTH (DESCENDING): Longer blocks are scheduled first within same
+ * 2. ROOM-FIXED FIRST: Entities whose room is already decided
+ * (CourseBlockAssignment.isRoomFixed() - a group preference or teacher
+ * requirement) are scheduled before entities the solver is still free to
+ * pick a room for.
+ * - A room-fixed entity's room value range is a singleton (zero degrees of
+ * freedom on that axis) - the same "most constrained first" principle
+ * already applied to teacher availability above, just extended to the
+ * `room` planning variable.
+ * - When a room-fixed and a room-movable entity end up wanting the same
+ * physical room, this gives the fixed one first pick of the open
+ * timeslots in that room; the movable one, still free to choose a
+ * different room, works around it.
+ * - This is a solution-quality/convergence lever, not a correctness
+ * requirement: noRoomDoubleBooking (hard) plus the fixed entity's
+ * structural immovability already guarantee its room can never actually
+ * be double-booked regardless of order.
+ *
+ * 3. BLOCK LENGTH (DESCENDING): Longer blocks are scheduled first within same
  * teacher availability
  * - Follows "largest first" bin packing heuristic
  * - Reduces fragmentation by placing large blocks before small blocks
  * - Leaves smaller, more flexible blocks to fill gaps
  *
- * 3. DETERMINISTIC ORDERING: Group ID → Course ID → Assignment ID
+ * 4. DETERMINISTIC ORDERING: Group ID → Course ID → Assignment ID
  * - Ensures reproducible results across solver runs
  * - Prevents non-deterministic behavior
  *
@@ -37,8 +54,9 @@ import com.example.domain.Teacher;
  * - RODRIGO (20h available) - all blocks scheduled fifth
  * - ... (teachers with 40h available scheduled last)
  *
- * Within each teacher, longer blocks (4h, 3h) are scheduled before shorter
- * blocks (2h, 1h).
+ * Within each teacher, room-fixed blocks are scheduled before room-movable
+ * ones, and longer blocks (4h, 3h) are scheduled before shorter blocks (2h,
+ * 1h).
  */
 public class BlockLengthDifficultyComparator implements Comparator<CourseBlockAssignment> {
 
@@ -51,14 +69,21 @@ public class BlockLengthDifficultyComparator implements Comparator<CourseBlockAs
             return availCompare;
         }
 
-        // Secondary: Sort by block length DESCENDING (longer blocks first)
+        // Secondary: Room-fixed entities (singleton room range) before
+        // room-movable ones (large range) - see class Javadoc.
+        int roomFixedCompare = Boolean.compare(!a1.isRoomFixed(), !a2.isRoomFixed());
+        if (roomFixedCompare != 0) {
+            return roomFixedCompare;
+        }
+
+        // Tertiary: Sort by block length DESCENDING (longer blocks first)
         // Within same teacher availability, longer blocks are harder to place
         int lengthCompare = Integer.compare(a2.getBlockLength(), a1.getBlockLength());
         if (lengthCompare != 0) {
             return lengthCompare;
         }
 
-        // Tertiary: Sort by group ID (deterministic)
+        // Quaternary: Sort by group ID (deterministic)
         if (a1.getGroup() != null && a2.getGroup() != null) {
             int groupCompare = a1.getGroup().getId().compareTo(a2.getGroup().getId());
             if (groupCompare != 0) {
@@ -66,7 +91,7 @@ public class BlockLengthDifficultyComparator implements Comparator<CourseBlockAs
             }
         }
 
-        // Quaternary: Sort by course ID (deterministic)
+        // Quinary: Sort by course ID (deterministic)
         if (a1.getCourse() != null && a2.getCourse() != null) {
             int courseCompare = a1.getCourse().getId().compareTo(a2.getCourse().getId());
             if (courseCompare != 0) {

@@ -60,6 +60,15 @@ public final class PreSolveValidator {
             return;
         }
 
+        // Room must be assigned (data-integrity rule, mirrors the DB's
+        // check_block_assignment_pinned_requires_room constraint - a pinned
+        // row without a room can still be loaded from a database that
+        // predates that constraint, so this check stays even though the
+        // constraint should normally prevent it at the source).
+        if (a.getRoom() == null) {
+            problems.add(describe(a) + " is pinned but has no room assigned.");
+        }
+
         // Block length must match timeslot length (data-integrity rule).
         if (a.getBlockLength() != slot.getLengthHours()) {
             problems.add(String.format("%s block length %d does not match timeslot length %d (%s).",

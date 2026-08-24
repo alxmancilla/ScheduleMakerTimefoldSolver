@@ -173,6 +173,28 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    public void createAssignment_pinnedWithoutRoom_returns400() throws Exception {
+        Map<String, Object> body = validPayload();
+        body.put("pinned", true);
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("without a room")));
+        verify(assignmentRepository, never()).save(any(CourseBlockAssignmentEntity.class));
+    }
+
+    @Test
+    public void createAssignment_pinnedWithRoom_succeeds() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        Map<String, Object> body = validPayload();
+        body.put("pinned", true);
+        body.put("roomName", "AULA 1");
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+        verify(assignmentRepository).save(any(CourseBlockAssignmentEntity.class));
+    }
+
+    @Test
     public void createAssignment_teacherHasCompatibleRequiredRoom_overridesSubmittedRoom() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));

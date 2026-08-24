@@ -1,8 +1,8 @@
 # School Timeslot Optimizer with Timefold Solver
 
-A Java 17 application that places pre-assigned teacher/room/course blocks into weekly timeslots using **Timefold Solver 1.29.0**. Each `CourseBlockAssignment` arrives with its teacher, room, and course already assigned; the solver's single planning variable is the block's `timeslot`. It optimizes timeslot placement while respecting hard constraints and soft preferences.
+A Java 17 application that places pre-assigned teacher/course blocks into weekly timeslots using **Timefold Solver 1.29.0**. Each `CourseBlockAssignment` arrives with its teacher and course already assigned; the solver always solves the block's `timeslot`, and also solves its `room` for the handful of blocks nobody has already assigned one to. It optimizes timeslot (and, where needed, room) placement while respecting hard constraints and soft preferences.
 
-> **Scope note:** Teacher and room are **not** planning variables — they are fixed inputs pre-assigned from the database (the `teacher`/`room` `@PlanningVariable` annotations are intentionally commented out). This is a **timeslot optimizer** over pre-assigned teacher/room blocks, not a full teacher/room scheduler.
+> **Scope note:** Teacher is **not** a planning variable — it's a fixed input pre-assigned from the database (the `teacher` `@PlanningVariable` annotation is intentionally commented out). `room` **is** a planning variable, but its value range collapses to a singleton for any block whose group has a preferred room or whose teacher has a required room, so those stay effectively fixed too — only genuinely roomless blocks are freely solved. This is primarily a **timeslot optimizer** over pre-assigned teacher blocks, with room assignment layered on for the cases nobody's decided yet — not a full teacher/room scheduler.
 
 > **Schedule run history:** `course_block_assignment` is pure input — the solver never writes to it. Each solve inserts a `schedule_run` (score + timestamp) and one `schedule_run_result` row per assignment, then prunes to the most recent 10 runs. Anything showing "the current schedule" reads through the `course_block_assignment_current` view (pinned rows resolve to their own input timeslot; everything else resolves to the latest run), which also gives the solver warm-starting for free.
 
@@ -31,7 +31,7 @@ teachers read-only access to their own resulting schedule).
 ## At a Glance
 
 - Block-based scheduling only (multi-hour consecutive blocks, 1-4 hours); hour-based scheduling has been fully removed
-- 11 hard / 8 soft constraints, kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest` — including a hard rest-period rule so teachers and groups can't be scheduled into an unbroken run longer than 4 hours
+- 12 hard / 8 soft constraints, kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest` — including a hard rest-period rule so teachers and groups can't be scheduled into an unbroken run longer than 4 hours
 - Calendar exceptions (holidays, exam days, half-days) are tracked from Settings → Calendar — record-keeping v1, not yet read by block generation or the solver (see [Known Limitations](#known-limitations))
 - Dual room requirements and custom block templates are fully manageable from the web UI, not just the database
 - Web app: JWT auth with `READER`/`WRITER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
@@ -70,7 +70,7 @@ Calendar, but that data doesn't gate block generation or the solver yet — see
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (11 hard, 8 soft).
+test run (12 hard, 8 soft).
 
 #### Hard Constraints (must be satisfied)
 1. **Block Length Must Match Timeslot Length**
@@ -79,11 +79,12 @@ test run (11 hard, 8 soft).
 4. **No Teacher Double-Booking**
 5. **No Room Double-Booking**
 6. **Room Type Must Satisfy Course Requirement** — uses `assignment.satisfiesRoomType`, not `course.roomRequirement` (dual room requirement support)
-7. **Group Cannot Have Two Courses at Same Time**
-8. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
-9. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
-10. **Teacher Must Have a Break After Consecutive Hours** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
-11. **Group Must Have a Break After Consecutive Hours** — same rule, for student groups
+7. **Teacher's Required Room Must Be Used** — a block's room must match its teacher's `requiredRoomName` when one is set; not excluded for pinned blocks (a data-integrity check, since a non-pinned block's room is already structurally guaranteed correct)
+8. **Group Cannot Have Two Courses at Same Time**
+9. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
+10. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
+11. **Teacher Must Have a Break After Consecutive Hours** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
+12. **Group Must Have a Break After Consecutive Hours** — same rule, for student groups
 
 #### Soft Constraints (weighted quality preferences)
 1. **Non-Standard Rooms Should Finish by 2pm** (weight 10) — labs/workshops/computer centers

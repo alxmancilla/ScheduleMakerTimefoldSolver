@@ -54,6 +54,7 @@ database/migrations/*
 !database/migrations/add_calendar_exception.sql
 !database/migrations/add_schedule_run_history.sql
 !database/migrations/add_schedule_run_input_snapshot.sql
+!database/migrations/add_pinned_requires_room_check.sql
 md_files/
 
 # Build artifacts

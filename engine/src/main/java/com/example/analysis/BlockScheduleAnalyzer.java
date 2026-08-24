@@ -147,6 +147,21 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Room type must satisfy course requirement", roomTypeMismatch);
 
+        // Teacher's required room must be used - NOT excluded for pinned
+        // assignments (mirrors SchoolConstraintProvider.teacherRequiredRoomMustBeUsed:
+        // a non-pinned block's room is already structurally guaranteed correct by
+        // CourseBlockAssignment.getMatchingRooms(), so this only ever fires for a
+        // pinned row whose room drifted out of sync with its teacher's current
+        // required room).
+        int teacherRequiredRoomMismatch = 0;
+        for (CourseBlockAssignment a : list) {
+            if (a.getTeacher() != null && a.getTeacher().getRequiredRoomName() != null && a.getRoom() != null
+                    && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName())) {
+                teacherRequiredRoomMismatch++;
+            }
+        }
+        result.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
+
         // Group cannot have two courses at same time (blocks overlap)
         int groupConflict = 0;
         for (int i = 0; i < list.size(); i++) {
@@ -367,6 +382,19 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Room type must satisfy course requirement", roomTypeMismatch);
+
+        // Teacher's required room must be used - NOT excluded for pinned
+        // assignments, see the count version above for why.
+        List<String> teacherRequiredRoomMismatch = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getTeacher() != null && a.getTeacher().getRequiredRoomName() != null && a.getRoom() != null
+                    && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName())) {
+                teacherRequiredRoomMismatch.add(
+                        blockAssignmentToString(a) + " (requiredRoom=" + a.getTeacher().getRequiredRoomName()
+                                + ", assignedRoom=" + a.getRoom().getName() + ")");
+            }
+        }
+        details.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
 
         // Group cannot have two courses at same time
         List<String> groupConflict = new ArrayList<>();
