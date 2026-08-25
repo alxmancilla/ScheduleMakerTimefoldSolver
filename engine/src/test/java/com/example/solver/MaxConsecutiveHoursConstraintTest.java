@@ -33,15 +33,20 @@ public class MaxConsecutiveHoursConstraintTest {
     public void fiveStraightHoursIsAViolationOfOne() {
         // 7-8, 8-9, 9-10, 10-11, 11-12: 5h straight, 1h over the 4h threshold
         int[] starts = { 7, 8, 9, 10, 11 };
-        assertEquals(1, teacherViolations(starts));
-        assertEquals(1, groupViolations(starts));
+        // Both sides TEMP DISABLED 2026-08-24, see SchoolConstraintProvider/
+        // BlockScheduleAnalyzer - re-enable these assertions (expect 1/1) together
+        // with them.
+        assertEquals(0, teacherViolations(starts));
+        assertEquals(0, groupViolations(starts));
     }
 
     @Test
     public void sixStraightHoursIsAViolationOfTwo() {
         int[] starts = { 7, 8, 9, 10, 11, 12 };
-        assertEquals(2, teacherViolations(starts));
-        assertEquals(2, groupViolations(starts));
+        // Both sides TEMP DISABLED 2026-08-24 - re-enable (expect 2/2) together
+        // with SchoolConstraintProvider/BlockScheduleAnalyzer.
+        assertEquals(0, teacherViolations(starts));
+        assertEquals(0, groupViolations(starts));
     }
 
     @Test

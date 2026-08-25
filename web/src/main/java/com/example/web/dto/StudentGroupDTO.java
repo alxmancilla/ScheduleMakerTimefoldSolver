@@ -24,9 +24,6 @@ public class StudentGroupDTO {
     @Size(min = 2, max = 200, message = "Group name must be between 2 and 200 characters")
     private String name;
 
-    @Size(max = 100, message = "Preferred room name must not exceed 100 characters")
-    private String preferredRoomName;
-
     /** Optional headcount; when set alongside a room's capacity, a soft
      * constraint warns if this group is placed in a room too small for it. */
     @Min(value = 1, message = "Student count must be at least 1")
@@ -56,14 +53,6 @@ public class StudentGroupDTO {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getPreferredRoomName() {
-        return preferredRoomName;
-    }
-
-    public void setPreferredRoomName(String preferredRoomName) {
-        this.preferredRoomName = preferredRoomName;
     }
 
     public Integer getStudentCount() {

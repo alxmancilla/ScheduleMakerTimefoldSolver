@@ -251,7 +251,11 @@ public class ExcelToDatabaseImporter {
             throw new IllegalArgumentException("Sheet 'Groups' not found in Excel file");
         }
 
-        String sql = "INSERT INTO student_group (id, name, preferred_room_name, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())";
+        // preferred_room_name was replaced by group_room_range (a group's
+        // curated acceptable rooms per room type) - not a single flat
+        // column, so it's out of scope for this bulk Excel import; manage
+        // ranges via the Groups UI / /api/groups/{id}/room-ranges afterward.
+        String sql = "INSERT INTO student_group (id, name, created_at, updated_at) VALUES (?, ?, NOW(), NOW())";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             int count = 0;
@@ -260,15 +264,8 @@ public class ExcelToDatabaseImporter {
                 if (row == null)
                     continue;
 
-                String preferredRoom = getCellValueAsString(row.getCell(2));
-
                 ps.setString(1, getCellValueAsString(row.getCell(0)));
                 ps.setString(2, getCellValueAsString(row.getCell(1)));
-                if (preferredRoom == null || preferredRoom.trim().isEmpty()) {
-                    ps.setNull(3, Types.VARCHAR);
-                } else {
-                    ps.setString(3, preferredRoom);
-                }
                 ps.executeUpdate();
                 count++;
             }

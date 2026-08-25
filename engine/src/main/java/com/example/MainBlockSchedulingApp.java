@@ -141,7 +141,8 @@ public class MainBlockSchedulingApp {
         System.out.println("=== Saving to Database ===");
         DataSaver dataSaver = new DataSaver(jdbcUrl, username, password);
         try {
-            dataSaver.saveSchedule(solvedSchedule, built.minutesSpentLimit(), built.unimprovedMinutesSpentLimit());
+            dataSaver.saveSchedule(solvedSchedule, built.minutesSpentLimit(), built.unimprovedMinutesSpentLimit(),
+                    violations.keySet(), softViolations.keySet());
 
             // Print statistics
             System.out.println();

@@ -59,6 +59,77 @@ public class TeacherRequiredRoomConstraintTest {
         assertEquals(0, violations);
     }
 
+    @Test
+    public void requiredRoomWrongTypeForThisBlock_notApplicable_noViolationEvenThoughRoomsDiffer() {
+        // A teacher whose required room (CC3, Computer Lab) doesn't satisfy
+        // THIS block's requirement (Mixed) never had that requirement apply
+        // here in the first place (see CourseBlockAssignment's compatibility
+        // fallback) - the block correctly landed in a different (Mixed) room,
+        // and that's not a violation of a requirement that was never
+        // applicable.
+        Teacher teacher = new Teacher("T1", "Test", "Teacher", new HashSet<>(), new HashMap<>(), 40);
+        teacher.setRequiredRoomName("CC3");
+        Course course = new Course("1", "Test Course", "TEST", 2, "BASICAS", "estándar", 4, Boolean.TRUE);
+        Group group = new Group("G1", "Test Group", new HashSet<>());
+        Room cc3 = new Room("CC3", "A", "Specialized - Computer Lab");
+        Room mixedRoom = new Room("TEM1", "A", "Mixed");
+        BlockTimeslot timeslot = new BlockTimeslot("slot1", DayOfWeek.MONDAY, 7, 1);
+
+        CourseBlockAssignment assignment = new CourseBlockAssignment("a1", group, course, 1);
+        assignment.setTimeslot(timeslot);
+        assignment.setTeacher(teacher);
+        assignment.setAllRooms(List.of(cc3, mixedRoom));
+        assignment.setSatisfiesRoomType("Mixed");
+        assignment.setRoom(mixedRoom);
+        assignment.setPinned(true);
+
+        SchoolSchedule schedule = new SchoolSchedule(
+                Collections.singletonList(teacher),
+                Collections.singletonList(timeslot),
+                List.of(cc3, mixedRoom),
+                Collections.singletonList(course),
+                Collections.singletonList(group),
+                Collections.singletonList(assignment));
+
+        Map<String, Integer> hardViolations = BlockScheduleAnalyzer.analyzeHardConstraintViolations(schedule);
+        int violations = hardViolations.getOrDefault(CONSTRAINT_NAME, 0);
+        assertEquals(0, violations);
+    }
+
+    @Test
+    public void requiredRoomRightTypeForThisBlock_stillAViolationWhenAssignedRoomDiffers() {
+        // The requirement DOES apply here (CC3 satisfies this block's
+        // Computer Lab requirement), so a pinned row sitting in a different
+        // room is still a genuine violation.
+        Teacher teacher = new Teacher("T1", "Test", "Teacher", new HashSet<>(), new HashMap<>(), 40);
+        teacher.setRequiredRoomName("CC3");
+        Course course = new Course("1", "Test Course", "TEST", 2, "BASICAS", "estándar", 4, Boolean.TRUE);
+        Group group = new Group("G1", "Test Group", new HashSet<>());
+        Room cc3 = new Room("CC3", "A", "Specialized - Computer Lab");
+        Room wrongRoom = new Room("AULA 1", "A", "Standard");
+        BlockTimeslot timeslot = new BlockTimeslot("slot1", DayOfWeek.MONDAY, 7, 1);
+
+        CourseBlockAssignment assignment = new CourseBlockAssignment("a1", group, course, 1);
+        assignment.setTimeslot(timeslot);
+        assignment.setTeacher(teacher);
+        assignment.setAllRooms(List.of(cc3, wrongRoom));
+        assignment.setSatisfiesRoomType("Specialized - Computer Lab");
+        assignment.setRoom(wrongRoom);
+        assignment.setPinned(true);
+
+        SchoolSchedule schedule = new SchoolSchedule(
+                Collections.singletonList(teacher),
+                Collections.singletonList(timeslot),
+                List.of(cc3, wrongRoom),
+                Collections.singletonList(course),
+                Collections.singletonList(group),
+                Collections.singletonList(assignment));
+
+        Map<String, Integer> hardViolations = BlockScheduleAnalyzer.analyzeHardConstraintViolations(schedule);
+        int violations = hardViolations.getOrDefault(CONSTRAINT_NAME, 0);
+        assertEquals(1, violations);
+    }
+
     private int violationCountFor(String requiredRoomName, String assignedRoomName, boolean pinned) {
         Teacher teacher = new Teacher("T1", "Test", "Teacher", new HashSet<>(), new HashMap<>(), 40);
         teacher.setRequiredRoomName(requiredRoomName);

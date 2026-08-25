@@ -163,50 +163,154 @@ public class CourseBlockAssignment {
 
     /**
      * Whether this block's room has already been decided outside the solver:
-     * true when the group has a preferred room, or the teacher has a required
-     * room (which overrides the group's preference - see
-     * BlockGenerationService.defaultRoomFor() in the web module for the same
-     * priority order). Used both by getMatchingRooms() below (to collapse the
-     * room value range to a singleton) and by BlockLengthDifficultyComparator
-     * (to schedule fixed-room blocks before movable ones).
+     * true when the teacher has a required room, or the group's curated
+     * range for this block's satisfiesRoomType resolves to exactly one
+     * compatible room (the teacher's requirement overrides the group's range
+     * - see BlockGenerationService.defaultRoomFor() in the web module for the
+     * same priority order) - but only when that fixed room's type actually
+     * satisfies this block's own satisfiesRoomType. A teacher who mostly
+     * teaches one room type but also has an occasional course of a different
+     * type (e.g. a workshop teacher who also covers one computer-lab course)
+     * shouldn't have their requiredRoomName blanket-lock every block they
+     * teach; when it doesn't apply here, this falls through to the group's
+     * range exactly as if the teacher had no requirement at all (and that, in
+     * turn, falls through to "not fixed" if the range is undefined for this
+     * type, empty, incompatible, or has more than one acceptable room - see
+     * getMatchingRooms()). Used both by getMatchingRooms() below (to
+     * collapse the room value range to a singleton) and by
+     * BlockLengthDifficultyComparator (to schedule fixed-room blocks before
+     * movable ones).
      */
     public boolean isRoomFixed() {
-        return (group != null && group.getPreferredRoom() != null)
-                || (teacher != null && teacher.getRequiredRoomName() != null);
+        if (teacher != null && teacher.getRequiredRoomName() != null && teacherRequiredRoomAppliesHere()) {
+            return true;
+        }
+        List<Room> groupRange = resolveGroupAcceptableRooms();
+        return groupRange != null && groupRange.size() == 1;
     }
 
     /**
-     * This block's valid room candidates. When isRoomFixed() is true, the
-     * range collapses to a singleton derived from stable, solver-untouched
-     * facts - group.getPreferredRoom() (already a resolved Room reference)
-     * or teacher.getRequiredRoomName() (resolved against allRooms by name) -
+     * The group's curated range for this block's satisfiesRoomType, filtered
+     * to rooms that actually satisfy it, or {@code null} when the group has
+     * no range for this type (falls through to the unrestricted list),
+     * curated a range that resolves to nothing after filtering, or has no
+     * group at all.
+     */
+    private List<Room> resolveGroupAcceptableRooms() {
+        if (group == null) {
+            return null;
+        }
+        List<Room> range = group.getAcceptableRooms(satisfiesRoomType);
+        if (range == null || range.isEmpty()) {
+            return null;
+        }
+        List<Room> compatible = new ArrayList<>();
+        for (Room candidate : range) {
+            if (roomSatisfiesType(candidate)) {
+                compatible.add(candidate);
+            }
+        }
+        return compatible.isEmpty() ? null : compatible;
+    }
+
+    /**
+     * True when the teacher's required room should be treated as fixing this
+     * block: either it satisfies satisfiesRoomType, or compatibility can't be
+     * verified yet (allRooms not wired up - e.g. a plain domain-object test -
+     * or the name is a dangling reference to no known room, a data error
+     * that should surface as "fixed to an empty range" via getMatchingRooms()
+     * rather than silently falling back to the group's preference).
+     */
+    private boolean teacherRequiredRoomAppliesHere() {
+        Room required = resolveTeacherRequiredRoomObject();
+        return required == null || roomSatisfiesType(required);
+    }
+
+    private Room resolveTeacherRequiredRoomObject() {
+        if (allRooms == null || teacher == null || teacher.getRequiredRoomName() == null) {
+            return null;
+        }
+        for (Room candidate : allRooms) {
+            if (candidate.getName().equals(teacher.getRequiredRoomName())) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private boolean roomSatisfiesType(Room room) {
+        return satisfiesRoomType == null || room.satisfiesRequirement(satisfiesRoomType);
+    }
+
+    /**
+     * True when the teacher has a required room AND it genuinely governs
+     * this block (satisfies satisfiesRoomType, or compatibility can't be
+     * determined) - as opposed to a blanket requirement the compatibility
+     * fallback would skip for this particular course (see isRoomFixed()).
+     * Used by SchoolConstraintProvider.teacherRequiredRoomMustBeUsed and its
+     * BlockScheduleAnalyzer mirror to only flag a room that disagrees with a
+     * requirement that actually applies here - not one the fallback would
+     * have ignored anyway.
+     */
+    public boolean isTeacherRequiredRoomApplicable() {
+        return teacher != null && teacher.getRequiredRoomName() != null && teacherRequiredRoomAppliesHere();
+    }
+
+    /**
+     * This block's valid room candidates, in priority order: the teacher's
+     * required room (singleton) if it applies here; otherwise the group's
+     * curated range for this block's satisfiesRoomType (singleton if it
+     * resolves to exactly one compatible room, or the whole filtered set if
+     * more than one - a narrowed but still movable range); otherwise every
+     * room whose type satisfies this block's requirement (the unrestricted
+     * fallback, used whenever the group hasn't curated a range for this
+     * type). Room objects come from stable, solver-untouched facts -
+     * group.getAcceptableRooms() (already resolved Room references) or
+     * teacher.getRequiredRoomName() (resolved against allRooms by name) -
      * deliberately NOT this entity's own current room field. Timefold's
      * construction heuristic nulls a variable before consulting its own
      * value-range provider to decide what to assign it, so a fixed-branch
      * that read `room` here would always see null and return an empty range,
      * permanently unassigning every fixed block (confirmed empirically: an
      * earlier version of this method did exactly that and left ~400 fixed
-     * blocks roomless after one real solve). Otherwise every room whose type
-     * satisfies this block's requirement.
+     * blocks roomless after one real solve).
      */
     @ValueRangeProvider(id = "matchingRoomRange")
     public List<Room> getMatchingRooms() {
         if (allRooms == null) {
             return Collections.emptyList();
         }
-        // Teacher's required room takes precedence over the group's preferred
-        // room (matches BlockGenerationService.defaultRoomFor()'s priority in
-        // the web module: teacher's required room > group's preferred room).
+        // Teacher's required room takes precedence over the group's range
+        // (matches BlockGenerationService.defaultRoomFor()'s priority in the
+        // web module: teacher's required room > group's range) - but only
+        // when it actually satisfies this block's satisfiesRoomType. When it
+        // doesn't, fall through to the group's range below instead of
+        // locking this block to a room of the wrong type.
         if (teacher != null && teacher.getRequiredRoomName() != null) {
+            Room required = null;
+            boolean found = false;
             for (Room candidate : allRooms) {
                 if (candidate.getName().equals(teacher.getRequiredRoomName())) {
-                    return Collections.singletonList(candidate);
+                    required = candidate;
+                    found = true;
+                    break;
                 }
             }
-            return Collections.emptyList();
+            if (!found) {
+                // Dangling required-room reference (data error) - surface it
+                // as permanently unassigned rather than silently falling
+                // back to the group's range, which would mask the bad data.
+                return Collections.emptyList();
+            }
+            if (roomSatisfiesType(required)) {
+                return Collections.singletonList(required);
+            }
+            // else: wrong type for this block - fall through below, exactly
+            // as if the teacher had no requirement at all.
         }
-        if (group != null && group.getPreferredRoom() != null) {
-            return Collections.singletonList(group.getPreferredRoom());
+        List<Room> groupRange = resolveGroupAcceptableRooms();
+        if (groupRange != null) {
+            return groupRange.size() == 1 ? Collections.singletonList(groupRange.get(0)) : groupRange;
         }
         if (satisfiesRoomType == null) {
             return allRooms;

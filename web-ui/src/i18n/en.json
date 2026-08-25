@@ -252,14 +252,34 @@
     "fields": {
       "id": "ID:",
       "name": "Name:",
-      "preferredRoom": "Preferred Room (optional):",
       "studentCount": "Student Count (optional):"
     },
     "table": {
       "id": "ID",
       "name": "Name",
-      "preferredRoom": "Preferred Room",
       "studentCount": "Students"
+    },
+    "roomRanges": {
+      "title": "Room Ranges",
+      "description": "Which rooms this group can use, per room type - e.g. a handful of equivalent classrooms for Core courses. A room type with no rows here is unrestricted (any room of that type may be used). One row means the group is fixed to that single room; two or more rows means the solver can freely pick among them.",
+      "addRange": "+ Add Room",
+      "editRange": "Edit Room Range",
+      "newRange": "New Room Range",
+      "loadFailedPrefix": "Failed to load this group's room ranges: ",
+      "saveFailedPrefix": "Failed to save room range: ",
+      "deleteFailedPrefix": "Failed to delete room range: ",
+      "confirmDelete": "Remove this room from the group's range?",
+      "fields": {
+        "roomType": "Room Type:",
+        "roomName": "Room:"
+      },
+      "table": {
+        "roomType": "Room Type",
+        "roomName": "Room"
+      },
+      "none": "This group has no curated room ranges yet - any room of the matching type may be used.",
+      "savedMessage": "Room range saved",
+      "deletedMessage": "Room range deleted"
     },
     "courses": {
       "title": "Courses",

@@ -40,7 +40,9 @@ public class PdfReporter {
             Map.entry("violationsTitle", "Block Schedule - Constraint Violations Report"),
             Map.entry("score", "Score"),
             Map.entry("hardViolations", "Hard Constraint Violations:"),
-            Map.entry("softViolations", "Soft Constraint Violations:"));
+            Map.entry("softViolations", "Soft Constraint Violations:"),
+            Map.entry("page", "Page"),
+            Map.entry("pageOf", "of"));
 
     private static final Map<String, String> TEXT_ES = Map.ofEntries(
             Map.entry("coverTeacherTitle", "Horarios de Maestros"),
@@ -59,7 +61,9 @@ public class PdfReporter {
             Map.entry("violationsTitle", "Reporte de Violaciones de Restricciones - Horario por Bloques"),
             Map.entry("score", "Puntuación"),
             Map.entry("hardViolations", "Violaciones de Restricciones Estrictas:"),
-            Map.entry("softViolations", "Violaciones de Restricciones Suaves:"));
+            Map.entry("softViolations", "Violaciones de Restricciones Suaves:"),
+            Map.entry("page", "Página"),
+            Map.entry("pageOf", "de"));
 
     /** Report chrome text for the given key, in the given locale ("es" or anything else -> "en"). */
     private static String t(String key, String locale) {
@@ -244,19 +248,32 @@ public class PdfReporter {
         }
 
         float fontSize = 8f;
+        int totalPages = doc.getNumberOfPages();
         int pageIndex = 0;
         for (PDPage page : doc.getPages()) {
-            if (pageIndex++ < skipPages) {
-                continue;
-            }
+            int pageNumber = ++pageIndex;
             float pageWidth = page.getMediaBox().getWidth();
-            float textWidth = PDType1Font.HELVETICA.getStringWidth(footerText) / 1000 * fontSize;
+            String pageText = t("page", locale) + " " + pageNumber + " " + t("pageOf", locale) + " " + totalPages;
+            boolean drawFooterText = pageIndex > skipPages;
+
             try (PDPageContentStream cs = new PDPageContentStream(doc, page,
                     PDPageContentStream.AppendMode.APPEND, true)) {
+                if (drawFooterText) {
+                    float textWidth = PDType1Font.HELVETICA.getStringWidth(footerText) / 1000 * fontSize;
+                    cs.beginText();
+                    cs.setFont(PDType1Font.HELVETICA, fontSize);
+                    cs.newLineAtOffset((pageWidth - textWidth) / 2, 20);
+                    cs.showText(footerText);
+                    cs.endText();
+                }
+
+                // Page number: centered, every page (including the cover), below the
+                // generated/version line above so both stay independently readable.
+                float pageTextWidth = PDType1Font.HELVETICA.getStringWidth(pageText) / 1000 * fontSize;
                 cs.beginText();
                 cs.setFont(PDType1Font.HELVETICA, fontSize);
-                cs.newLineAtOffset((pageWidth - textWidth) / 2, 20);
-                cs.showText(footerText);
+                cs.newLineAtOffset((pageWidth - pageTextWidth) / 2, 8);
+                cs.showText(pageText);
                 cs.endText();
             }
         }
@@ -368,6 +385,8 @@ public class PdfReporter {
             PDPage page = new PDPage(PDRectangle.LETTER);
             doc.addPage(page);
 
+            Locale javaLocale = "es".equalsIgnoreCase(locale) ? new Locale("es") : Locale.ENGLISH;
+
             PDPageContentStream cs = new PDPageContentStream(doc, page);
             try {
                 float margin = 50;
@@ -384,6 +403,20 @@ public class PdfReporter {
                 currentY -= leading * 1.5f;
 
                 cs.setFont(PDType1Font.HELVETICA, 11);
+                // When the schedule was actually solved (schedule_run.created_at) - not
+                // to be confused with the small "Generated: <today>" footer line, which
+                // is when this PDF file itself was rendered, possibly long after the
+                // solve. Omitted when unknown (e.g. no schedule_run exists yet), same
+                // null-safety convention as the cover page / footer's own use of this
+                // value.
+                if (scheduleRunTimestamp != null) {
+                    String versionText = scheduleRunTimestamp.format(
+                            java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy, h:mm a", javaLocale));
+                    cs.showText(t("scheduleVersion", locale) + ": " + versionText);
+                    cs.newLineAtOffset(0, -leading);
+                    currentY -= leading;
+                }
+
                 cs.showText(t("score", locale) + ": " + schedule.getScore());
                 cs.newLineAtOffset(0, -leading);
                 currentY -= leading;

@@ -29,6 +29,14 @@ public final class BlockScheduleAnalyzer {
     // Mirrors SchoolConstraintProvider.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK.
     private static final int MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK = 4;
 
+    // Mirrors SchoolConstraintProvider.EARLIEST_START_HOUR.
+    private static final int EARLIEST_START_HOUR = 7;
+
+    /** True when this block belongs to a first-semester (semester == 1) course. */
+    private static boolean isSemesterOneBlock(CourseBlockAssignment a) {
+        return a.getCourse() != null && Integer.valueOf(1).equals(a.getCourse().getSemester());
+    }
+
     /**
      * The longest run of occupied hours (merging touching or overlapping
      * blocks into one span) once sorted by start hour, tie-broken by id for a
@@ -152,10 +160,13 @@ public final class BlockScheduleAnalyzer {
         // a non-pinned block's room is already structurally guaranteed correct by
         // CourseBlockAssignment.getMatchingRooms(), so this only ever fires for a
         // pinned row whose room drifted out of sync with its teacher's current
-        // required room).
+        // required room). Uses isTeacherRequiredRoomApplicable() rather than a
+        // blind name comparison, so a multi-subject teacher's blocks that the
+        // compatibility fallback correctly routed to the group's room aren't
+        // flagged as violating a requirement that never applied to them.
         int teacherRequiredRoomMismatch = 0;
         for (CourseBlockAssignment a : list) {
-            if (a.getTeacher() != null && a.getTeacher().getRequiredRoomName() != null && a.getRoom() != null
+            if (a.isTeacherRequiredRoomApplicable() && a.getRoom() != null
                     && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName())) {
                 teacherRequiredRoomMismatch++;
             }
@@ -275,7 +286,8 @@ public final class BlockScheduleAnalyzer {
                 teacherBreakViolations += excess;
             }
         }
-        result.put("Teacher must have a break after consecutive hours", teacherBreakViolations);
+        // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
+        // result.put("Teacher must have a break after consecutive hours", teacherBreakViolations);
         int groupBreakViolations = 0;
         for (List<CourseBlockAssignment> blocks : groupDayBlocks.values()) {
             int excess = longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
@@ -283,7 +295,8 @@ public final class BlockScheduleAnalyzer {
                 groupBreakViolations += excess;
             }
         }
-        result.put("Group must have a break after consecutive hours", groupBreakViolations);
+        // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
+        // result.put("Group must have a break after consecutive hours", groupBreakViolations);
 
         // NOTE: "Non-standard rooms should finish by 2pm" is a SOFT constraint in
         // SchoolConstraintProvider (weight 10), so it is reported by
@@ -387,7 +400,7 @@ public final class BlockScheduleAnalyzer {
         // assignments, see the count version above for why.
         List<String> teacherRequiredRoomMismatch = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
-            if (a.getTeacher() != null && a.getTeacher().getRequiredRoomName() != null && a.getRoom() != null
+            if (a.isTeacherRequiredRoomApplicable() && a.getRoom() != null
                     && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName())) {
                 teacherRequiredRoomMismatch.add(
                         blockAssignmentToString(a) + " (requiredRoom=" + a.getTeacher().getRequiredRoomName()
@@ -516,7 +529,8 @@ public final class BlockScheduleAnalyzer {
                         MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
             }
         }
-        details.put("Teacher must have a break after consecutive hours", teacherBreakDetails);
+        // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
+        // details.put("Teacher must have a break after consecutive hours", teacherBreakDetails);
         List<String> groupBreakDetails = new ArrayList<>();
         for (Map.Entry<Object, List<CourseBlockAssignment>> entry : groupDayBlocksDetail.entrySet()) {
             List<CourseBlockAssignment> blocks = entry.getValue();
@@ -530,7 +544,8 @@ public final class BlockScheduleAnalyzer {
                         group.getName(), formatDay(day), run, MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
             }
         }
-        details.put("Group must have a break after consecutive hours", groupBreakDetails);
+        // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
+        // details.put("Group must have a break after consecutive hours", groupBreakDetails);
 
         // NOTE: "Non-standard rooms should finish by 2pm" is a SOFT constraint in
         // SchoolConstraintProvider (weight 10), so its details are reported by
@@ -575,38 +590,36 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Teacher exceeds max hours per week", teacherMaxExcess);
 
-        // Minimize group idle gaps (SOFT) - Detailed
-        // Mirror the solver/count: group unpinned blocks by (group, day), sort by
-        // start hour, and report only the gaps between ADJACENT blocks so the listed
-        // offenders match the summed count (no pairwise over-counting).
-        List<String> groupIdleGapsDetails = new ArrayList<>();
-        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayForDetails = new HashMap<>();
-        for (CourseBlockAssignment a : list) {
-            if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
-                continue;
-            String groupKey = a.getGroup().getId();
-            DayOfWeek day = a.getTimeslot().getDayOfWeek();
-            groupDayForDetails.computeIfAbsent(groupKey, k -> new HashMap<>())
-                    .computeIfAbsent(day, k -> new ArrayList<>())
-                    .add(a);
-        }
-        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayForDetails.values()) {
-            for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
-                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
-                for (int i = 1; i < assigns.size(); i++) {
-                    CourseBlockAssignment prev = assigns.get(i - 1);
-                    CourseBlockAssignment curr = assigns.get(i);
-                    int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
-                    int gap = curr.getTimeslot().getStartHour() - prevEnd;
-                    if (gap > 0) {
-                        String reason = String.format("(gap=%d hours)", gap);
-                        groupIdleGapsDetails.add(blockAssignmentToString(prev) + "  <->  " +
-                                blockAssignmentToString(curr) + " " + reason);
-                    }
-                }
-            }
-        }
-        details.put("Minimize group idle gaps", groupIdleGapsDetails);
+        // Minimize group idle gaps (SOFT) - Detailed - TEMP DISABLED 2026-08-24, see
+        // the count version's mirror above for why. Re-enable together with it.
+        // List<String> groupIdleGapsDetails = new ArrayList<>();
+        // Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayForDetails = new HashMap<>();
+        // for (CourseBlockAssignment a : list) {
+        //     if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
+        //         continue;
+        //     String groupKey = a.getGroup().getId();
+        //     DayOfWeek day = a.getTimeslot().getDayOfWeek();
+        //     groupDayForDetails.computeIfAbsent(groupKey, k -> new HashMap<>())
+        //             .computeIfAbsent(day, k -> new ArrayList<>())
+        //             .add(a);
+        // }
+        // for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayForDetails.values()) {
+        //     for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
+        //         assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+        //         for (int i = 1; i < assigns.size(); i++) {
+        //             CourseBlockAssignment prev = assigns.get(i - 1);
+        //             CourseBlockAssignment curr = assigns.get(i);
+        //             int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
+        //             int gap = curr.getTimeslot().getStartHour() - prevEnd;
+        //             if (gap > 0) {
+        //                 String reason = String.format("(gap=%d hours)", gap);
+        //                 groupIdleGapsDetails.add(blockAssignmentToString(prev) + "  <->  " +
+        //                         blockAssignmentToString(curr) + " " + reason);
+        //             }
+        //         }
+        //     }
+        // }
+        // details.put("Minimize group idle gaps", groupIdleGapsDetails);
 
         // Prefer block's specified room (SOFT) - Detailed
         List<String> blockSpecifiedRoomDetails = new ArrayList<>();
@@ -658,20 +671,48 @@ public final class BlockScheduleAnalyzer {
 
         List<CourseBlockAssignment> list = schedule.getCourseBlockAssignments();
 
-        // Prefer group's preferred room (SOFT, weight 2) - uses dual room requirements
+        // Prefer group's preferred room (SOFT, weight 2) - mirrors
+        // SchoolConstraintProvider.groupPreferredRoomConstraint: a group's
+        // curated acceptable-room range is keyed by room type, so this
+        // naturally applies (or doesn't) per type rather than needing a
+        // special Mixed-type exclusion.
         int preferredRoomViolations = 0;
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
-                var preferredRoom = a.getGroup().getPreferredRoom();
-                if (preferredRoom != null &&
-                        !(a.getSatisfiesRoomType() != null && "Mixed".equalsIgnoreCase(a.getSatisfiesRoomType()))
-                        &&
-                        !preferredRoom.equals(a.getRoom())) {
+                var acceptableRooms = a.getGroup().getAcceptableRooms(a.getSatisfiesRoomType());
+                if (acceptableRooms != null && !acceptableRooms.contains(a.getRoom())) {
                     preferredRoomViolations++;
                 }
             }
         }
         result.put("Prefer group's preferred room", preferredRoomViolations);
+
+        // Prefer Core 1h blocks at the same time across days (SOFT, weight 2) -
+        // mirrors SchoolConstraintProvider.preferCoreOneHourBlocksAtSameTimeAcrossDays:
+        // group by (group, course), then for each group of 1h Core blocks, penalize
+        // by how many blocks deviate from the most common ("mode") start hour.
+        int coreSameTimeViolations = 0;
+        Map<String, Map<String, List<CourseBlockAssignment>>> coreBlocksByGroupAndCourse = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getBlockLength() == 1 && a.getGroup() != null && a.getCourse() != null
+                    && a.getTimeslot() != null && "Core".equals(a.getCourse().getDesignation())) {
+                coreBlocksByGroupAndCourse
+                        .computeIfAbsent(a.getGroup().getId(), k -> new HashMap<>())
+                        .computeIfAbsent(a.getCourse().getId(), k -> new ArrayList<>())
+                        .add(a);
+            }
+        }
+        for (Map<String, List<CourseBlockAssignment>> byCourse : coreBlocksByGroupAndCourse.values()) {
+            for (List<CourseBlockAssignment> blocks : byCourse.values()) {
+                Map<Integer, Integer> hourCounts = new HashMap<>();
+                for (CourseBlockAssignment a : blocks) {
+                    hourCounts.merge(a.getTimeslot().getStartHour(), 1, Integer::sum);
+                }
+                int modeCount = Collections.max(hourCounts.values());
+                coreSameTimeViolations += blocks.size() - modeCount;
+            }
+        }
+        result.put("Prefer Core 1h blocks at the same time across days", coreSameTimeViolations);
 
         // Room capacity should fit group size (SOFT, weight 4) - only applies when
         // both room.capacity and group.studentCount are known; mirrors
@@ -710,7 +751,8 @@ public final class BlockScheduleAnalyzer {
                 }
             }
         }
-        result.put("Minimize teacher building changes", buildingChanges);
+        // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
+        // result.put("Minimize teacher building changes", buildingChanges);
 
         // Teacher max hours per week (SOFT, weight 5)
         // IMPORTANT: Includes BOTH pinned and unpinned assignments because pinned
@@ -786,36 +828,96 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Minimize teacher idle gaps (availability-aware)", idleGaps);
 
-        // Minimize group idle gaps (SOFT, weight 3)
-        // Mirror the solver: group unpinned blocks by (group, day), sort by start
-        // hour, and sum only the gaps between ADJACENT blocks. This avoids the
-        // pairwise over-counting where a non-adjacent pair (blocks 1 and 3) would
-        // re-count idle hours already covered by the adjacent pairs.
-        int groupIdleGaps = 0;
-        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayAssignments = new HashMap<>();
+        // Minimize group idle gaps (SOFT, weight 3) - TEMP DISABLED 2026-08-24 (per
+        // request, replaced for first-semester groups by "Minimize first-semester
+        // group idle gaps" below; other groups' idle gaps are no longer minimized
+        // at all) - re-enable by uncommenting, along with SchoolConstraintProvider,
+        // GroupIdleGapAnalyzerTest's assertions, and ConstraintConsistencyTest's
+        // expected soft constraints/counts.
+        // int groupIdleGaps = 0;
+        // Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayAssignments = new HashMap<>();
+        // for (CourseBlockAssignment a : list) {
+        //     if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
+        //         continue;
+        //     String groupKey = a.getGroup().getId();
+        //     DayOfWeek day = a.getTimeslot().getDayOfWeek();
+        //     groupDayAssignments.computeIfAbsent(groupKey, k -> new HashMap<>())
+        //             .computeIfAbsent(day, k -> new ArrayList<>())
+        //             .add(a);
+        // }
+        // for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayAssignments.values()) {
+        //     for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
+        //         assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+        //         for (int i = 1; i < assigns.size(); i++) {
+        //             int prevEnd = assigns.get(i - 1).getTimeslot().getStartHour()
+        //                     + assigns.get(i - 1).getTimeslot().getLengthHours();
+        //             int gap = assigns.get(i).getTimeslot().getStartHour() - prevEnd;
+        //             if (gap > 0) {
+        //                 groupIdleGaps += gap;
+        //             }
+        //         }
+        //     }
+        // }
+        // result.put("Minimize group idle gaps", groupIdleGaps);
+
+        // Prefer first-semester blocks to start early (SOFT, weight 4) - mirrors
+        // SchoolConstraintProvider.preferSemesterOneBlocksStartEarly: group unpinned
+        // semester-1 blocks by (group, day), penalize by how far the earliest one's
+        // start hour is from EARLIEST_START_HOUR (7).
+        int semesterOneStartEarlyViolations = 0;
+        Map<String, Map<DayOfWeek, Integer>> semesterOneEarliestHourByGroupDay = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getGroup() == null || a.getCourse() == null || a.getTimeslot() == null
+                    || !Integer.valueOf(1).equals(a.getCourse().getSemester())) {
+                continue;
+            }
+            String groupKey = a.getGroup().getId();
+            DayOfWeek day = a.getTimeslot().getDayOfWeek();
+            int startHour = a.getTimeslot().getStartHour();
+            semesterOneEarliestHourByGroupDay.computeIfAbsent(groupKey, k -> new HashMap<>())
+                    .merge(day, startHour, Math::min);
+        }
+        for (Map<DayOfWeek, Integer> byDay : semesterOneEarliestHourByGroupDay.values()) {
+            for (int earliestHour : byDay.values()) {
+                if (earliestHour > EARLIEST_START_HOUR) {
+                    semesterOneStartEarlyViolations += earliestHour - EARLIEST_START_HOUR;
+                }
+            }
+        }
+        result.put("Prefer first-semester blocks to start early", semesterOneStartEarlyViolations);
+
+        // Minimize first-semester group idle gaps (SOFT, weight 4) - mirrors
+        // SchoolConstraintProvider.minimizeSemesterOneGroupIdleGaps: same adjacent-gap
+        // logic as the (now disabled) generic group-idle-gaps rule, over the group's
+        // FULL day (any semester, so a higher-semester block correctly breaks
+        // adjacency instead of being mistaken for idle time), but only summing a gap
+        // when BOTH framing blocks are themselves semester-1.
+        int semesterOneIdleGaps = 0;
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> fullDayAssignmentsForSemesterOneGaps = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
                 continue;
             String groupKey = a.getGroup().getId();
             DayOfWeek day = a.getTimeslot().getDayOfWeek();
-            groupDayAssignments.computeIfAbsent(groupKey, k -> new HashMap<>())
+            fullDayAssignmentsForSemesterOneGaps.computeIfAbsent(groupKey, k -> new HashMap<>())
                     .computeIfAbsent(day, k -> new ArrayList<>())
                     .add(a);
         }
-        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayAssignments.values()) {
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : fullDayAssignmentsForSemesterOneGaps.values()) {
             for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
                 assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
                 for (int i = 1; i < assigns.size(); i++) {
-                    int prevEnd = assigns.get(i - 1).getTimeslot().getStartHour()
-                            + assigns.get(i - 1).getTimeslot().getLengthHours();
-                    int gap = assigns.get(i).getTimeslot().getStartHour() - prevEnd;
-                    if (gap > 0) {
-                        groupIdleGaps += gap;
+                    CourseBlockAssignment prev = assigns.get(i - 1);
+                    CourseBlockAssignment curr = assigns.get(i);
+                    int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
+                    int gap = curr.getTimeslot().getStartHour() - prevEnd;
+                    if (gap > 0 && isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
+                        semesterOneIdleGaps += gap;
                     }
                 }
             }
         }
-        result.put("Minimize group idle gaps", groupIdleGaps);
+        result.put("Minimize first-semester group idle gaps", semesterOneIdleGaps);
 
         // Prefer block's specified room (SOFT, weight 3)
         int blockSpecifiedRoomViolations = 0;

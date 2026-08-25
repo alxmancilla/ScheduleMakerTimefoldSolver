@@ -34,10 +34,11 @@ public class DemoDataGenerator {
                 List<CourseBlockAssignment> blockAssignments = generateCourseBlockAssignments(groups, courses);
 
                 // Clear teacher, room, and timeslot assignments (solver will assign them).
-                // A group with a preferred room still ends up "room-fixed" (see
-                // CourseBlockAssignment.isRoomFixed()) even starting from null - its value
-                // range is derived from Group.getPreferredRoom() directly, not from this
-                // field, so clearing it here doesn't affect that.
+                // A group whose curated range for a block's room type resolves to exactly
+                // one room still ends up "room-fixed" (see CourseBlockAssignment.isRoomFixed())
+                // even starting from null - its value range is derived from
+                // Group.getAcceptableRooms() directly, not from this field, so clearing it
+                // here doesn't affect that.
                 for (CourseBlockAssignment cba : blockAssignments) {
                         cba.setTeacher(null);
                         cba.setRoom(null);
@@ -265,15 +266,25 @@ public class DemoDataGenerator {
                 return rooms;
         }
 
+        /**
+         * A single-room acceptable range for demo data, keyed by that room's own
+         * type - mirrors what DataLoader builds from group_room_range for a group
+         * with exactly one curated room for a type. Null if the room isn't found.
+         */
+        private static Map<String, List<Room>> singleRoomRange(List<Room> rooms, String roomName) {
+                Room room = rooms.stream()
+                                .filter(r -> r.getName().equals(roomName))
+                                .findFirst()
+                                .orElse(null);
+                return room == null ? null : Map.of(room.getType(), List.of(room));
+        }
+
         private static List<Group> generateGroups(List<Room> rooms) {
                 List<Group> groups = new ArrayList<>();
 
                 // Group 1o A: Math 101, Physics 101, English 101
                 // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
-                Room preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 08"))
-                                .findFirst()
-                                .orElse(null);
+                Map<String, List<Room>> preferred = singleRoomRange(rooms, "Room 08");
 
                 groups.add(new Group("g_1A", "Gpo 1oA",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -286,10 +297,7 @@ public class DemoDataGenerator {
                 // Group 1o C: Math 101, Physics 101, English 101
                 // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
 
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 05"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 05");
 
                 groups.add(new Group("g_1B", "Gpo 1oB",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -301,10 +309,7 @@ public class DemoDataGenerator {
 
                 // Group 1o C: Math 101, Physics 101, English 101
                 // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 06"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 06");
 
                 groups.add(new Group("g_1C", "Gpo 1oC",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -316,10 +321,7 @@ public class DemoDataGenerator {
 
                 // Group 1o C: Math 101, Physics 101, English 101
                 // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 09"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 09");
 
                 groups.add(new Group("g_1D", "Gpo 1oD",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -331,10 +333,7 @@ public class DemoDataGenerator {
 
                 // Group 1o C: Math 101, Physics 101, English 101
                 // Assign a preferred room to Grupo 1o C (pre-assigned room for the group)
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 10"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 10");
 
                 groups.add(new Group("g_1E", "Gpo 1oE",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -346,10 +345,7 @@ public class DemoDataGenerator {
 
                 // Group 10 G: Math 101, Physics 101, English 101
 
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 11"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 11");
 
                 groups.add(new Group("g_1F", "Gpo 1oF",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -360,10 +356,7 @@ public class DemoDataGenerator {
                                 preferred));
 
                 // Group 10 G: Math 101, Physics 101, English 101
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 07"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 07");
 
                 groups.add(new Group("g_1G", "Gpo 1oG",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -374,10 +367,7 @@ public class DemoDataGenerator {
                                 preferred));
 
                 // Group 10 G: Math 101, Physics 101, English 101
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 12"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 12");
 
                 groups.add(new Group("g_1H", "Gpo 1oH",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",
@@ -388,10 +378,7 @@ public class DemoDataGenerator {
                                 preferred));
 
                 // Group 10 G: Math 101, Physics 101, English 101
-                preferred = rooms.stream()
-                                .filter(r -> r.getName().equals("Room 13"))
-                                .findFirst()
-                                .orElse(null);
+                preferred = singleRoomRange(rooms, "Room 13");
 
                 groups.add(new Group("g_1I", "Gpo 1oI",
                                 Set.of("LENGUA Y COMUNICACIÓN I", "INGLÉS I", "PENSAMIENTO MATEMÁTICO I",

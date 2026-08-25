@@ -4,12 +4,16 @@ import {
   getGroups, createGroup, updateGroup, deleteGroup, getRooms, getCourses, getTeachers,
   getGroupCourses, addGroupCourse, removeGroupCourse, setGroupCourseDefaultTeacher,
   getAssignmentsByGroup, updateAssignment,
+  getGroupRoomRanges, createGroupRoomRange, updateGroupRoomRange, deleteGroupRoomRange,
 } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
+import { ROOM_TYPES } from '../constants';
+
+const EMPTY_RANGE_FORM = { roomType: ROOM_TYPES[0], roomName: '' };
 
 function Groups() {
   const { t } = useTranslation();
@@ -31,6 +35,12 @@ function Groups() {
   const [courseToAdd, setCourseToAdd] = useState('');
   const [groupAssignments, setGroupAssignments] = useState([]);
   const [savingTeacherFor, setSavingTeacherFor] = useState(null);
+
+  const [roomRanges, setRoomRanges] = useState([]);
+  const [rangesError, setRangesError] = useState(null);
+  const [showRangeForm, setShowRangeForm] = useState(false);
+  const [editingRange, setEditingRange] = useState(null);
+  const [rangeForm, setRangeForm] = useState(EMPTY_RANGE_FORM);
 
   useEffect(() => {
     loadGroups();
@@ -88,6 +98,16 @@ function Groups() {
       setGroupAssignments(response.data);
     } catch (err) {
       // Non-critical: the inline teacher picker just won't have data to work with.
+    }
+  };
+
+  const loadRoomRanges = async (groupId) => {
+    try {
+      const response = await getGroupRoomRanges(groupId);
+      setRoomRanges(response.data);
+      setRangesError(null);
+    } catch (err) {
+      setRangesError(t('groups.roomRanges.loadFailedPrefix') + err.message);
     }
   };
 
@@ -178,7 +198,6 @@ function Groups() {
     const group = {
       id: formData.get('id'),
       name: formData.get('name'),
-      preferredRoomName: formData.get('preferredRoomName') || null,
       studentCount: studentCount ? parseInt(studentCount, 10) : null,
     };
 
@@ -204,6 +223,10 @@ function Groups() {
     setCourseToAdd('');
     loadGroupCourses(group.id);
     loadGroupAssignments(group.id);
+    setRangesError(null);
+    setShowRangeForm(false);
+    setEditingRange(null);
+    loadRoomRanges(group.id);
   };
 
   const handleDelete = async (id) => {
@@ -224,6 +247,65 @@ function Groups() {
     setGroupAssignments([]);
     setCoursesError(null);
     setCourseToAdd('');
+    setRoomRanges([]);
+    setRangesError(null);
+    setShowRangeForm(false);
+    setEditingRange(null);
+  };
+
+  const handleAddRange = () => {
+    setEditingRange(null);
+    setRangeForm(EMPTY_RANGE_FORM);
+    setRangesError(null);
+    setShowRangeForm(true);
+  };
+
+  const handleEditRange = (range) => {
+    setEditingRange(range);
+    setRangeForm({ roomType: range.roomType, roomName: range.roomName });
+    setRangesError(null);
+    setShowRangeForm(true);
+  };
+
+  const handleCancelRange = () => {
+    setShowRangeForm(false);
+    setEditingRange(null);
+    setRangesError(null);
+  };
+
+  const handleRangeField = (e) => {
+    const { name, value } = e.target;
+    setRangeForm({ ...rangeForm, [name]: value });
+  };
+
+  const handleSubmitRange = async (e) => {
+    e.preventDefault();
+    setRangesError(null);
+    const payload = { roomType: rangeForm.roomType, roomName: rangeForm.roomName };
+    try {
+      if (editingRange) {
+        await updateGroupRoomRange(editingGroup.id, editingRange.id, payload);
+      } else {
+        await createGroupRoomRange(editingGroup.id, payload);
+      }
+      setShowRangeForm(false);
+      setEditingRange(null);
+      loadRoomRanges(editingGroup.id);
+      showToast(t('groups.roomRanges.savedMessage'));
+    } catch (err) {
+      setRangesError(err.response?.data?.message || t('groups.roomRanges.saveFailedPrefix') + err.message);
+    }
+  };
+
+  const handleDeleteRange = async (id) => {
+    if (!(await confirmAction(t('groups.roomRanges.confirmDelete')))) return;
+    try {
+      await deleteGroupRoomRange(editingGroup.id, id);
+      loadRoomRanges(editingGroup.id);
+      showToast(t('groups.roomRanges.deletedMessage'));
+    } catch (err) {
+      setRangesError(err.response?.data?.message || t('groups.roomRanges.deleteFailedPrefix') + err.message);
+    }
   };
 
   const handleAddGroupCourse = async () => {
@@ -277,6 +359,10 @@ function Groups() {
                 setGroupAssignments([]);
                 setCoursesError(null);
                 setCourseToAdd('');
+                setRoomRanges([]);
+                setRangesError(null);
+                setShowRangeForm(false);
+                setEditingRange(null);
               }}
             >
               {t('groups.addGroup')}
@@ -298,15 +384,6 @@ function Groups() {
             <div className="form-group">
               <label>{t('groups.fields.name')}</label>
               <input type="text" name="name" defaultValue={editingGroup?.name || ''} required />
-            </div>
-            <div className="form-group">
-              <label>{t('groups.fields.preferredRoom')}</label>
-              <select name="preferredRoomName" defaultValue={editingGroup?.preferredRoomName || ''}>
-                <option value="">{t('common.noneOption')}</option>
-                {rooms.map((room) => (
-                  <option key={room.name} value={room.name}>{room.name}</option>
-                ))}
-              </select>
             </div>
             <div className="form-group">
               <label>{t('groups.fields.studentCount')}</label>
@@ -333,7 +410,7 @@ function Groups() {
               <select value={courseToAdd} onChange={(e) => setCourseToAdd(e.target.value)} style={{ flex: 1 }}>
                 <option value="">{t('groups.courses.selectPlaceholder')}</option>
                 {allCourses
-                  .filter((c) => !groupCourses.some((gc) => gc.courseName === c.name))
+                  .filter((c) => c.active !== false && !groupCourses.some((gc) => gc.courseName === c.name))
                   .map((c) => (
                     <option key={c.id} value={c.name}>
                       {c.id} - {c.name}{!qualifiedCourseNames.has(c.name) ? ` (${t('groups.courses.noQualifiedTeacherShort')})` : ''}
@@ -438,6 +515,83 @@ function Groups() {
         </div>
       )}
 
+      {showForm && editingGroup && (
+        <div className="card table-wrap">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>{t('groups.roomRanges.title')}</h3>
+            <WriteOnly>
+              <button className="btn btn-success" onClick={handleAddRange}>
+                {t('groups.roomRanges.addRange')}
+              </button>
+            </WriteOnly>
+          </div>
+          <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+            {t('groups.roomRanges.description')}
+          </p>
+          {rangesError && <div className="error" role="alert">{rangesError}</div>}
+
+          {showRangeForm && (
+            <form onSubmit={handleSubmitRange} style={{ marginTop: '12px' }}>
+              <h4>{editingRange ? t('groups.roomRanges.editRange') : t('groups.roomRanges.newRange')}</h4>
+              <div className="form-group">
+                <label>{t('groups.roomRanges.fields.roomType')}</label>
+                <select name="roomType" value={rangeForm.roomType} onChange={handleRangeField}>
+                  {ROOM_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>{t('groups.roomRanges.fields.roomName')}</label>
+                <select name="roomName" value={rangeForm.roomName} onChange={handleRangeField} required>
+                  <option value="">{t('common.noneOption')}</option>
+                  {rooms.map((r) => (
+                    <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="submit" className="btn btn-primary">{t('common.save')}</button>
+                <button type="button" className="btn btn-secondary" onClick={handleCancelRange}>{t('common.cancel')}</button>
+              </div>
+            </form>
+          )}
+
+          <table style={{ marginTop: '12px' }}>
+            <thead>
+              <tr>
+                <th>{t('groups.roomRanges.table.roomType')}</th>
+                <th>{t('groups.roomRanges.table.roomName')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roomRanges.map((range) => (
+                <tr key={range.id}>
+                  <td>{range.roomType}</td>
+                  <td>{range.roomName}</td>
+                  <td>
+                    <WriteOnly>
+                      <button className="btn btn-primary" onClick={() => handleEditRange(range)} style={{ marginRight: '5px' }}>
+                        {t('common.edit')}
+                      </button>
+                      <button className="btn btn-danger" onClick={() => handleDeleteRange(range.id)}>
+                        {t('common.delete')}
+                      </button>
+                    </WriteOnly>
+                  </td>
+                </tr>
+              ))}
+              {roomRanges.length === 0 && (
+                <tr>
+                  <td colSpan={3} style={{ color: 'var(--color-text-secondary)' }}>{t('groups.roomRanges.none')}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card table-wrap">
         <div className="search-box">
           <input
@@ -452,7 +606,6 @@ function Groups() {
             <tr>
               <th>{t('groups.table.id')}</th>
               <th>{t('groups.table.name')}</th>
-              <th>{t('groups.table.preferredRoom')}</th>
               <th>{t('groups.table.studentCount')}</th>
               <th>{t('common.actions')}</th>
             </tr>
@@ -462,7 +615,6 @@ function Groups() {
               <tr key={group.id}>
                 <td>{group.id}</td>
                 <td>{group.name}</td>
-                <td>{group.preferredRoomName || '-'}</td>
                 <td>{group.studentCount ?? '-'}</td>
                 <td>
                   <WriteOnly>

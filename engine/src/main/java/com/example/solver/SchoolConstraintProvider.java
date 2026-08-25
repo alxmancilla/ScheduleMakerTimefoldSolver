@@ -9,9 +9,11 @@ import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.util.List;
 
 import com.example.domain.CourseBlockAssignment;
 import com.example.domain.BlockTimeslot;
+import com.example.domain.Room;
 import com.example.domain.Teacher;
 
 /**
@@ -61,8 +63,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max blocks per course per group per
                                                                         // day (per-component via component_block_rule)
                 courseBlocksMustBeConsecutive(constraintFactory), // HARD: ALL course blocks MUST be consecutive
-                teacherMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
-                groupMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
+                // TEMP DISABLED 2026-08-24 (per request) - re-enable by uncommenting.
+                // Also re-enable its BlockScheduleAnalyzer mirror and bump
+                // ConstraintConsistencyTest's expected counts back to 12 hard / 20 total.
+                // teacherMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
+                // TEMP DISABLED 2026-08-24 (per request - groups are limited, don't need a
+                // break) - re-enable by uncommenting, along with its BlockScheduleAnalyzer
+                // mirror and ConstraintConsistencyTest's expected counts.
+                // groupMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
 
                 // ========== SOFT Constraints - Quality Optimization ==========
                 // Don't affect feasibility; ordered by weight (highest first) for
@@ -71,12 +79,26 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                                                                       // finish by 2pm
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
                 roomCapacityShouldFitGroupSize(constraintFactory), // SOFT (weight 4): group shouldn't exceed room capacity
-                minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
+                preferSemesterOneBlocksStartEarly(constraintFactory), // SOFT (weight 4): first-semester groups start
+                                                                       // their day as early as possible
+                minimizeSemesterOneGroupIdleGaps(constraintFactory), // SOFT (weight 4): first-semester groups run
+                                                                      // gap-free
+                // TEMP DISABLED 2026-08-24 (per request - replaced for first-semester groups
+                // by minimizeSemesterOneGroupIdleGaps above; other groups' idle gaps are no
+                // longer minimized at all) - re-enable by uncommenting, along with its
+                // BlockScheduleAnalyzer mirror, GroupIdleGapAnalyzerTest's assertions, and
+                // ConstraintConsistencyTest's expected soft constraints/counts.
+                // minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
                 preferBlockSpecifiedRoom(constraintFactory), // SOFT (weight 3): prefer block's specified room (CC
                                                              // distribution)
                 minimizeTeacherIdleGaps(constraintFactory), // SOFT (weight 2): teacher satisfaction
                 groupPreferredRoomConstraint(constraintFactory), // SOFT (weight 2): prefer group's pre-assigned room
-                minimizeTeacherBuildingChanges(constraintFactory), // SOFT (weight 1): minimize teacher travel
+                preferCoreOneHourBlocksAtSameTimeAcrossDays(constraintFactory), // SOFT (weight 2): predictable "Math
+                                                                                // is always at 8am" schedule
+                // TEMP DISABLED 2026-08-24 (per request - not required anymore) - re-enable
+                // by uncommenting, along with its BlockScheduleAnalyzer mirror and
+                // ConstraintConsistencyTest's expected soft constraints/counts.
+                // minimizeTeacherBuildingChanges(constraintFactory), // SOFT (weight 1): minimize teacher travel
 
                 // ========== COMMENTED OUT CONSTRAINTS ==========
                 // Uncomment these if needed:
@@ -251,12 +273,18 @@ public class SchoolConstraintProvider implements ConstraintProvider {
      * when a teacher's required room changes, so a pinned row can silently
      * drift out of sync with its teacher's current requirement - with nothing
      * else to report that.
+     *
+     * Uses isTeacherRequiredRoomApplicable() rather than a blind name
+     * comparison: a teacher's required room only governs blocks whose
+     * satisfiesRoomType it actually satisfies (see CourseBlockAssignment's
+     * compatibility fallback) - a multi-subject teacher's other blocks
+     * correctly land in the group's room instead, and shouldn't be flagged
+     * as if they'd disobeyed a requirement that was never applicable to them.
      */
     private Constraint teacherRequiredRoomMustBeUsed(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEachIncludingUnassigned(CourseBlockAssignment.class)
-                .filter(a -> a.getTeacher() != null
-                        && a.getTeacher().getRequiredRoomName() != null
+                .filter(a -> a.isTeacherRequiredRoomApplicable()
                         && a.getRoom() != null
                         && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName()))
                 .penalize(HardSoftScore.ONE_HARD)
@@ -534,8 +562,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     private Constraint groupPreferredRoomConstraint(ConstraintFactory constraintFactory) {
-        // SOFT: Prefer assigning groups to their preferred room
-        // This reduces room changes for students and improves familiarity
+        // SOFT: Prefer assigning a group's blocks to one of its curated
+        // acceptable rooms for that block's own satisfiesRoomType (see
+        // Group.getAcceptableRooms()/CourseBlockAssignment.getMatchingRooms()).
+        // Being keyed by room type means this naturally applies (or doesn't)
+        // per type - a group with no curated range for a given type is
+        // skipped entirely below, so a Mixed-required block is only
+        // penalized if the group has actually curated a Mixed range for it,
+        // never against a range curated for a different type.
         // WEIGHT: 2 (Medium priority - operational efficiency)
         return constraintFactory
                 .forEachIncludingUnassigned(CourseBlockAssignment.class)
@@ -547,22 +581,51 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (assignment.getGroup() == null || assignment.getRoom() == null) {
                         return false;
                     }
-                    // Only apply to blocks that don't require the "Mixed" room type (those
-                    // must get an actual Mixed room)
-                    if (assignment.getSatisfiesRoomType() != null &&
-                            "Mixed".equalsIgnoreCase(assignment.getSatisfiesRoomType())) {
+                    List<Room> acceptableRooms = assignment.getGroup().getAcceptableRooms(assignment.getSatisfiesRoomType());
+                    if (acceptableRooms == null) {
                         return false;
                     }
-                    // Check if group has a preferred room
-                    var preferredRoom = assignment.getGroup().getPreferredRoom();
-                    if (preferredRoom == null) {
-                        return false;
-                    }
-                    // Penalize if NOT using preferred room
-                    return !preferredRoom.equals(assignment.getRoom());
+                    // Penalize if NOT using one of the acceptable rooms
+                    return !acceptableRooms.contains(assignment.getRoom());
                 })
                 .penalize(HardSoftScore.ofSoft(2))
                 .asConstraint("Prefer group's preferred room");
+    }
+
+    /**
+     * SOFT: For a Core course's 1-hour blocks (one per day it meets, for the
+     * same group), prefer they all land on the same start hour - a predictable
+     * "Math is always at 8am" schedule. Doesn't apply to multi-hour blocks
+     * (different lengths can't trivially "share an hour" the same way).
+     * WEIGHT: 2 (same tier as the other schedule-predictability preferences).
+     */
+    private Constraint preferCoreOneHourBlocksAtSameTimeAcrossDays(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .filter(a -> !a.isPinned() && a.getBlockLength() == 1
+                        && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null
+                        && "Core".equals(a.getCourse().getDesignation()))
+                .groupBy(CourseBlockAssignment::getGroup, CourseBlockAssignment::getCourse,
+                        ConstraintCollectors.toList())
+                .filter((group, course, blocks) -> blocksNotAtModeHour(blocks) > 0)
+                .penalize(HardSoftScore.ofSoft(2), (group, course, blocks) -> blocksNotAtModeHour(blocks))
+                .asConstraint("Prefer Core 1h blocks at the same time across days");
+    }
+
+    /**
+     * How many of these blocks' start hours differ from the most common
+     * ("mode") start hour in the set - 0 when they all agree, or already a
+     * singleton. Counting the deviation from the mode (not a flat 1-point
+     * penalty for "not perfectly consistent") gives local search a smooth
+     * gradient: moving one outlying block back toward the group's dominant
+     * hour measurably improves the score, rather than being all-or-nothing.
+     */
+    private static int blocksNotAtModeHour(java.util.List<CourseBlockAssignment> blocks) {
+        java.util.Map<Integer, Integer> hourCounts = new java.util.HashMap<>();
+        for (CourseBlockAssignment a : blocks) {
+            hourCounts.merge(a.getTimeslot().getStartHour(), 1, Integer::sum);
+        }
+        return blocks.size() - java.util.Collections.max(hourCounts.values());
     }
 
     private Constraint roomCapacityShouldFitGroupSize(ConstraintFactory constraintFactory) {
@@ -678,6 +741,85 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                                 && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
                 .penalize(HardSoftScore.ofSoft(2), (a1, a2) -> availableGapHours(a1, a2))
                 .asConstraint("Minimize teacher idle gaps (availability-aware)");
+    }
+
+    // The school day's earliest possible start hour (matches the earliest
+    // BlockTimeslot start hour, 7:00) - the target preferSemesterOneBlocksStartEarly
+    // penalizes deviation from.
+    private static final int EARLIEST_START_HOUR = 7;
+
+    /** True when this block belongs to a first-semester (semester == 1) course. */
+    private static boolean isSemesterOne(CourseBlockAssignment a) {
+        return a.getCourse() != null && Integer.valueOf(1).equals(a.getCourse().getSemester());
+    }
+
+    /**
+     * SOFT: First-semester groups should start their school day as early as
+     * possible (7:00). Groups the group's unpinned semester-1 blocks per day,
+     * penalizing by how far the EARLIEST one's start hour is from
+     * EARLIEST_START_HOUR - a deviation-from-ideal gradient (like
+     * preferCoreOneHourBlocksAtSameTimeAcrossDays' mode-deviation), not a flat
+     * all-or-nothing penalty, so local search can improve incrementally by
+     * moving the earliest block closer to 7:00.
+     * WEIGHT: 4 (middle priority, slightly above the general-purpose 3 tier).
+     */
+    private Constraint preferSemesterOneBlocksStartEarly(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .filter(a -> !a.isPinned() && a.getGroup() != null && a.getTimeslot() != null && isSemesterOne(a))
+                .groupBy(CourseBlockAssignment::getGroup, a -> a.getTimeslot().getDayOfWeek(),
+                        ConstraintCollectors.toList())
+                .filter((group, day, blocks) -> earliestStartHour(blocks) > EARLIEST_START_HOUR)
+                .penalize(HardSoftScore.ofSoft(4),
+                        (group, day, blocks) -> earliestStartHour(blocks) - EARLIEST_START_HOUR)
+                .asConstraint("Prefer first-semester blocks to start early");
+    }
+
+    /** The earliest start hour among these blocks. */
+    private static int earliestStartHour(java.util.List<CourseBlockAssignment> blocks) {
+        int earliest = Integer.MAX_VALUE;
+        for (CourseBlockAssignment a : blocks) {
+            earliest = Math.min(earliest, a.getTimeslot().getStartHour());
+        }
+        return earliest;
+    }
+
+    /**
+     * SOFT: First-semester groups should run their day gap-free. Same
+     * adjacent-pair-only idle-gap logic as minimizeGroupIdleGaps (now disabled
+     * in favor of this scoped, higher-weighted version), but the *pair* being
+     * penalized is restricted to two semester-1 blocks - both joined streams
+     * are filtered to isSemesterOne() up front, so every penalized pair is
+     * guaranteed semester-1-to-semester-1, with no overlap/double-counting
+     * against any other gap constraint. Adjacency itself, however, still
+     * considers a "mid" block of ANY semester: if a higher-semester block sits
+     * between two semester-1 blocks with no idle time on either side, the
+     * student isn't actually idle then (they're in that other class), so it
+     * must still break adjacency - scoping the mid-check to semester-1 only
+     * would have mistaken "occupied by another course" for "idle" and
+     * inflated the gap across the intervening block's own occupied hours.
+     * WEIGHT: 4 (middle priority, slightly above the general-purpose 3 tier).
+     */
+    private Constraint minimizeSemesterOneGroupIdleGaps(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .filter(SchoolConstraintProvider::isSemesterOne)
+                .join(constraintFactory.forEachIncludingUnassigned(CourseBlockAssignment.class)
+                                .filter(SchoolConstraintProvider::isSemesterOne),
+                        Joiners.lessThan(CourseBlockAssignment::getId),
+                        Joiners.equal(CourseBlockAssignment::getGroup),
+                        Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
+                .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
+                        && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
+                        && gapHours(a1, a2) > 0)
+                // Keep only adjacent pairs: no third block of the same group (any
+                // semester) lies in the [earlierEnd, laterStart] span between a1/a2.
+                .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
+                        Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
+                        Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
+                                && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
+                .penalize(HardSoftScore.ofSoft(4), (a1, a2) -> gapHours(a1, a2))
+                .asConstraint("Minimize first-semester group idle gaps");
     }
 
     private Constraint minimizeGroupIdleGaps(ConstraintFactory constraintFactory) {

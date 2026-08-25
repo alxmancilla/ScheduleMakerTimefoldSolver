@@ -120,6 +120,16 @@ export const updateGroup = (id, group) => api.put(`/groups/${id}`, group);
 export const deleteGroup = (id) => api.delete(`/groups/${id}`);
 export const searchGroups = (query) => api.get(`/groups/search?query=${query}`);
 
+// Group room ranges (a group's curated acceptable rooms per room type,
+// replacing the old single preferredRoomName)
+export const getGroupRoomRanges = (groupId) => api.get(`/groups/${groupId}/room-ranges`);
+export const createGroupRoomRange = (groupId, range) =>
+  api.post(`/groups/${groupId}/room-ranges`, range);
+export const updateGroupRoomRange = (groupId, id, range) =>
+  api.put(`/groups/${groupId}/room-ranges/${id}`, range);
+export const deleteGroupRoomRange = (groupId, id) =>
+  api.delete(`/groups/${groupId}/room-ranges/${id}`);
+
 // Assignments
 export const getAssignments = () => api.get('/assignments');
 export const getAssignment = (id) => api.get(`/assignments/${id}`);

@@ -51,9 +51,12 @@ public class ConstraintConsistencyTest {
                                 "Teacher's required room must be used",
                                 "Group cannot have two courses at same time",
                                 "Maximum blocks per course per group per day",
-                                "Course blocks must be consecutive",
-                                "Teacher must have a break after consecutive hours",
-                                "Group must have a break after consecutive hours"));
+                                "Course blocks must be consecutive"
+                                // "Teacher must have a break after consecutive hours" and
+                                // "Group must have a break after consecutive hours" - both TEMP
+                                // DISABLED 2026-08-24, see SchoolConstraintProvider. Re-add here
+                                // when re-enabled.
+                                ));
 
                 // Assert they match
                 assertEquals("Analyzer reports different HARD constraints than expected",
@@ -80,13 +83,21 @@ public class ConstraintConsistencyTest {
                 // now reported here rather than in the HARD map.
                 Set<String> expectedSoftConstraints = new HashSet<>(Arrays.asList(
                                 "Prefer group's preferred room",
-                                "Minimize teacher building changes",
+                                // "Minimize teacher building changes" - TEMP DISABLED
+                                // 2026-08-24, see SchoolConstraintProvider. Re-add here when
+                                // re-enabled.
                                 "Teacher exceeds max hours per week",
                                 "Minimize teacher idle gaps (availability-aware)",
-                                "Minimize group idle gaps",
+                                // "Minimize group idle gaps" - TEMP DISABLED 2026-08-24, see
+                                // SchoolConstraintProvider (replaced for first-semester groups
+                                // by "Minimize first-semester group idle gaps" below). Re-add
+                                // here when re-enabled.
                                 "Prefer block's specified room",
                                 "Non-standard rooms should finish by 2pm",
-                                "Room capacity should fit group size"));
+                                "Room capacity should fit group size",
+                                "Prefer Core 1h blocks at the same time across days",
+                                "Prefer first-semester blocks to start early",
+                                "Minimize first-semester group idle gaps"));
 
                 // Assert all expected soft constraints are present
                 for (String expected : expectedSoftConstraints) {
@@ -132,13 +143,18 @@ public class ConstraintConsistencyTest {
                 int softCount = BlockScheduleAnalyzer
                                 .analyzeSoftConstraintViolations(dummySchedule).size();
 
-                // Expected counts (as of 2026-08-23: added "Teacher's required room must
-                // be used", HARD)
-                assertEquals("Expected 12 HARD constraints", 12, hardCount);
-                assertEquals("Expected 8 SOFT constraints", 8, softCount);
+                // Expected counts (as of 2026-08-24: "Teacher must have a break after
+                // consecutive hours", "Group must have a break after consecutive hours",
+                // "Minimize teacher building changes", and "Minimize group idle gaps"
+                // all TEMP DISABLED - see SchoolConstraintProvider; "Prefer Core 1h
+                // blocks at the same time across days", "Prefer first-semester blocks
+                // to start early", and "Minimize first-semester group idle gaps" newly
+                // added - was 12 hard / 8 soft / 20 total before)
+                assertEquals("Expected 10 HARD constraints", 10, hardCount);
+                assertEquals("Expected 9 SOFT constraints", 9, softCount);
 
-                // Total should be 20 (12 hard + 8 soft)
-                assertEquals("Total constraint count mismatch", 20, hardCount + softCount);
+                // Total should be 19 (10 hard + 9 soft)
+                assertEquals("Total constraint count mismatch", 19, hardCount + softCount);
         }
 
         /**

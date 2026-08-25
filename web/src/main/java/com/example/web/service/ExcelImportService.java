@@ -338,7 +338,6 @@ public class ExcelImportService {
             String location = "Groups row " + (i + 1);
             String id = stringOf(row.getCell(0));
             String name = stringOf(row.getCell(1));
-            String preferredRoomName = stringOf(row.getCell(2));
 
             if (isBlank(id) || id.length() > 100) {
                 errors.add(location + ": id is required (max 100 characters)");
@@ -347,7 +346,11 @@ public class ExcelImportService {
                 errors.add(location + ": name is required (max 200 characters)");
             }
 
-            rows.add(new GroupRow(id, name, isBlank(preferredRoomName) ? null : preferredRoomName));
+            // preferred_room_name was replaced by group_room_range (a group's
+            // curated acceptable rooms per room type) - not a single flat
+            // column, so it's out of scope for this bulk Excel import;
+            // manage ranges via the Groups UI / /api/groups/{id}/room-ranges.
+            rows.add(new GroupRow(id, name));
         }
         return rows;
     }
@@ -357,13 +360,12 @@ public class ExcelImportService {
             StudentGroupEntity entity = studentGroupRepository.findById(r.id).orElseGet(StudentGroupEntity::new);
             entity.setId(r.id);
             entity.setName(r.name);
-            entity.setPreferredRoomName(r.preferredRoomName);
             studentGroupRepository.save(entity);
         }
         return rows.size();
     }
 
-    private record GroupRow(String id, String name, String preferredRoomName) {
+    private record GroupRow(String id, String name) {
     }
 
     // ---- Group_Courses ----
@@ -420,10 +422,6 @@ public class ExcelImportService {
 
     private void validateCrossReferences(List<RoomRow> roomRows, List<CourseRow> courseRows, List<GroupRow> groupRows,
             Map<String, List<String>> groupCourseRows, List<String> errors) {
-        Set<String> knownRoomNames = new HashSet<>();
-        roomRows.forEach(r -> knownRoomNames.add(r.name));
-        roomRepository.findAll().forEach(r -> knownRoomNames.add(r.getName()));
-
         Set<String> knownCourseNames = new HashSet<>();
         courseRows.forEach(c -> knownCourseNames.add(c.name));
         courseRepository.findAll().forEach(c -> knownCourseNames.add(c.getName()));
@@ -431,13 +429,6 @@ public class ExcelImportService {
         Set<String> knownGroupIds = new HashSet<>();
         groupRows.forEach(g -> knownGroupIds.add(g.id));
         studentGroupRepository.findAll().forEach(g -> knownGroupIds.add(g.getId()));
-
-        for (GroupRow g : groupRows) {
-            if (g.preferredRoomName != null && !knownRoomNames.contains(g.preferredRoomName)) {
-                errors.add("Groups: group '" + g.id + "' preferred_room_name '" + g.preferredRoomName
-                        + "' does not match any room (existing or in this file)");
-            }
-        }
 
         for (Map.Entry<String, List<String>> entry : groupCourseRows.entrySet()) {
             if (!knownGroupIds.contains(entry.getKey())) {

@@ -246,9 +246,12 @@ public class DatabaseToExcelExporter {
         Row header = sheet.createRow(0);
         header.createCell(0).setCellValue("id");
         header.createCell(1).setCellValue("name");
-        header.createCell(2).setCellValue("preferred_room_name");
 
-        String sql = "SELECT id, name, preferred_room_name FROM student_group ORDER BY id";
+        // preferred_room_name was replaced by group_room_range (a group's
+        // curated acceptable rooms per room type) - not a single flat
+        // column, so it's out of scope for this bulk Excel import/export;
+        // manage ranges via the Groups UI / /api/groups/{id}/room-ranges.
+        String sql = "SELECT id, name FROM student_group ORDER BY id";
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
 
@@ -257,12 +260,10 @@ public class DatabaseToExcelExporter {
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(rs.getString("id"));
                 row.createCell(1).setCellValue(rs.getString("name"));
-                String preferredRoom = rs.getString("preferred_room_name");
-                row.createCell(2).setCellValue(preferredRoom != null ? preferredRoom : "");
             }
         }
 
-        autosizeColumns(sheet, 3);
+        autosizeColumns(sheet, 2);
         System.out.println("  ✓ Exported Groups sheet");
     }
 

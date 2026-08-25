@@ -162,11 +162,10 @@ CREATE TABLE course_designation (
     name VARCHAR(20) PRIMARY KEY
 );
 
-COMMENT ON TABLE course_designation IS 'Valid course designation category values (Core, Elective, TEM, TCOM, etc.).';
+COMMENT ON TABLE course_designation IS 'Valid course designation category values: Core, Elective, Dual (part theory/part workshop-lab, via a course_room_requirement dual room requirement), Specialized.';
 
 INSERT INTO course_designation (name) VALUES
-    ('Core'), ('Elective'), ('Digital'), ('Specialized'), ('TCOM'), ('TCSEG'), ('TELE'),
-    ('TEM'), ('TIA'), ('TPIA'), ('TPROG'), ('TRH');
+    ('Core'), ('Elective'), ('Dual'), ('Specialized');
 
 -- ============================================================================
 -- COURSES TABLE
@@ -240,21 +239,17 @@ CREATE INDEX idx_teacher_required_room ON teacher(required_room_name);
 CREATE TABLE student_group (
     id VARCHAR(100) PRIMARY KEY,
     name VARCHAR(200) NOT NULL UNIQUE,
-    preferred_room_name VARCHAR(100),
     student_count INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_student_group_room FOREIGN KEY (preferred_room_name) REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT check_student_group_student_count CHECK (student_count IS NULL OR student_count > 0)
 );
 
 CREATE INDEX idx_student_group_name ON student_group(name);
-CREATE INDEX idx_student_group_preferred_room ON student_group(preferred_room_name);
 
 COMMENT ON TABLE student_group IS 'Student groups that attend courses together';
 COMMENT ON COLUMN student_group.id IS 'Unique group identifier (e.g., 2AARH, 4APIA)';
 COMMENT ON COLUMN student_group.name IS 'Full group name';
-COMMENT ON COLUMN student_group.preferred_room_name IS 'Optional pre-assigned room for this group (soft preference)';
 COMMENT ON COLUMN student_group.student_count IS 'Optional headcount. When set alongside room.capacity, a soft constraint warns if this group is placed in a room too small for it.';
 
 -- ============================================================================
@@ -704,6 +699,35 @@ COMMENT ON TABLE course_room_requirement IS 'Dual room requirements for courses 
 COMMENT ON COLUMN course_room_requirement.priority IS '1=primary requirement, 2=secondary, etc.';
 COMMENT ON COLUMN course_room_requirement.default_preferred_room IS 'Suggested room for this requirement';
 
+-- Group Room Ranges: a group's curated set of acceptable rooms per room
+-- type, replacing a single preferred_room_name. A room type with no rows for
+-- a group is unrestricted (full type-filtered list); one row is structurally
+-- fixed (same as the old single preference); 2+ rows is a narrowed but
+-- movable set. See group_room_range table comment below and
+-- add_group_room_ranges.sql for the migration from the old column.
+CREATE TABLE IF NOT EXISTS group_room_range (
+    id SERIAL PRIMARY KEY,
+    group_id VARCHAR(100) NOT NULL,
+    room_type VARCHAR(50) NOT NULL,
+    room_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_group_room_range_group FOREIGN KEY (group_id)
+        REFERENCES student_group(id) ON DELETE CASCADE,
+    CONSTRAINT fk_group_room_range_type FOREIGN KEY (room_type)
+        REFERENCES room_type(name) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_group_room_range_room FOREIGN KEY (room_name)
+        REFERENCES room(name) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT uq_group_room_range UNIQUE (group_id, room_type, room_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_room_range_group ON group_room_range(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_room_range_type ON group_room_range(room_type);
+
+COMMENT ON TABLE group_room_range IS 'A group''s curated set of acceptable rooms per room type, replacing the old single student_group.preferred_room_name. A room type with no rows for a group is unrestricted (falls through to the full type-filtered list); one row is structurally fixed like the old single preference; 2+ rows is a narrowed but movable set.';
+COMMENT ON COLUMN group_room_range.group_id IS 'The student group this row applies to.';
+COMMENT ON COLUMN group_room_range.room_type IS 'Which room type this acceptable room applies to - matches course_block_assignment.satisfies_room_type.';
+COMMENT ON COLUMN group_room_range.room_name IS 'One room this group may use for blocks requiring room_type.';
+
 -- Table 2: Course Block Templates (custom decomposition)
 -- Allows explicit specification of how a course should be decomposed into blocks
 -- Example: A 6-hour course might be decomposed as 2h + 2h + 2h instead of default 4h + 2h
@@ -908,6 +932,19 @@ CREATE TABLE IF NOT EXISTS schedule_run_result (
 CREATE INDEX IF NOT EXISTS idx_schedule_run_result_assignment ON schedule_run_result(assignment_id);
 CREATE INDEX IF NOT EXISTS idx_schedule_run_created_at ON schedule_run(created_at);
 
+-- Which constraints (by name) were active for a given run - lets score-history
+-- analysis separate normal solver variance from a genuine constraint-set
+-- change between runs. Populated from BlockScheduleAnalyzer's own
+-- active-constraint maps at save time, not a hand-maintained duplicate.
+CREATE TABLE IF NOT EXISTS schedule_run_constraint (
+    schedule_run_id INTEGER NOT NULL REFERENCES schedule_run(id) ON DELETE CASCADE,
+    constraint_name VARCHAR(200) NOT NULL,
+    is_hard BOOLEAN NOT NULL,
+    PRIMARY KEY (schedule_run_id, constraint_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_run_constraint_name ON schedule_run_constraint(constraint_name);
+
 -- Resolves "the current effective schedule" in one place: pinned rows use
 -- their own (input) block_timeslot_id; every other row uses the most recent
 -- schedule_run's result for that assignment. Everything that displays or
@@ -934,6 +971,7 @@ LEFT JOIN (
 
 COMMENT ON TABLE schedule_run IS 'One row per solver run. DataSaver prunes to the most recent 10 after every insert.';
 COMMENT ON TABLE schedule_run_result IS 'One row per assignment per run: the solved (or still-unassigned) timeslot for that run.';
+COMMENT ON TABLE schedule_run_constraint IS 'Which constraints (by name) were active for a given schedule_run - lets score-history analysis separate normal solver variance from a genuine constraint-set change between runs.';
 COMMENT ON VIEW course_block_assignment_current IS 'Resolved "current schedule": pinned rows use their own input timeslot, everything else uses the most recent schedule_run.';
 
 -- ============================================================================

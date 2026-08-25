@@ -193,8 +193,11 @@ public class ExcelExportService {
         Row header = sheet.createRow(0);
         header.createCell(0).setCellValue("id");
         header.createCell(1).setCellValue("name");
-        header.createCell(2).setCellValue("preferred_room_name");
 
+        // preferred_room_name was replaced by group_room_range (a group's
+        // curated acceptable rooms per room type) - not a single flat
+        // column, so it's out of scope for this bulk Excel export; manage
+        // ranges via the Groups UI / /api/groups/{id}/room-ranges.
         List<StudentGroupEntity> groups = studentGroupRepository.findAll().stream()
                 .sorted(Comparator.comparing(StudentGroupEntity::getId))
                 .toList();
@@ -204,10 +207,9 @@ public class ExcelExportService {
             Row row = sheet.createRow(rowNum++);
             row.createCell(0).setCellValue(group.getId());
             row.createCell(1).setCellValue(group.getName());
-            row.createCell(2).setCellValue(group.getPreferredRoomName() != null ? group.getPreferredRoomName() : "");
         }
 
-        autosizeColumns(sheet, 3);
+        autosizeColumns(sheet, 2);
     }
 
     private void exportGroupCourses(XSSFWorkbook wb) {

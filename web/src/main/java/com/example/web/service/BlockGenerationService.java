@@ -13,7 +13,9 @@ import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
 import com.example.web.repository.CourseRepository;
+import com.example.web.entity.GroupRoomRangeEntity;
 import com.example.web.repository.CourseRoomRequirementRepository;
+import com.example.web.repository.GroupRoomRangeRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.StudentGroupRepository;
 import com.example.web.repository.TeacherRepository;
@@ -61,13 +63,15 @@ import java.util.Map;
  *
  * Room defaulting: whenever a generated block would otherwise have no room
  * (no block-template preferredRoomName, no room-requirement
- * defaultPreferredRoom) and the group has a preferredRoomName whose type
- * satisfies the block's satisfiesRoomType - the same Standard/Specialized -
+ * defaultPreferredRoom) and the group's curated room range
+ * (group_room_range) for the block's satisfiesRoomType resolves to exactly
+ * one type-compatible room - the same Standard/Specialized -
  * Workshop/Mixed compatibility convention as engine's
- * Room.satisfiesRequirement() - the
- * group's preferred room is used as roomName directly, since room is never
- * solver-assigned. A group's preferred room never overrides a more specific
- * room already supplied by a template or room requirement.
+ * Room.satisfiesRequirement() - that room is used as roomName directly,
+ * since room is never solver-assigned. A range of 2+ rooms has no single
+ * deterministic choice, so the block is left roomless in that case. A
+ * group's range never overrides a more specific room already supplied by a
+ * template or room requirement.
  *
  * Teacher defaulting: every block generated for a (group, course) pair also
  * gets group_course.default_teacher_id (if set) as its teacher_id, since
@@ -97,6 +101,8 @@ public class BlockGenerationService {
     private RoomRepository roomRepository;
     @Autowired
     private TeacherRepository teacherRepository;
+    @Autowired
+    private GroupRoomRangeRepository groupRoomRangeRepository;
 
     @Transactional
     public GenerationResult generateBlocks() {
@@ -110,6 +116,15 @@ public class BlockGenerationService {
                 if (course == null) {
                     warnings.add("Group '" + group.getId() + "': course '" + groupCourse.getCourseName()
                             + "' not found, skipped");
+                    continue;
+                }
+                if (Boolean.FALSE.equals(course.getActive())) {
+                    // The course was active when this group_course link was created (the API
+                    // rejects adding an inactive one outright) but has since been marked
+                    // inactive - skip rather than generate blocks for a course nobody's
+                    // supposed to be teaching right now.
+                    warnings.add("Group '" + group.getId() + "': course '" + course.getName()
+                            + "' is inactive, skipped");
                     continue;
                 }
                 if (assignmentRepository.existsByGroupIdAndCourseId(group.getId(), course.getId())) {
@@ -242,10 +257,13 @@ public class BlockGenerationService {
     /**
      * The room a generated block should default to, in priority order: the
      * defaultTeacherId's required room (if set and type-compatible - a
-     * teacher's fixed-room requirement overrides the group's preference), then
-     * the group's preferred room (if set and type-compatible). Null if neither
-     * applies, leaving the room for manual assignment instead of an invalid
-     * default.
+     * teacher's fixed-room requirement overrides the group's range), then the
+     * group's curated range for satisfiesRoomType, but only when it resolves
+     * to exactly one type-compatible room - a range of 2+ rooms has no single
+     * deterministic choice to default to, so the block is left roomless for
+     * the solver/manual assignment to pick among them instead. Null if
+     * nothing applies, leaving the room for manual assignment instead of an
+     * invalid default.
      */
     private String defaultRoomFor(StudentGroupEntity group, String satisfiesRoomType, String defaultTeacherId) {
         if (defaultTeacherId != null) {
@@ -254,15 +272,17 @@ public class BlockGenerationService {
                 return teacherRoom;
             }
         }
-        String preferredRoomName = group.getPreferredRoomName();
-        if (preferredRoomName == null) {
+        List<GroupRoomRangeEntity> range = groupRoomRangeRepository.findByGroupIdAndRoomType(group.getId(),
+                satisfiesRoomType);
+        if (range.size() != 1) {
             return null;
         }
-        RoomEntity preferredRoom = roomRepository.findById(preferredRoomName).orElse(null);
-        if (preferredRoom == null || !RoomTypeCompatibility.satisfies(preferredRoom.getType(), satisfiesRoomType)) {
+        String onlyRoomName = range.get(0).getRoomName();
+        RoomEntity onlyRoom = roomRepository.findById(onlyRoomName).orElse(null);
+        if (onlyRoom == null || !RoomTypeCompatibility.satisfies(onlyRoom.getType(), satisfiesRoomType)) {
             return null;
         }
-        return preferredRoomName;
+        return onlyRoomName;
     }
 
     /** A teacher's required room, if set and its type satisfies the requirement - null otherwise. */

@@ -55,6 +55,9 @@ database/migrations/*
 !database/migrations/add_schedule_run_history.sql
 !database/migrations/add_schedule_run_input_snapshot.sql
 !database/migrations/add_pinned_requires_room_check.sql
+!database/migrations/add_dual_designation.sql
+!database/migrations/trim_course_designations_to_four.sql
+!database/migrations/add_group_room_ranges.sql
 md_files/
 
 # Build artifacts

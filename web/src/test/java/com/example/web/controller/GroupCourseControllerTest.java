@@ -1,5 +1,6 @@
 package com.example.web.controller;
 
+import com.example.web.entity.CourseEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.CourseRepository;
@@ -97,13 +98,26 @@ public class GroupCourseControllerTest {
 
     @Test
     public void addCourse_valid_returnsSaved() throws Exception {
-        when(courseRepository.existsByName("Mathematics")).thenReturn(true);
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(new CourseEntity("C1", "Mathematics", "estándar", 4)));
         Map<String, Object> body = Map.of("courseName", "Mathematics");
         mockMvc.perform(post("/api/groups/G1/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.groupId").value("G1"))
                 .andExpect(jsonPath("$.courseName").value("Mathematics"));
         verify(groupRepository).save(group);
+    }
+
+    @Test
+    public void addCourse_inactiveCourse_returns400() throws Exception {
+        CourseEntity inactive = new CourseEntity("C1", "Mathematics", "estándar", 4);
+        inactive.setActive(false);
+        when(courseRepository.findByName("Mathematics")).thenReturn(Optional.of(inactive));
+        Map<String, Object> body = Map.of("courseName", "Mathematics");
+        mockMvc.perform(post("/api/groups/G1/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("inactive")));
+        verify(groupRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -117,7 +131,7 @@ public class GroupCourseControllerTest {
 
     @Test
     public void addCourse_unknownCourse_returns400() throws Exception {
-        when(courseRepository.existsByName("Nonexistent")).thenReturn(false);
+        when(courseRepository.findByName("Nonexistent")).thenReturn(Optional.empty());
         Map<String, Object> body = Map.of("courseName", "Nonexistent");
         mockMvc.perform(post("/api/groups/G1/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isBadRequest())
@@ -128,7 +142,8 @@ public class GroupCourseControllerTest {
     @Test
     public void addCourse_alreadyLinked_returns400() throws Exception {
         group.addCourse("Mathematics");
-        when(courseRepository.existsByName("Mathematics")).thenReturn(true);
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(new CourseEntity("C1", "Mathematics", "estándar", 4)));
         Map<String, Object> body = Map.of("courseName", "Mathematics");
         mockMvc.perform(post("/api/groups/G1/courses").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isBadRequest())

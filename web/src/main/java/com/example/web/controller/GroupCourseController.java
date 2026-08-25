@@ -2,6 +2,7 @@ package com.example.web.controller;
 
 import com.example.web.dto.AddGroupCourseRequest;
 import com.example.web.dto.SetGroupCourseTeacherRequest;
+import com.example.web.entity.CourseEntity;
 import com.example.web.entity.GroupCourseEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
@@ -55,8 +56,10 @@ public class GroupCourseController {
     public GroupCourseEntity addCourse(@PathVariable String groupId, @Valid @RequestBody AddGroupCourseRequest request) {
         StudentGroupEntity group = requireGroup(groupId);
         String courseName = request.getCourseName();
-        if (!courseRepository.existsByName(courseName)) {
-            throw new IllegalArgumentException("Course '" + courseName + "' does not exist");
+        CourseEntity course = courseRepository.findByName(courseName)
+                .orElseThrow(() -> new IllegalArgumentException("Course '" + courseName + "' does not exist"));
+        if (Boolean.FALSE.equals(course.getActive())) {
+            throw new IllegalArgumentException("Course '" + courseName + "' is inactive and cannot be added to a group");
         }
         boolean alreadyLinked = group.getCourses().stream().anyMatch(gc -> gc.getCourseName().equals(courseName));
         if (alreadyLinked) {

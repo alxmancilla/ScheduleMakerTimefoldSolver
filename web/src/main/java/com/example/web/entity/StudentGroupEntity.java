@@ -17,9 +17,6 @@ public class StudentGroupEntity {
     @Column(name = "name", length = 200, nullable = false, unique = true)
     private String name;
 
-    @Column(name = "preferred_room_name", length = 100)
-    private String preferredRoomName;
-
     @Column(name = "student_count")
     private Integer studentCount;
 
@@ -68,14 +65,6 @@ public class StudentGroupEntity {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getPreferredRoomName() {
-        return preferredRoomName;
-    }
-
-    public void setPreferredRoomName(String preferredRoomName) {
-        this.preferredRoomName = preferredRoomName;
     }
 
     public Integer getStudentCount() {

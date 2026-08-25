@@ -57,7 +57,6 @@ public class ExcelImportServiceTest {
         when(studentGroupRepository.findById(org.mockito.ArgumentMatchers.anyString())).thenReturn(Optional.empty());
         when(studentGroupRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(studentGroupRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(roomRepository.findAll()).thenReturn(List.of());
         when(courseRepository.findAll()).thenReturn(List.of());
         when(studentGroupRepository.findAll()).thenReturn(List.of());
     }

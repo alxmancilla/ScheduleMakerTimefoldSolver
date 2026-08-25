@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   getAssignments, createAssignment, updateAssignment, deleteAssignment,
-  getGroups, getCourses, getTeachers, getRooms, listTimeslots,
+  getGroups, getCourses, getTeachers, getRooms, listTimeslots, getGroupRoomRanges,
 } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
@@ -308,17 +308,26 @@ function Assignments() {
                 onChange={(e) => {
                   const newGroupId = e.target.value;
                   setGroupId(newGroupId);
-                  // Suggest the group's own preferred room, but only when the field is still
-                  // empty (never clobber a value the user or the loaded assignment already
-                  // set) and only when it actually matches Satisfies Room Type if that's
-                  // already set - e.g. don't suggest a group's regular classroom onto a block
-                  // that's already marked as requiring a mixto room.
-                  if (!preferredRoomHint) {
-                    const group = groups.find((g) => g.id === newGroupId);
-                    const candidateRoom = rooms.find((r) => r.name === group?.preferredRoomName);
-                    if (group?.preferredRoomName && roomMatchesType(candidateRoom, satisfiesRoomType)) {
-                      setPreferredRoomHint(group.preferredRoomName);
-                    }
+                  // Suggest a room from the group's own curated range for the
+                  // current Satisfies Room Type, but only when the field is
+                  // still empty (never clobber a value the user or the loaded
+                  // assignment already set), only when Satisfies Room Type is
+                  // already chosen (ranges are keyed by room type, so there's
+                  // no type-agnostic range to fall back to), and only when
+                  // that range resolves to exactly one room - the same "only
+                  // auto-pick when unambiguous" rule the backend applies to
+                  // this same range.
+                  if (!preferredRoomHint && newGroupId && satisfiesRoomType) {
+                    getGroupRoomRanges(newGroupId)
+                      .then((response) => {
+                        const matching = response.data.filter((r) => r.roomType === satisfiesRoomType);
+                        if (matching.length === 1) {
+                          setPreferredRoomHint(matching[0].roomName);
+                        }
+                      })
+                      .catch(() => {
+                        // Non-critical: the preferred-room suggestion just won't populate.
+                      });
                   }
                   // Course is scoped to this group's own courses below - clear it (and the
                   // Teacher that depends on it) instead of silently keeping a course the new

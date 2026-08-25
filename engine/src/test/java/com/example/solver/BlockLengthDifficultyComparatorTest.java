@@ -11,6 +11,8 @@ import org.junit.Test;
 import java.time.DayOfWeek;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertTrue;
@@ -38,9 +40,18 @@ public class BlockLengthDifficultyComparatorTest {
         return new Teacher(id, "Test", "Teacher", new HashSet<>(), availability, 40);
     }
 
+    /** A group whose only curated range is "Standard" -> the given room. */
+    private static Group groupWithStandardRange(String id, String name, Room room) {
+        return new Group(id, name, new HashSet<>(), Map.of("Standard", List.of(room)), null);
+    }
+
     private CourseBlockAssignment block(String id, Group group, Teacher teacher, int blockLength) {
         CourseBlockAssignment a = new CourseBlockAssignment(id, group, COURSE, blockLength);
         a.setTeacher(teacher);
+        // These tests are all Standard-room scenarios - set consistently so
+        // a group's type-keyed curated range (see groupWithStandardRange())
+        // is actually looked up under the same key it was stored with.
+        a.setSatisfiesRoomType("Standard");
         return a;
     }
 
@@ -48,7 +59,7 @@ public class BlockLengthDifficultyComparatorTest {
     public void roomFixedByGroupPreference_sortsBeforeRoomMovable_sameTeacherAndLength() {
         Teacher t = teacher("T1", 20);
         Room preferred = new Room("AULA 1", "A", "Standard");
-        Group fixedGroup = new Group("G1", "Fixed Group", new HashSet<>(), preferred, null);
+        Group fixedGroup = groupWithStandardRange("G1", "Fixed Group", preferred);
         Group movableGroup = new Group("G2", "Movable Group", new HashSet<>());
 
         CourseBlockAssignment fixed = block("a1", fixedGroup, t, 2);
@@ -79,7 +90,7 @@ public class BlockLengthDifficultyComparatorTest {
         Teacher scarce = teacher("SCARCE", 5);
         Teacher plentiful = teacher("PLENTIFUL", 30);
         Room preferred = new Room("AULA 1", "A", "Standard");
-        Group fixedGroup = new Group("G1", "Fixed Group", new HashSet<>(), preferred, null);
+        Group fixedGroup = groupWithStandardRange("G1", "Fixed Group", preferred);
         Group movableGroup = new Group("G2", "Movable Group", new HashSet<>());
 
         CourseBlockAssignment scarceMovable = block("a1", movableGroup, scarce, 1);

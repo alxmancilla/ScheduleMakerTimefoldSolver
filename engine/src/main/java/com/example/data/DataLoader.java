@@ -209,33 +209,63 @@ public class DataLoader {
     }
 
     /**
+     * Load every group's curated acceptable-room ranges from
+     * group_room_range, resolved against the already-loaded room pool and
+     * grouped as group_id -> room_type -> that type's list of Room objects.
+     * A group/room-type pair with no rows here is absent from the returned
+     * map entirely (not an empty list) - Group.getAcceptableRooms() then
+     * returns null for it, which CourseBlockAssignment.getMatchingRooms()
+     * treats as "unrestricted, fall through to the full type-filtered list."
+     */
+    private Map<String, Map<String, List<Room>>> loadGroupRoomRanges(Connection conn, List<Room> rooms)
+            throws SQLException {
+        Map<String, Room> roomsByName = new HashMap<>();
+        for (Room room : rooms) {
+            roomsByName.put(room.getName(), room);
+        }
+
+        Map<String, Map<String, List<Room>>> result = new HashMap<>();
+        String sql = "SELECT group_id, room_type, room_name FROM group_room_range ORDER BY group_id, room_type";
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String groupId = rs.getString("group_id");
+                String roomType = rs.getString("room_type");
+                Room room = roomsByName.get(rs.getString("room_name"));
+                if (room == null) {
+                    continue; // dangling room reference - skip rather than fail the whole load
+                }
+                result.computeIfAbsent(groupId, k -> new HashMap<>())
+                        .computeIfAbsent(roomType, k -> new ArrayList<>())
+                        .add(room);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Load all student groups with their courses.
      */
     private List<Group> loadGroups(Connection conn, List<Room> rooms) throws SQLException {
         Map<String, Group> groupMap = new HashMap<>();
 
+        // Load each group's curated acceptable-room ranges, keyed by (group,
+        // room type), before building the Group objects themselves - see
+        // loadGroupRoomRanges().
+        Map<String, Map<String, List<Room>>> roomRangesByGroup = loadGroupRoomRanges(conn, rooms);
+
         // Load basic group info
-        String sql = "SELECT id, name, preferred_room_name, student_count FROM student_group";
+        String sql = "SELECT id, name, student_count FROM student_group";
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
                 String id = rs.getString("id");
                 String name = rs.getString("name");
-                String preferredRoomName = rs.getString("preferred_room_name");
                 Integer studentCount = rs.getObject("student_count", Integer.class);
 
-                // Find preferred room
-                Room preferredRoom = null;
-                if (preferredRoomName != null) {
-                    preferredRoom = rooms.stream()
-                            .filter(r -> r.getName().equals(preferredRoomName))
-                            .findFirst()
-                            .orElse(null);
-                }
-
                 // Create group with empty course set (will be populated below)
-                Group group = new Group(id, name, new HashSet<>(), preferredRoom, studentCount);
+                Group group = new Group(id, name, new HashSet<>(), roomRangesByGroup.get(id), studentCount);
                 groupMap.put(id, group);
             }
         }
@@ -559,6 +589,20 @@ public class DataLoader {
                 boolean pinned = rs.getBoolean("pinned");
                 assignment.setPinned(pinned);
 
+                // NEW: Load room requirement fields - must happen BEFORE the
+                // isRoomFixed()/getMatchingRooms() correction below, since both
+                // now factor satisfiesRoomType into whether a teacher's/group's
+                // fixed room actually applies (see CourseBlockAssignment).
+                String satisfiesRoomType = rs.getString("satisfies_room_type");
+                if (satisfiesRoomType != null && !satisfiesRoomType.isEmpty()) {
+                    assignment.setSatisfiesRoomType(satisfiesRoomType);
+                }
+
+                String preferredRoomHint = rs.getString("preferred_room_hint");
+                if (preferredRoomHint != null && !preferredRoomHint.isEmpty()) {
+                    assignment.setPreferredRoomHint(preferredRoomHint);
+                }
+
                 // A non-pinned "room-fixed" block's room must always match its
                 // group's preferred room / teacher's required room, not whatever
                 // room_name happens to be sitting on this row - that value can be
@@ -570,30 +614,16 @@ public class DataLoader {
                 // rows are deliberately left alone here - see
                 // teacherRequiredRoomMustBeUsed, which reports this as a hard
                 // violation instead of silently rewriting locked-in data.
+                //
+                // Delegates to getMatchingRooms() itself (a singleton for a
+                // genuinely fixed block, empty for a dangling required-room
+                // reference) rather than re-deriving the teacher-then-group
+                // priority here, so this stays in lockstep with its
+                // compatibility-fallback logic instead of a second copy that
+                // could drift out of sync.
                 if (!pinned && assignment.isRoomFixed()) {
-                    // Teacher's required room takes precedence over the group's
-                    // preferred room - matches getMatchingRooms()'s own priority.
-                    if (assignment.getTeacher() != null && assignment.getTeacher().getRequiredRoomName() != null) {
-                        String requiredRoomName = assignment.getTeacher().getRequiredRoomName();
-                        Room requiredRoom = rooms.stream()
-                                .filter(r -> r.getName().equals(requiredRoomName))
-                                .findFirst()
-                                .orElse(null);
-                        assignment.setRoom(requiredRoom);
-                    } else if (group.getPreferredRoom() != null) {
-                        assignment.setRoom(group.getPreferredRoom());
-                    }
-                }
-
-                // NEW: Load room requirement fields
-                String satisfiesRoomType = rs.getString("satisfies_room_type");
-                if (satisfiesRoomType != null && !satisfiesRoomType.isEmpty()) {
-                    assignment.setSatisfiesRoomType(satisfiesRoomType);
-                }
-
-                String preferredRoomHint = rs.getString("preferred_room_hint");
-                if (preferredRoomHint != null && !preferredRoomHint.isEmpty()) {
-                    assignment.setPreferredRoomHint(preferredRoomHint);
+                    List<Room> matchingRooms = assignment.getMatchingRooms();
+                    assignment.setRoom(matchingRooms.size() == 1 ? matchingRooms.get(0) : null);
                 }
 
                 if (assignment.isPinned()) {

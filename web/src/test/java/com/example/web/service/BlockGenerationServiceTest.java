@@ -5,6 +5,7 @@ import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.CourseBlockTemplateEntity;
 import com.example.web.entity.CourseEntity;
 import com.example.web.entity.CourseRoomRequirementEntity;
+import com.example.web.entity.GroupRoomRangeEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
@@ -13,6 +14,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.CourseRoomRequirementRepository;
+import com.example.web.repository.GroupRoomRangeRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.StudentGroupRepository;
 import com.example.web.repository.TeacherRepository;
@@ -55,6 +57,8 @@ public class BlockGenerationServiceTest {
     private RoomRepository roomRepository;
     @Mock
     private TeacherRepository teacherRepository;
+    @Mock
+    private GroupRoomRangeRepository groupRoomRangeRepository;
 
     @InjectMocks
     private BlockGenerationService service;
@@ -71,6 +75,7 @@ public class BlockGenerationServiceTest {
                 .thenReturn(Optional.of(new ComponentBlockRuleEntity("BASICAS", 1, 1)));
         when(roomRepository.findById(anyString())).thenReturn(Optional.empty());
         when(teacherRepository.findById(anyString())).thenReturn(Optional.empty());
+        when(groupRoomRangeRepository.findByGroupIdAndRoomType(anyString(), anyString())).thenReturn(List.of());
     }
 
     private CourseEntity course(String id, String name, int hours, String designation, String roomReq) {
@@ -155,13 +160,14 @@ public class BlockGenerationServiceTest {
     @Test
     public void groupWithCompatiblePreferredRoom_defaultsGeneratedBlocksToIt() {
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
-        group.setPreferredRoomName("ROOM1");
         group.addCourse("Mathematics");
         when(studentGroupRepository.findAll()).thenReturn(List.of(group));
         when(courseRepository.findByName("Mathematics"))
                 .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
         when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
         when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        when(groupRoomRangeRepository.findByGroupIdAndRoomType("G1", "estándar"))
+                .thenReturn(List.of(new GroupRoomRangeEntity("G1", "estándar", "ROOM1")));
 
         service.generateBlocks();
 
@@ -194,15 +200,15 @@ public class BlockGenerationServiceTest {
     @Test
     public void defaultTeacherRequiredRoom_takesPrecedenceOverGroupPreferredRoom() {
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
-        group.setPreferredRoomName("GROUPROOM");
         group.addCourse("Mathematics");
         group.getCourses().stream().findFirst().orElseThrow().setDefaultTeacherId("T1");
         when(studentGroupRepository.findAll()).thenReturn(List.of(group));
         when(courseRepository.findByName("Mathematics"))
                 .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
         when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
-        // No stub for GROUPROOM: the teacher's required room short-circuits before
-        // defaultRoomFor ever falls back to checking the group's preferred room.
+        // No stub for the group's own range lookup: the teacher's required room
+        // short-circuits before defaultRoomFor ever falls back to checking the
+        // group's range (default stub in setUp() returns empty either way).
         TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
         teacher.setRequiredRoomName("TEACHERROOM");
         when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
@@ -220,15 +226,17 @@ public class BlockGenerationServiceTest {
 
     @Test
     public void groupWithIncompatiblePreferredRoom_leavesRoomUnset() {
-        // A mixto-required block can't default to a plain estándar room.
+        // A mixto-required block can't default to a plain estándar room, even
+        // if (a data error) it's curated under the group's "mixto" range.
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
-        group.setPreferredRoomName("ROOM1");
         group.addCourse("Chemistry");
         when(studentGroupRepository.findAll()).thenReturn(List.of(group));
         when(courseRepository.findByName("Chemistry"))
                 .thenReturn(Optional.of(course("C4", "Chemistry", 2, "BASICAS", "mixto")));
         when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C4")).thenReturn(false);
         when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        when(groupRoomRangeRepository.findByGroupIdAndRoomType("G1", "mixto"))
+                .thenReturn(List.of(new GroupRoomRangeEntity("G1", "mixto", "ROOM1")));
 
         service.generateBlocks();
 
@@ -242,7 +250,6 @@ public class BlockGenerationServiceTest {
     @Test
     public void roomRequirementDefaultPreferredRoom_takesPrecedenceOverGroupPreference() {
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
-        group.setPreferredRoomName("ROOM1");
         group.addCourse("Computing");
         when(studentGroupRepository.findAll()).thenReturn(List.of(group));
         when(courseRepository.findByName("Computing"))
@@ -250,8 +257,9 @@ public class BlockGenerationServiceTest {
         when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C5")).thenReturn(false);
         when(roomRequirementRepository.findByCourseIdOrderByPriority("C5")).thenReturn(List.of(
                 new CourseRoomRequirementEntity("C5", "estándar", 2, 1, "CC1")));
-        // No roomRepository stub needed: the requirement's own defaultPreferredRoom
-        // ("CC1") short-circuits defaultRoomFor() before it would look up ROOM1.
+        // No stub for the group's own range lookup needed: the requirement's
+        // own defaultPreferredRoom ("CC1") short-circuits defaultRoomFor()
+        // before it would look up the group's range.
 
         service.generateBlocks();
 
@@ -275,6 +283,23 @@ public class BlockGenerationServiceTest {
         assertEquals(0, result.getBlocksCreated());
         assertEquals(1, result.getGroupCoursesSkippedExisting());
         verify(assignmentRepository, never()).save(any());
+    }
+
+    @Test
+    public void groupCourseReferencingInactiveCourse_addsWarningAndSkips() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Retired Course");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        CourseEntity inactive = course("C1", "Retired Course", 4, "BASICAS", "estándar");
+        inactive.setActive(false);
+        when(courseRepository.findByName("Retired Course")).thenReturn(Optional.of(inactive));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(0, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("inactive"));
+        verify(assignmentRepository, never()).existsByGroupIdAndCourseId(anyString(), anyString());
     }
 
     @Test

@@ -257,6 +257,22 @@ decomposition, optionally scoped to one group:
 | `DELETE .../courses/{courseName}` | Remove |
 | `PUT .../courses/{courseName}/default-teacher` | Pre-assign (or clear, with `{teacherId: null}`) a teacher for this pairing before blocks exist — validated against that teacher's qualifications, then applied automatically to every block `POST /admin/blocks/generate` creates for it; has no effect once blocks already exist |
 
+**Group Room Ranges** (`/api/groups/{groupId}/room-ranges`) — a group's curated acceptable
+rooms per room type, replacing the old single `preferred_room_name`; a type with no rows is
+unrestricted, one row fixes the group to that single room, 2+ rows lets the solver pick freely
+among them:
+| Method & Path | Description |
+|---|---|
+| `GET .../room-ranges` | List for a group |
+| `POST .../room-ranges` | Create `{roomType, roomName}` |
+| `PUT .../room-ranges/{id}` | Update |
+| `DELETE .../room-ranges/{id}` | Delete |
+
+Setting/changing/removing a range row also **backfills every existing non-pinned block already
+assigned to that group** whose `satisfiesRoomType` matches, but only when that type's range
+resolves to exactly one room — a range of 2+ rooms has no single deterministic choice, so those
+blocks are left for the next solve to decide among the (now on-disk) narrowed range instead.
+
 ### Assignments (`/api/assignments`)
 | Method & Path | Description |
 |---|---|
@@ -275,7 +291,7 @@ decomposition, optionally scoped to one group:
 `POST`/`PUT` apply one override automatically: if the submitted `teacherId` resolves to a
 teacher with a `requiredRoomName` whose type fits this block's `satisfiesRoomType`, `roomName`
 is forced to it regardless of what was submitted — matching "this teacher always uses this
-room" even if a different room (e.g. the group's preferred one) was sent in the request body.
+room" even if a different room (e.g. one from the group's curated range) was sent in the request body.
 
 ### Schedule (`/api/schedule`)
 | Method & Path | Role | Description |

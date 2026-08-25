@@ -71,7 +71,7 @@ README).
 
 #### Teachers
 - Qualifications, per-day availability, `maxHoursPerWeek`, an optional required-room override
-  (this teacher's blocks always use it, ahead of the group's preferred room, when the room
+  (this teacher's blocks always use it, ahead of the group's curated room range, when the room
   type fits), and a live workload column (assigned hours vs. weekly max, computed client-side)
 
 #### Courses
@@ -86,10 +86,12 @@ README).
   room-capacity-vs-group-size constraint)
 
 #### Student Groups
-- Preferred room, optional `studentCount`, and a Group-Courses card managing which courses
-  each group takes — each course row flags when no teacher is qualified for it, and lets you
-  pick a teacher directly: pre-assigned before blocks exist (applied automatically the next
-  time blocks are generated), or applied straight to a course's existing blocks once they do
+- Optional `studentCount`, a **Room Ranges** card curating which rooms this group may use per
+  room type (a type with no rows is unrestricted; one row fixes the group to that single room;
+  2+ rows lets the solver pick freely among them), and a Group-Courses card managing which
+  courses each group takes — each course row flags when no teacher is qualified for it, and
+  lets you pick a teacher directly: pre-assigned before blocks exist (applied automatically the
+  next time blocks are generated), or applied straight to a course's existing blocks once they do
 
 #### Course Block Assignments
 - Group, course, block length, teacher, timeslot, room, pinned status; filter by All /

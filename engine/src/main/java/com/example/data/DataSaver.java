@@ -57,9 +57,16 @@ public class DataSaver {
      *                                     (see SchoolSolverConfig.Built) - never null in practice,
      *                                     since solverConfig.xml always defines one.
      * @param unimprovedMinutesSpentLimit the effective give-up-if-stuck budget used for this run
+     * @param activeHardConstraintNames   the HARD constraint names active for this solve - typically
+     *                                     {@code BlockScheduleAnalyzer.analyzeHardConstraintViolations(schedule).keySet()},
+     *                                     already computed by the caller for reporting, so this is
+     *                                     the same ground truth rather than a second, hand-maintained
+     *                                     list that could drift out of sync with SchoolConstraintProvider
+     * @param activeSoftConstraintNames   the SOFT constraint names active for this solve, same source
      * @throws SQLException if database access fails
      */
-    public void saveSchedule(SchoolSchedule schedule, Long minutesSpentLimit, Long unimprovedMinutesSpentLimit)
+    public void saveSchedule(SchoolSchedule schedule, Long minutesSpentLimit, Long unimprovedMinutesSpentLimit,
+            Set<String> activeHardConstraintNames, Set<String> activeSoftConstraintNames)
             throws SQLException {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             conn.setAutoCommit(false); // Start transaction
@@ -67,6 +74,7 @@ public class DataSaver {
                 int runId = insertScheduleRun(conn, schedule.getScore(), minutesSpentLimit,
                         unimprovedMinutesSpentLimit);
                 insertScheduleRunResults(conn, runId, schedule.getCourseBlockAssignments());
+                insertScheduleRunConstraints(conn, runId, activeHardConstraintNames, activeSoftConstraintNames);
                 pruneOldRuns(conn);
                 conn.commit();
                 System.out.println("✓ Schedule run #" + runId + " saved (keeping the most recent "
@@ -132,6 +140,31 @@ public class DataSaver {
         System.out.println("  Recorded " + assignments.size() + " assignment results for run #" + runId);
         if (unassignedCount > 0) {
             System.out.println("  ⚠ Warning: " + unassignedCount + " assignments remain unassigned");
+        }
+    }
+
+    /**
+     * Records which constraints were active for this run, so a later
+     * comparison across runs' scores can tell a genuine constraint-set
+     * change apart from ordinary solver-run variance.
+     */
+    private void insertScheduleRunConstraints(Connection conn, int runId, Set<String> hardNames,
+            Set<String> softNames) throws SQLException {
+        String sql = "INSERT INTO schedule_run_constraint (schedule_run_id, constraint_name, is_hard) VALUES (?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            for (String name : hardNames) {
+                stmt.setInt(1, runId);
+                stmt.setString(2, name);
+                stmt.setBoolean(3, true);
+                stmt.addBatch();
+            }
+            for (String name : softNames) {
+                stmt.setInt(1, runId);
+                stmt.setString(2, name);
+                stmt.setBoolean(3, false);
+                stmt.addBatch();
+            }
+            stmt.executeBatch();
         }
     }
 

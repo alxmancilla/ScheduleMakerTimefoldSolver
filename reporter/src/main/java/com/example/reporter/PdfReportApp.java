@@ -1,5 +1,6 @@
 package com.example.reporter;
 
+import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import com.example.analysis.BlockScheduleAnalyzer;
 import com.example.data.DataLoader;
 import com.example.domain.SchoolSchedule;
@@ -56,8 +57,17 @@ public class PdfReportApp {
 
         // When solved (schedule_run.created_at) the run backing this report's content
         // actually is - reportRunId if one was explicitly requested, otherwise the
-        // same latest run DataLoader just resolved above.
-        LocalDateTime scheduleRunTimestamp = loadScheduleRunTimestamp(jdbcUrl, username, password, reportRunId);
+        // same latest run DataLoader just resolved above. Also carries that run's
+        // persisted score: DataLoader only loads placements, never solves, so
+        // schedule.getScore() (Timefold's @PlanningScore field) is always null on a
+        // schedule reconstructed this way - schedule_run.hard_score/soft_score is
+        // the only place the actual score still exists once the solver process that
+        // produced it has exited.
+        ScheduleRunMetadata runMetadata = loadScheduleRunMetadata(jdbcUrl, username, password, reportRunId);
+        LocalDateTime scheduleRunTimestamp = runMetadata != null ? runMetadata.createdAt() : null;
+        if (runMetadata != null) {
+            schedule.setScore(runMetadata.score());
+        }
 
         // Report chrome language ("es" or anything else -> "en"); unset defaults to
         // English, same as before this existed. This only covers PdfReporter's own
@@ -138,15 +148,23 @@ public class PdfReportApp {
         return null;
     }
 
+    /** The timestamp and persisted score of the schedule_run backing this report's content. */
+    private record ScheduleRunMetadata(LocalDateTime createdAt, HardSoftScore score) {
+    }
+
     /**
      * When the schedule_run backing this report's content was actually solved -
      * that specific run if scheduleRunId is non-null, otherwise the latest run
-     * (same COALESCE-to-MAX(id) resolution DataLoader's default path uses).
-     * Null if no schedule_run exists yet or the lookup fails.
+     * (same COALESCE-to-MAX(id) resolution DataLoader's default path uses) -
+     * plus that run's persisted hard_score/soft_score, since a schedule
+     * reconstructed by DataLoader never goes through the solver and so never
+     * gets its @PlanningScore field populated any other way. Null if no
+     * schedule_run exists yet or the lookup fails.
      */
-    private static LocalDateTime loadScheduleRunTimestamp(String jdbcUrl, String username, String password,
+    private static ScheduleRunMetadata loadScheduleRunMetadata(String jdbcUrl, String username, String password,
             Integer scheduleRunId) {
-        String sql = "SELECT created_at FROM schedule_run WHERE id = COALESCE(?, (SELECT MAX(id) FROM schedule_run))";
+        String sql = "SELECT created_at, hard_score, soft_score FROM schedule_run "
+                + "WHERE id = COALESCE(?, (SELECT MAX(id) FROM schedule_run))";
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password);
                 PreparedStatement stmt = conn.prepareStatement(sql)) {
             if (scheduleRunId != null) {
@@ -157,12 +175,14 @@ public class PdfReportApp {
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     Timestamp ts = rs.getTimestamp("created_at");
-                    return ts != null ? ts.toLocalDateTime() : null;
+                    LocalDateTime createdAt = ts != null ? ts.toLocalDateTime() : null;
+                    HardSoftScore score = HardSoftScore.of(rs.getInt("hard_score"), rs.getInt("soft_score"));
+                    return new ScheduleRunMetadata(createdAt, score);
                 }
             }
         } catch (Exception e) {
             System.out.println(
-                    "Note: could not load the schedule run timestamp for the report cover page: " + e.getMessage());
+                    "Note: could not load the schedule run metadata for the report cover page: " + e.getMessage());
         }
         return null;
     }

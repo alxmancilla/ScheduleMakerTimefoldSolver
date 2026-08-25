@@ -2,7 +2,7 @@
 
 A Java 17 application that places pre-assigned teacher/course blocks into weekly timeslots using **Timefold Solver 1.29.0**. Each `CourseBlockAssignment` arrives with its teacher and course already assigned; the solver always solves the block's `timeslot`, and also solves its `room` for the handful of blocks nobody has already assigned one to. It optimizes timeslot (and, where needed, room) placement while respecting hard constraints and soft preferences.
 
-> **Scope note:** Teacher is **not** a planning variable — it's a fixed input pre-assigned from the database (the `teacher` `@PlanningVariable` annotation is intentionally commented out). `room` **is** a planning variable, but its value range collapses to a singleton for any block whose group has a preferred room or whose teacher has a required room, so those stay effectively fixed too — only genuinely roomless blocks are freely solved. This is primarily a **timeslot optimizer** over pre-assigned teacher blocks, with room assignment layered on for the cases nobody's decided yet — not a full teacher/room scheduler.
+> **Scope note:** Teacher is **not** a planning variable — it's a fixed input pre-assigned from the database (the `teacher` `@PlanningVariable` annotation is intentionally commented out). `room` **is** a planning variable, but its value range collapses to a singleton for any block whose group has a single-room curated range for that block's room type, or whose teacher has a compatible required room, so those stay effectively fixed too — a group range with 2+ rooms narrows the value range without fixing it, and only genuinely roomless blocks (or a group range with no rows for that type) are freely solved across every matching room. This is primarily a **timeslot optimizer** over pre-assigned teacher blocks, with room assignment layered on for the cases nobody's decided yet — not a full teacher/room scheduler.
 
 > **Schedule run history:** `course_block_assignment` is pure input — the solver never writes to it. Each solve inserts a `schedule_run` (score + timestamp) and one `schedule_run_result` row per assignment, then prunes to the most recent 10 runs. Anything showing "the current schedule" reads through the `course_block_assignment_current` view (pinned rows resolve to their own input timeslot; everything else resolves to the latest run), which also gives the solver warm-starting for free.
 
@@ -53,8 +53,11 @@ Block Rules (`component_block_rule`), defaulting to 2h — or, per course/group,
 Since teacher and room aren't solver-assigned, `BlockGenerationService` ("Generate Blocks")
 pre-fills them wherever a more specific override doesn't already provide one: a block's room
 defaults first to a teacher's `required_room_name` (if that teacher is already pre-assigned to
-the block, and their required room's type fits), then to the group's `preferred_room_name` —
-each gated by room-type compatibility so a bad default is never applied. A teacher can be
+the block, and their required room's type fits), then to the group's curated `group_room_range`
+for that block's room type, but only when it resolves to exactly one compatible room (a range of
+2+ rooms has no single deterministic default, so the block is left roomless for the solver/manual
+assignment instead) — each gated by room-type compatibility so a bad default is never applied. A
+teacher can be
 pre-assigned to a (group, course) pairing before any blocks exist via `group_course.
 default_teacher_id`, applied automatically the next time blocks are generated. Assigning a
 teacher afterward (Groups tab, Assignments tab, or the API) also re-applies their required room
@@ -70,7 +73,8 @@ Calendar, but that data doesn't gate block generation or the solver yet — see
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (12 hard, 8 soft).
+test run (12 hard defined / 10 active, 11 soft defined / 9 active - the ones
+marked TEMP DISABLED below are currently switched off by request).
 
 #### Hard Constraints (must be satisfied)
 1. **Block Length Must Match Timeslot Length**
@@ -83,18 +87,21 @@ test run (12 hard, 8 soft).
 8. **Group Cannot Have Two Courses at Same Time**
 9. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
 10. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
-11. **Teacher Must Have a Break After Consecutive Hours** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
-12. **Group Must Have a Break After Consecutive Hours** — same rule, for student groups
+11. ~~**Teacher Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
+12. ~~**Group Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — same rule, for student groups
 
 #### Soft Constraints (weighted quality preferences)
 1. **Non-Standard Rooms Should Finish by 2pm** (weight 10) — labs/workshops/computer centers
 2. **Teacher Exceeds Max Hours Per Week** (weight 5)
 3. **Room Capacity Should Fit Group Size** (weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
-4. **Minimize Group Idle Gaps** (weight 3/hour, adjacent-pair only)
-5. **Prefer Block's Specified Room** (weight 3) — `preferred_room_hint`
-6. **Minimize Teacher Idle Gaps** (weight 2/hour, availability-aware, adjacent-pair only)
-7. **Prefer Group's Preferred Room** (weight 2) — excludes `Mixed`-required blocks
-8. **Minimize Teacher Building Changes** (weight 1)
+4. **Prefer First-Semester Blocks to Start Early** (weight 4) — a group's earliest unpinned `course.semester == 1` block each day should start at 7:00; penalty is the deviation in hours
+5. **Minimize First-Semester Group Idle Gaps** (weight 4/hour, adjacent-pair only) — same logic as #6 below, but only counts a gap when both framing blocks are semester-1 (a higher-semester block in between still correctly breaks adjacency)
+6. ~~**Minimize Group Idle Gaps**~~ (weight 3/hour, adjacent-pair only) — **TEMP DISABLED**, replaced for first-semester groups by #5 above
+7. **Prefer Block's Specified Room** (weight 3) — `preferred_room_hint`
+8. **Minimize Teacher Idle Gaps** (weight 2/hour, availability-aware, adjacent-pair only)
+9. **Prefer Group's Preferred Room** (weight 2) — a room from the group's curated `group_room_range` for the block's room type
+10. ~~**Minimize Teacher Building Changes**~~ (weight 1) — **TEMP DISABLED** (not required anymore)
+11. **Prefer Core 1h Blocks at the Same Time Across Days** (weight 2) — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
 
 ## Features
 
@@ -103,7 +110,7 @@ test run (12 hard, 8 soft).
 - Dual room requirements (a course can split its hours across multiple room types) and custom per-course/per-group block templates — both database-driven and web-UI-manageable
 - Per-component block-sizing and max-blocks-per-day rules (`component_block_rule`), configurable from Settings → Block Rules instead of hardcoded
 - Hard rest-period rule: a teacher or group can't be scheduled into more than 4 unbroken hours without a gap
-- Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's preferred room are applied automatically wherever a more specific override doesn't already provide one
+- Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's curated room range (per room type, `group_room_range`) are applied automatically wherever a more specific override doesn't already provide one and the choice is unambiguous
 - Optional room-capacity awareness (`room.capacity` vs. `student_group.student_count`)
 - 4 room types: Standard, Mixed (doubles as Standard or Specialized - Workshop), Specialized - Workshop, Specialized - Computer Lab
 - PostgreSQL-backed: schema, reporting views, and data loading scripts

@@ -139,7 +139,6 @@ public class ExcelExportServiceTest {
         when(courseRepository.findAll()).thenReturn(List.of(course));
 
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
-        group.setPreferredRoomName("R1");
         group.addCourse("Math");
         when(studentGroupRepository.findAll()).thenReturn(List.of(group));
 
@@ -160,7 +159,6 @@ public class ExcelExportServiceTest {
         when(importCourseRepo.findAll()).thenReturn(List.of());
         when(importRoomRepo.findById("R1")).thenReturn(Optional.empty());
         when(importRoomRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
-        when(importRoomRepo.findAll()).thenReturn(List.of());
         when(importGroupRepo.findById("G1")).thenReturn(Optional.of(group));
         when(importGroupRepo.saveAndFlush(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
         when(importGroupRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));

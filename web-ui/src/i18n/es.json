@@ -252,14 +252,34 @@
     "fields": {
       "id": "ID:",
       "name": "Nombre:",
-      "preferredRoom": "Aula Preferida (opcional):",
       "studentCount": "Número de Alumnos (opcional):"
     },
     "table": {
       "id": "ID",
       "name": "Nombre",
-      "preferredRoom": "Aula Preferida",
       "studentCount": "Alumnos"
+    },
+    "roomRanges": {
+      "title": "Rango de Aulas",
+      "description": "Qué aulas puede usar este grupo, por tipo de aula - por ejemplo, un conjunto de aulas equivalentes para cursos Core. Un tipo de aula sin filas aquí no tiene restricción (puede usarse cualquier aula de ese tipo). Una fila significa que el grupo queda fijo a esa única aula; dos o más filas significa que el solver puede elegir libremente entre ellas.",
+      "addRange": "+ Agregar Aula",
+      "editRange": "Editar Rango de Aula",
+      "newRange": "Nuevo Rango de Aula",
+      "loadFailedPrefix": "Error al cargar los rangos de aulas de este grupo: ",
+      "saveFailedPrefix": "Error al guardar el rango de aula: ",
+      "deleteFailedPrefix": "Error al eliminar el rango de aula: ",
+      "confirmDelete": "¿Quitar esta aula del rango del grupo?",
+      "fields": {
+        "roomType": "Tipo de Aula:",
+        "roomName": "Aula:"
+      },
+      "table": {
+        "roomType": "Tipo de Aula",
+        "roomName": "Aula"
+      },
+      "none": "Este grupo aún no tiene rangos de aulas configurados - puede usarse cualquier aula del tipo correspondiente.",
+      "savedMessage": "Rango de aula guardado",
+      "deletedMessage": "Rango de aula eliminado"
     },
     "courses": {
       "title": "Cursos",
