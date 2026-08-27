@@ -95,7 +95,9 @@ public class ConstraintConsistencyTest {
                                 "Prefer block's specified room",
                                 "Non-standard rooms should finish by 2pm",
                                 "Room capacity should fit group size",
-                                "Prefer Core 1h blocks at the same time across days",
+                                // "Prefer Core 1h blocks at the same time across days" - TEMP
+                                // DISABLED 2026-08-26, see SchoolConstraintProvider. Re-add
+                                // here when re-enabled.
                                 "Prefer first-semester blocks to start early",
                                 "Minimize first-semester group idle gaps"));
 
@@ -149,12 +151,15 @@ public class ConstraintConsistencyTest {
                 // all TEMP DISABLED - see SchoolConstraintProvider; "Prefer Core 1h
                 // blocks at the same time across days", "Prefer first-semester blocks
                 // to start early", and "Minimize first-semester group idle gaps" newly
-                // added - was 12 hard / 8 soft / 20 total before)
+                // added - was 12 hard / 8 soft / 20 total before. As of 2026-08-26:
+                // "Prefer Core 1h blocks at the same time across days" also TEMP
+                // DISABLED - see SchoolConstraintProvider - was 10 hard / 9 soft / 19
+                // total before)
                 assertEquals("Expected 10 HARD constraints", 10, hardCount);
-                assertEquals("Expected 9 SOFT constraints", 9, softCount);
+                assertEquals("Expected 8 SOFT constraints", 8, softCount);
 
-                // Total should be 19 (10 hard + 9 soft)
-                assertEquals("Total constraint count mismatch", 19, hardCount + softCount);
+                // Total should be 18 (10 hard + 8 soft)
+                assertEquals("Total constraint count mismatch", 18, hardCount + softCount);
         }
 
         /**

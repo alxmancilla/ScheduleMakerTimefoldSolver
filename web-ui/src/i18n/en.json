@@ -80,7 +80,7 @@
       "availability": "Availability:"
     },
     "requiredRoomHint": "If set, this teacher is always placed in this room, overriding the group's preferred room, whenever a block's room type allows it.",
-    "qualificationsPlaceholder": "Type at least 2 letters to search courses, or add a course and press Enter",
+    "qualificationsPlaceholder": "Type at least 2 letters to search courses, then select one to add",
     "add": "Add",
     "noQualifications": "No courses added",
     "checkAll": "Check All",

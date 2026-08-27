@@ -4,6 +4,7 @@ import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,6 +63,9 @@ public class TeacherControllerTest {
 
     @MockBean
     private RoomRepository roomRepository;
+
+    @MockBean
+    private CourseRepository courseRepository;
 
     private TeacherEntity teacher;
 
@@ -189,6 +193,30 @@ public class TeacherControllerTest {
         mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    public void createTeacher_knownQualification_returnsSaved() throws Exception {
+        when(teacherRepository.existsById("T1")).thenReturn(false);
+        when(courseRepository.existsByName("Mathematics")).thenReturn(true);
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        Map<String, Object> body = validPayload();
+        body.put("qualifications", List.of("Mathematics"));
+        mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+        verify(teacherRepository).save(any(TeacherEntity.class));
+    }
+
+    @Test
+    public void createTeacher_unknownQualification_returns400() throws Exception {
+        when(teacherRepository.existsById("T1")).thenReturn(false);
+        when(courseRepository.existsByName("Not A Real Course")).thenReturn(false);
+        Map<String, Object> body = validPayload();
+        body.put("qualifications", List.of("Not A Real Course"));
+        mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Not A Real Course")));
+        verify(teacherRepository, never()).save(any(TeacherEntity.class));
     }
 
     // ---- PUT (update) ----

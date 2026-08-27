@@ -16,6 +16,11 @@ import java.util.*;
  * the most common ("mode") start hour, not a flat all-or-nothing penalty.
  * Exercised via {@link BlockScheduleAnalyzer}, which independently mirrors
  * {@link SchoolConstraintProvider}'s rule.
+ *
+ * TEMP DISABLED 2026-08-26 (per request) - see SchoolConstraintProvider and
+ * BlockScheduleAnalyzer. The constraint no longer reports a value, so every
+ * case below now asserts 0 via getOrDefault; re-enable by reverting those
+ * assertions to their commented expected values below.
  */
 public class CoreOneHourSameTimeConstraintTest {
 
@@ -30,15 +35,17 @@ public class CoreOneHourSameTimeConstraintTest {
     @Test
     public void oneOutlierIsAViolationOfOne() {
         // Mode is 8 (count 2), one block at 9 deviates.
+        // TEMP DISABLED 2026-08-26: expected 1 when enabled.
         int[] starts = { 8, 8, 9 };
-        assertEquals(1, violations(starts, "Core", 1, false));
+        assertEquals(0, violations(starts, "Core", 1, false));
     }
 
     @Test
     public void allDifferentHoursIsAViolationOfSizeMinusOne() {
         // No repeated hour: mode count is 1, so penalty = size - 1.
+        // TEMP DISABLED 2026-08-26: expected 2 when enabled.
         int[] starts = { 7, 8, 9 };
-        assertEquals(2, violations(starts, "Core", 1, false));
+        assertEquals(0, violations(starts, "Core", 1, false));
     }
 
     @Test

@@ -712,7 +712,8 @@ public final class BlockScheduleAnalyzer {
                 coreSameTimeViolations += blocks.size() - modeCount;
             }
         }
-        result.put("Prefer Core 1h blocks at the same time across days", coreSameTimeViolations);
+        // TEMP DISABLED 2026-08-26 (mirrors SchoolConstraintProvider - re-enable both together)
+        // result.put("Prefer Core 1h blocks at the same time across days", coreSameTimeViolations);
 
         // Room capacity should fit group size (SOFT, weight 4) - only applies when
         // both room.capacity and group.studentCount are known; mirrors

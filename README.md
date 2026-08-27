@@ -73,7 +73,7 @@ Calendar, but that data doesn't gate block generation or the solver yet — see
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (12 hard defined / 10 active, 11 soft defined / 9 active - the ones
+test run (12 hard defined / 10 active, 11 soft defined / 8 active - the ones
 marked TEMP DISABLED below are currently switched off by request).
 
 #### Hard Constraints (must be satisfied)
@@ -92,16 +92,16 @@ marked TEMP DISABLED below are currently switched off by request).
 
 #### Soft Constraints (weighted quality preferences)
 1. **Non-Standard Rooms Should Finish by 2pm** (weight 10) — labs/workshops/computer centers
-2. **Teacher Exceeds Max Hours Per Week** (weight 5)
-3. **Room Capacity Should Fit Group Size** (weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
-4. **Prefer First-Semester Blocks to Start Early** (weight 4) — a group's earliest unpinned `course.semester == 1` block each day should start at 7:00; penalty is the deviation in hours
-5. **Minimize First-Semester Group Idle Gaps** (weight 4/hour, adjacent-pair only) — same logic as #6 below, but only counts a gap when both framing blocks are semester-1 (a higher-semester block in between still correctly breaks adjacency)
-6. ~~**Minimize Group Idle Gaps**~~ (weight 3/hour, adjacent-pair only) — **TEMP DISABLED**, replaced for first-semester groups by #5 above
+2. **Prefer First-Semester Blocks to Start Early** (weight 6) — a group's earliest unpinned `course.semester == 1` block each day should start at 7:00; penalty is the deviation in hours. Raised from weight 4 on 2026-08-26 to outweigh teacher-workload balancing.
+3. **Minimize First-Semester Group Idle Gaps** (weight 6/hour, adjacent-pair only) — same logic as #6 below, but only counts a gap when both framing blocks are semester-1 (a higher-semester block in between still correctly breaks adjacency). Raised from weight 4 on 2026-08-26.
+4. **Teacher Exceeds Max Hours Per Week** (weight 5)
+5. **Room Capacity Should Fit Group Size** (weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
+6. ~~**Minimize Group Idle Gaps**~~ (weight 3/hour, adjacent-pair only) — **TEMP DISABLED**, replaced for first-semester groups by #3 above
 7. **Prefer Block's Specified Room** (weight 3) — `preferred_room_hint`
 8. **Minimize Teacher Idle Gaps** (weight 2/hour, availability-aware, adjacent-pair only)
 9. **Prefer Group's Preferred Room** (weight 2) — a room from the group's curated `group_room_range` for the block's room type
 10. ~~**Minimize Teacher Building Changes**~~ (weight 1) — **TEMP DISABLED** (not required anymore)
-11. **Prefer Core 1h Blocks at the Same Time Across Days** (weight 2) — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
+11. ~~**Prefer Core 1h Blocks at the Same Time Across Days**~~ (weight 2) — **TEMP DISABLED** — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
 
 ## Features
 

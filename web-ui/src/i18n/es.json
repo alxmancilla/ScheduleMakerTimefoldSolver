@@ -80,7 +80,7 @@
       "availability": "Disponibilidad:"
     },
     "requiredRoomHint": "Si se define, este maestro siempre se coloca en este salón, sin importar el salón preferido del grupo, siempre que el tipo de salón del bloque lo permita.",
-    "qualificationsPlaceholder": "Escriba al menos 2 letras para buscar cursos, o agregue un curso y presione Enter",
+    "qualificationsPlaceholder": "Escriba al menos 2 letras para buscar cursos y seleccione uno para agregarlo",
     "add": "Agregar",
     "noQualifications": "No se han agregado cursos",
     "checkAll": "Marcar Todo",

@@ -2,6 +2,7 @@ package com.example.web.security;
 
 import com.example.web.controller.TeacherController;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +57,11 @@ public class WebSecurityAuthorizationTest {
 
     @MockBean
     private RoomRepository roomRepository;
+
+    // Required by TeacherController's constructor (qualification validation
+    // against existing course names).
+    @MockBean
+    private CourseRepository courseRepository;
 
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean

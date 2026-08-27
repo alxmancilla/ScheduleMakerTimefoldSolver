@@ -77,12 +77,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // readability only.
                 nonStandardRoomsShouldFinishBy2pm(constraintFactory), // SOFT (weight 10): Prefer non-standard rooms to
                                                                       // finish by 2pm
+                preferSemesterOneBlocksStartEarly(constraintFactory), // SOFT (weight 6): first-semester groups start
+                                                                       // their day as early as possible
+                minimizeSemesterOneGroupIdleGaps(constraintFactory), // SOFT (weight 6): first-semester groups run
+                                                                      // gap-free
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
                 roomCapacityShouldFitGroupSize(constraintFactory), // SOFT (weight 4): group shouldn't exceed room capacity
-                preferSemesterOneBlocksStartEarly(constraintFactory), // SOFT (weight 4): first-semester groups start
-                                                                       // their day as early as possible
-                minimizeSemesterOneGroupIdleGaps(constraintFactory), // SOFT (weight 4): first-semester groups run
-                                                                      // gap-free
                 // TEMP DISABLED 2026-08-24 (per request - replaced for first-semester groups
                 // by minimizeSemesterOneGroupIdleGaps above; other groups' idle gaps are no
                 // longer minimized at all) - re-enable by uncommenting, along with its
@@ -93,8 +93,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                                                              // distribution)
                 minimizeTeacherIdleGaps(constraintFactory), // SOFT (weight 2): teacher satisfaction
                 groupPreferredRoomConstraint(constraintFactory), // SOFT (weight 2): prefer group's pre-assigned room
-                preferCoreOneHourBlocksAtSameTimeAcrossDays(constraintFactory), // SOFT (weight 2): predictable "Math
-                                                                                // is always at 8am" schedule
+                // TEMP DISABLED 2026-08-26 (per request) - re-enable by uncommenting, along
+                // with its BlockScheduleAnalyzer mirror and ConstraintConsistencyTest's
+                // expected soft constraints/counts.
+                // preferCoreOneHourBlocksAtSameTimeAcrossDays(constraintFactory), // SOFT
+                // (weight 2): predictable "Math is always at 8am" schedule
                 // TEMP DISABLED 2026-08-24 (per request - not required anymore) - re-enable
                 // by uncommenting, along with its BlockScheduleAnalyzer mirror and
                 // ConstraintConsistencyTest's expected soft constraints/counts.
@@ -770,7 +773,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .groupBy(CourseBlockAssignment::getGroup, a -> a.getTimeslot().getDayOfWeek(),
                         ConstraintCollectors.toList())
                 .filter((group, day, blocks) -> earliestStartHour(blocks) > EARLIEST_START_HOUR)
-                .penalize(HardSoftScore.ofSoft(4),
+                .penalize(HardSoftScore.ofSoft(6),
                         (group, day, blocks) -> earliestStartHour(blocks) - EARLIEST_START_HOUR)
                 .asConstraint("Prefer first-semester blocks to start early");
     }
@@ -818,7 +821,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(4), (a1, a2) -> gapHours(a1, a2))
+                .penalize(HardSoftScore.ofSoft(6), (a1, a2) -> gapHours(a1, a2))
                 .asConstraint("Minimize first-semester group idle gaps");
     }
 

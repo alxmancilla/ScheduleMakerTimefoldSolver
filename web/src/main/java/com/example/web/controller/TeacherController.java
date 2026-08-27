@@ -7,6 +7,7 @@ import com.example.web.entity.TeacherEntity;
 import com.example.web.entity.TeacherQualificationEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.common.RoomTypeCompatibility;
@@ -28,12 +29,15 @@ public class TeacherController {
     private final TeacherRepository teacherRepository;
     private final CourseBlockAssignmentRepository assignmentRepository;
     private final RoomRepository roomRepository;
+    private final CourseRepository courseRepository;
 
     public TeacherController(TeacherRepository teacherRepository,
-            CourseBlockAssignmentRepository assignmentRepository, RoomRepository roomRepository) {
+            CourseBlockAssignmentRepository assignmentRepository, RoomRepository roomRepository,
+            CourseRepository courseRepository) {
         this.teacherRepository = teacherRepository;
         this.assignmentRepository = assignmentRepository;
         this.roomRepository = roomRepository;
+        this.courseRepository = courseRepository;
     }
 
     @GetMapping
@@ -125,6 +129,12 @@ public class TeacherController {
      * keeps existing matches, removes obsolete rows (orphanRemoval) and adds new
      * ones. The managed collection is mutated in place so Hibernate can track it.
      * A null request collection means "leave unchanged".
+     *
+     * Each qualification must name a real course (active or not - a teacher can
+     * stay qualified for a currently-inactive course). teacherMustBeQualified
+     * matches a qualification against course.getName() by exact string equality,
+     * so an unvalidated typo would previously be accepted but silently never
+     * match anything.
      */
     private void applyQualifications(TeacherEntity teacher, Set<String> requested) {
         if (requested == null) {
@@ -134,6 +144,15 @@ public class TeacherController {
                 .filter(qualification -> qualification != null && !qualification.isBlank())
                 .map(String::trim)
                 .collect(Collectors.toSet());
+
+        List<String> unknown = desired.stream()
+                .filter(qualification -> !courseRepository.existsByName(qualification))
+                .sorted()
+                .toList();
+        if (!unknown.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Qualification(s) do not match any existing course: " + String.join(", ", unknown));
+        }
 
         teacher.getQualifications().removeIf(existing -> !desired.contains(existing.getQualification()));
 

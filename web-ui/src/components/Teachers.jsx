@@ -118,7 +118,7 @@ function Teachers() {
 
   const addQualification = (rawValue) => {
     const value = (rawValue ?? qualInput).trim();
-    if (value && !qualifications.includes(value)) {
+    if (value && courseNames.includes(value) && !qualifications.includes(value)) {
       setQualifications([...qualifications, value]);
     }
     setQualInput('');
