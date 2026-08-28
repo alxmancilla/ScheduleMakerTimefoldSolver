@@ -73,7 +73,7 @@ Calendar, but that data doesn't gate block generation or the solver yet — see
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (12 hard defined / 10 active, 11 soft defined / 8 active - the ones
+test run (13 hard defined / 11 active, 11 soft defined / 8 active - the ones
 marked TEMP DISABLED below are currently switched off by request).
 
 #### Hard Constraints (must be satisfied)
@@ -84,11 +84,12 @@ marked TEMP DISABLED below are currently switched off by request).
 5. **No Room Double-Booking**
 6. **Room Type Must Satisfy Course Requirement** — uses `assignment.satisfiesRoomType`, not `course.roomRequirement` (dual room requirement support)
 7. **Teacher's Required Room Must Be Used** — a block's room must match its teacher's `requiredRoomName` when one is set; not excluded for pinned blocks (a data-integrity check, since a non-pinned block's room is already structurally guaranteed correct)
-8. **Group Cannot Have Two Courses at Same Time**
-9. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
-10. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
-11. ~~**Teacher Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
-12. ~~**Group Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — same rule, for student groups
+8. **First-Semester Blocks Must Finish by 2pm** — a `course.semester == 1` block may never be assigned a timeslot ending after 14:00; not excluded for pinned blocks (same data-integrity precedent as #7 above). A hard guarantee, not a soft preference, since the school's weekly capacity comfortably covers every first-semester group's hours within 7:00-14:00.
+9. **Group Cannot Have Two Courses at Same Time**
+10. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
+11. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
+12. ~~**Teacher Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
+13. ~~**Group Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — same rule, for student groups
 
 #### Soft Constraints (weighted quality preferences)
 1. **Non-Standard Rooms Should Finish by 2pm** (weight 10) — labs/workshops/computer centers

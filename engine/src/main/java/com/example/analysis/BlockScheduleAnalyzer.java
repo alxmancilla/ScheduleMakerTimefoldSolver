@@ -32,9 +32,12 @@ public final class BlockScheduleAnalyzer {
     // Mirrors SchoolConstraintProvider.EARLIEST_START_HOUR.
     private static final int EARLIEST_START_HOUR = 7;
 
+    // Mirrors SchoolConstraintProvider.SEMESTER_ONE_LATEST_END_HOUR.
+    private static final int SEMESTER_ONE_LATEST_END_HOUR = 14;
+
     /** True when this block belongs to a first-semester (semester == 1) course. */
     private static boolean isSemesterOneBlock(CourseBlockAssignment a) {
-        return a.getCourse() != null && Integer.valueOf(1).equals(a.getCourse().getSemester());
+        return a.isSemesterOne();
     }
 
     /**
@@ -172,6 +175,22 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
+
+        // First-semester blocks must finish by 2pm - NOT excluded for pinned
+        // assignments (mirrors SchoolConstraintProvider.semesterOneBlocksMustFinishBy2pm:
+        // a non-pinned first-semester block can never be assigned a timeslot
+        // ending after 14:00 in the first place - CourseBlockAssignment.
+        // getMatchingBlockTimeslots() excludes it from the value range - so
+        // this only ever fires for a pinned row whose timeslot predates the
+        // rule).
+        int semesterOneFinishBy2pmViolations = 0;
+        for (CourseBlockAssignment a : list) {
+            if (isSemesterOneBlock(a) && a.getTimeslot() != null
+                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR) {
+                semesterOneFinishBy2pmViolations++;
+            }
+        }
+        result.put("First-semester blocks must finish by 2pm", semesterOneFinishBy2pmViolations);
 
         // Group cannot have two courses at same time (blocks overlap)
         int groupConflict = 0;
@@ -408,6 +427,17 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
+
+        // First-semester blocks must finish by 2pm - NOT excluded for pinned
+        // assignments, see the count version above for why.
+        List<String> semesterOneFinishBy2pm = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (isSemesterOneBlock(a) && a.getTimeslot() != null
+                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR) {
+                semesterOneFinishBy2pm.add(blockAssignmentToString(a));
+            }
+        }
+        details.put("First-semester blocks must finish by 2pm", semesterOneFinishBy2pm);
 
         // Group cannot have two courses at same time
         List<String> groupConflict = new ArrayList<>();

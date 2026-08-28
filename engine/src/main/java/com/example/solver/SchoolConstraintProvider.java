@@ -51,6 +51,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
                 teacherRequiredRoomMustBeUsed(constraintFactory), // #3b: Pinned blocks only - see method doc
+                semesterOneBlocksMustFinishBy2pm(constraintFactory), // #3c: Pinned blocks only - see method doc
 
                 // ========== High-Selectivity HARD Pair Constraints ==========
                 // Optimized with Joiners (very few pairs evaluated) - the pruning here
@@ -292,6 +293,27 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Teacher's required room must be used");
+    }
+
+    /**
+     * HARD, data-integrity constraint (like blockLengthMustMatchTimeslotLength
+     * and teacherRequiredRoomMustBeUsed): NOT excluded for pinned assignments,
+     * because pinned rows are exactly the case this exists to catch. A
+     * non-pinned first-semester block can never be assigned a timeslot ending
+     * after 14:00 in the first place -
+     * CourseBlockAssignment.getMatchingBlockTimeslots() excludes any such
+     * timeslot from its entity-scoped value range - so this can only ever
+     * fire for a pinned row whose timeslot predates this rule (or was pinned
+     * before its course's semester was set to 1).
+     */
+    private Constraint semesterOneBlocksMustFinishBy2pm(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .filter(a -> a.isSemesterOne() && a.getTimeslot() != null
+                        && a.getTimeslot().getStartHour()
+                                + a.getTimeslot().getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR)
+                .penalize(HardSoftScore.ONE_HARD)
+                .asConstraint("First-semester blocks must finish by 2pm");
     }
 
     private Constraint groupCannotHaveTwoCoursesAtSameTime(ConstraintFactory constraintFactory) {
@@ -751,9 +773,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     // penalizes deviation from.
     private static final int EARLIEST_START_HOUR = 7;
 
+    // Mirrors CourseBlockAssignment.SEMESTER_ONE_LATEST_END_HOUR - see
+    // semesterOneBlocksMustFinishBy2pm below for why this is a HARD guarantee
+    // rather than a soft preference like EARLIEST_START_HOUR above.
+    private static final int SEMESTER_ONE_LATEST_END_HOUR = 14;
+
     /** True when this block belongs to a first-semester (semester == 1) course. */
     private static boolean isSemesterOne(CourseBlockAssignment a) {
-        return a.getCourse() != null && Integer.valueOf(1).equals(a.getCourse().getSemester());
+        return a.isSemesterOne();
     }
 
     /**

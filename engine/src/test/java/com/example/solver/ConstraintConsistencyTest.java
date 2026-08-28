@@ -49,6 +49,7 @@ public class ConstraintConsistencyTest {
                                 "No room double-booking",
                                 "Room type must satisfy course requirement",
                                 "Teacher's required room must be used",
+                                "First-semester blocks must finish by 2pm",
                                 "Group cannot have two courses at same time",
                                 "Maximum blocks per course per group per day",
                                 "Course blocks must be consecutive"
@@ -154,12 +155,13 @@ public class ConstraintConsistencyTest {
                 // added - was 12 hard / 8 soft / 20 total before. As of 2026-08-26:
                 // "Prefer Core 1h blocks at the same time across days" also TEMP
                 // DISABLED - see SchoolConstraintProvider - was 10 hard / 9 soft / 19
-                // total before)
-                assertEquals("Expected 10 HARD constraints", 10, hardCount);
+                // total before. Also as of 2026-08-27: added "First-semester blocks
+                // must finish by 2pm" (HARD) - was 10 hard / 8 soft / 18 total before)
+                assertEquals("Expected 11 HARD constraints", 11, hardCount);
                 assertEquals("Expected 8 SOFT constraints", 8, softCount);
 
-                // Total should be 18 (10 hard + 8 soft)
-                assertEquals("Total constraint count mismatch", 18, hardCount + softCount);
+                // Total should be 19 (11 hard + 8 soft)
+                assertEquals("Total constraint count mismatch", 19, hardCount + softCount);
         }
 
         /**
