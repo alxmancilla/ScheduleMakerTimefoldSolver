@@ -8,6 +8,7 @@ import Courses from './components/Courses';
 import Rooms from './components/Rooms';
 import Groups from './components/Groups';
 import Assignments from './components/Assignments';
+import CourseCoverage from './components/CourseCoverage';
 import Reports from './components/Reports';
 import ImportExcel from './components/Import';
 import Settings from './components/Settings';
@@ -32,10 +33,11 @@ const ADMIN_ITEMS = [
   { path: '/settings', labelKey: 'nav.settings' },
   { path: '/users', labelKey: 'nav.users' },
 ];
-// Reports is READER+ (no gate); Import is WRITER+ (writeOnly) - filtered per
-// role before rendering, unlike SETUP_ITEMS/ADMIN_ITEMS which are uniform.
+// Reports/Course Coverage are READER+ (no gate); Import is WRITER+ (writeOnly) -
+// filtered per role before rendering, unlike SETUP_ITEMS/ADMIN_ITEMS which are uniform.
 const TOOLS_ITEMS = [
   { path: '/reports', labelKey: 'nav.reports' },
+  { path: '/course-coverage', labelKey: 'nav.courseCoverage' },
   { path: '/import', labelKey: 'nav.import', writeOnly: true },
 ];
 
@@ -318,6 +320,7 @@ function App() {
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/course-coverage" element={<CourseCoverage />} />
             <Route element={<WriteRoute />}>
               <Route path="/import" element={<ImportExcel />} />
             </Route>

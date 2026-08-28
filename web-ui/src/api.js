@@ -212,6 +212,10 @@ export const exportExcel = (entities) =>
     params: entities && entities.length ? { entities: entities.join(',') } : undefined,
   });
 
+// Course coverage dashboard (v_group_course_teachers) - read-only, any role
+// that can view domain data (READER/WRITER/ADMIN, not TEACHER).
+export const getCourseCoverage = () => api.get('/course-coverage');
+
 // Admin: whole-database export/import (scripts/db-export.sh, scripts/db-import.sh
 // run server-side; import restores from a file already listed by
 // listDatabaseBackups(), not a browser upload - see DatabaseBackupController's

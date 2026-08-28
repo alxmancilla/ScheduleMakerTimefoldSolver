@@ -42,6 +42,7 @@
     "assignments": "Assignments",
     "tools": "Tools",
     "reports": "Reports",
+    "courseCoverage": "Course Coverage",
     "import": "Import / Export",
     "admin": "Admin",
     "settings": "Settings",
@@ -375,6 +376,31 @@
     "satisfiesRoomTypeHint": "Defaults to the selected course's room requirement, if it has one; pick a different type to override.",
     "courseFilteredHint": "Showing only courses the selected group takes.",
     "teacherFilteredHint": "Showing only teachers qualified for the selected course."
+  },
+  "courseCoverage": {
+    "title": "Course Coverage",
+    "description": "For every group/course pair, how many hours are actually scheduled against how many are required. Complete = fully scheduled, Partial = some hours scheduled, Not Scheduled = no blocks generated yet.",
+    "loading": "Loading course coverage...",
+    "loadFailedPrefix": "Failed to load course coverage: ",
+    "searchPlaceholder": "Search by group, course, or teacher...",
+    "showing": "Showing {{filtered}} of {{total}} pairs",
+    "none": "No matching pairs",
+    "noTeacher": "No teacher assigned",
+    "filters": {
+      "all": "All",
+      "complete": "Complete",
+      "partial": "Partial",
+      "notScheduled": "Not Scheduled"
+    },
+    "table": {
+      "group": "Group",
+      "course": "Course",
+      "requiredHours": "Required Hrs",
+      "scheduledHours": "Scheduled Hrs",
+      "status": "Status",
+      "teacher": "Teacher",
+      "rooms": "Rooms"
+    }
   },
   "reports": {
     "title": "Reports",

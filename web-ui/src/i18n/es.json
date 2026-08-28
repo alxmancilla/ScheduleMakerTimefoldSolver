@@ -42,6 +42,7 @@
     "assignments": "Asignaciones",
     "tools": "Herramientas",
     "reports": "Reportes",
+    "courseCoverage": "Cobertura de Cursos",
     "import": "Importar / Exportar",
     "admin": "Administración",
     "settings": "Configuración",
@@ -375,6 +376,31 @@
     "satisfiesRoomTypeHint": "Por defecto usa el requisito de aula del curso seleccionado, si tiene uno; elija otro tipo para anularlo.",
     "courseFilteredHint": "Mostrando solo las materias que cursa el grupo seleccionado.",
     "teacherFilteredHint": "Mostrando solo maestros calificados para la materia seleccionada."
+  },
+  "courseCoverage": {
+    "title": "Cobertura de Cursos",
+    "description": "Para cada par grupo/materia, cuántas horas están realmente programadas contra cuántas se requieren. Completo = totalmente programado, Parcial = algunas horas programadas, Sin Programar = aún no se han generado bloques.",
+    "loading": "Cargando cobertura de cursos...",
+    "loadFailedPrefix": "Error al cargar la cobertura de cursos: ",
+    "searchPlaceholder": "Buscar por grupo, materia o maestro...",
+    "showing": "Mostrando {{filtered}} de {{total}} pares",
+    "none": "No hay pares que coincidan",
+    "noTeacher": "Sin maestro asignado",
+    "filters": {
+      "all": "Todos",
+      "complete": "Completo",
+      "partial": "Parcial",
+      "notScheduled": "Sin Programar"
+    },
+    "table": {
+      "group": "Grupo",
+      "course": "Materia",
+      "requiredHours": "Hrs. Requeridas",
+      "scheduledHours": "Hrs. Programadas",
+      "status": "Estado",
+      "teacher": "Maestro",
+      "rooms": "Aulas"
+    }
   },
   "reports": {
     "title": "Reportes",
