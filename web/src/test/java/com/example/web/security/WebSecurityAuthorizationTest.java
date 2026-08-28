@@ -5,6 +5,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
+import com.example.web.repository.TeacherWorkloadRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,6 +63,10 @@ public class WebSecurityAuthorizationTest {
     // against existing course names).
     @MockBean
     private CourseRepository courseRepository;
+
+    // Required by TeacherController's constructor (GET /api/teachers/workload).
+    @MockBean
+    private TeacherWorkloadRepository teacherWorkloadRepository;
 
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean

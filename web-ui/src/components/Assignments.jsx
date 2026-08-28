@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   getAssignments, createAssignment, updateAssignment, deleteAssignment,
   getGroups, getCourses, getTeachers, getRooms, listTimeslots, getGroupRoomRanges,
+  exportAssignments, importAssignments,
 } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
@@ -42,6 +43,14 @@ function Assignments() {
   const [roomName, setRoomName] = useState('');
   const [satisfiesRoomType, setSatisfiesRoomType] = useState('');
   const [preferredRoomHint, setPreferredRoomHint] = useState('');
+
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState(null);
+  const importFileInputRef = useRef(null);
 
   // Mirrors Room.satisfiesRequirement() (engine domain model): a room satisfies a
   // requirement of its own type, and a Mixed room additionally satisfies Standard
@@ -119,6 +128,55 @@ function Assignments() {
       setTimeslots(timeslotsRes.data);
     } catch (err) {
       // Non-critical: the dropdowns just won't have options.
+    }
+  };
+
+  const handleExportAssignments = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const response = await exportAssignments();
+      const blobUrl = URL.createObjectURL(new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }));
+      const disposition = response.headers['content-disposition'];
+      const match = disposition && disposition.match(/filename="(.+)"/);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = match ? match[1] : 'assignments-export.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch (err) {
+      setExportError(err.response?.data?.message || t('assignments.exportFailedPrefix') + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImportAssignments = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportError(null);
+    setImportResult(null);
+    try {
+      const response = await importAssignments(importFile);
+      setImportResult(response.data);
+      if (response.data.success) {
+        loadAssignments();
+      }
+    } catch (err) {
+      const data = err.response?.data;
+      if (data && typeof data.success === 'boolean') {
+        setImportResult(data);
+      } else {
+        setImportError(data?.message || t('assignments.importFailedPrefix') + err.message);
+      }
+    } finally {
+      setImporting(false);
+      setImportFile(null);
+      if (importFileInputRef.current) importFileInputRef.current.value = '';
     }
   };
 
@@ -291,6 +349,54 @@ function Assignments() {
         <p style={{ marginTop: '10px', color: 'var(--color-text-secondary)' }}>
           {t('assignments.showing', { filtered: filteredAssignments.length, total: assignments.length })}
         </p>
+      </div>
+
+      <div className="card">
+        <h3>{t('assignments.backup.title')}</h3>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+          {t('assignments.backup.description')}
+        </p>
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '10px', alignItems: 'flex-start' }}>
+          <div>
+            <button className="btn btn-secondary" onClick={handleExportAssignments} disabled={exporting}>
+              {exporting ? t('assignments.backup.exporting') : `⇩ ${t('assignments.backup.exportButton')}`}
+            </button>
+            {exportError && <div className="error" role="alert" style={{ marginTop: '8px' }}>{exportError}</div>}
+          </div>
+          <div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".xlsx"
+                onChange={(e) => setImportFile(e.target.files[0] || null)}
+              />
+              <button
+                className="btn btn-success"
+                onClick={handleImportAssignments}
+                disabled={!importFile || importing}
+              >
+                {importing ? t('assignments.backup.importing') : `⇪ ${t('assignments.backup.importButton')}`}
+              </button>
+            </div>
+            {importError && <div className="error" role="alert" style={{ marginTop: '8px' }}>{importError}</div>}
+            {importResult && importResult.success && (
+              <div style={{ marginTop: '8px', fontSize: '13px', color: '#2e7d32' }}>
+                {t('assignments.backup.importedSummary', { count: importResult.assignmentsImported })}
+              </div>
+            )}
+            {importResult && !importResult.success && (
+              <div style={{ marginTop: '8px' }}>
+                <div className="error" role="alert">{t('assignments.backup.rejected')}</div>
+                <ul style={{ marginTop: '6px', fontSize: '13px', color: 'var(--color-danger-dark)' }}>
+                  {importResult.errors.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {error && <div className="error" role="alert">{error}</div>}

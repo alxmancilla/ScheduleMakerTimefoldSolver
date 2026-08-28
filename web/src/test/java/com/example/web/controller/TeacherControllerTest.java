@@ -7,6 +7,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
+import com.example.web.repository.TeacherWorkloadRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -67,6 +68,9 @@ public class TeacherControllerTest {
     @MockBean
     private CourseRepository courseRepository;
 
+    @MockBean
+    private TeacherWorkloadRepository teacherWorkloadRepository;
+
     private TeacherEntity teacher;
 
     @Before
@@ -98,6 +102,21 @@ public class TeacherControllerTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value("T1"))
                 .andExpect(jsonPath("$[0].name").value("Ada"));
+    }
+
+    @Test
+    public void getWorkload_returnsList() throws Exception {
+        com.example.web.entity.TeacherWorkloadEntity workload = new com.example.web.entity.TeacherWorkloadEntity(
+                "T1", "Ada", "Lovelace", "Ada Lovelace", 40, 12L, 28L, new java.math.BigDecimal("30.00"));
+        when(teacherWorkloadRepository.findAll()).thenReturn(List.of(workload));
+
+        mockMvc.perform(get("/api/teachers/workload"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value("T1"))
+                .andExpect(jsonPath("$[0].assignedHours").value(12))
+                .andExpect(jsonPath("$[0].remainingCapacity").value(28))
+                .andExpect(jsonPath("$[0].utilizationPercent").value(30.00));
     }
 
     @Test

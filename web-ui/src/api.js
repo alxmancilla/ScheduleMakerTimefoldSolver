@@ -59,6 +59,10 @@ export const createTeacher = (teacher) => api.post('/teachers', teacher);
 export const updateTeacher = (id, teacher) => api.put(`/teachers/${id}`, teacher);
 export const deleteTeacher = (id) => api.delete(`/teachers/${id}`);
 export const searchTeachers = (query) => api.get(`/teachers/search?query=${query}`);
+// Server-computed workload (v_teacher_workload) - unlike getAssignments(), stays
+// readable by any role that can view the Teachers page (/api/assignments/** is
+// ADMIN-only, this endpoint deliberately isn't).
+export const getTeacherWorkload = () => api.get('/teachers/workload');
 
 // Courses
 export const getCourses = () => api.get('/courses');
@@ -143,6 +147,18 @@ export const getAssignedBlocks = () => api.get('/assignments/assigned');
 export const getUnassignedBlocks = () => api.get('/assignments/unassigned');
 export const getPinnedAssignments = () => api.get('/assignments/pinned');
 
+// Assignments Excel export/import (ADMIN only - /api/assignments/** is
+// restricted to ADMIN by SecurityConfig, unlike the base-data import/export
+// above which is WRITER+)
+export const exportAssignments = () => api.get('/assignments/export', { responseType: 'blob' });
+export const importAssignments = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post('/assignments/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
 // Timeslots (read-only, any authenticated role - e.g. for the Assignments form)
 export const listTimeslots = () => api.get('/timeslots');
 
@@ -195,6 +211,17 @@ export const exportExcel = (entities) =>
     responseType: 'blob',
     params: entities && entities.length ? { entities: entities.join(',') } : undefined,
   });
+
+// Admin: whole-database export/import (scripts/db-export.sh, scripts/db-import.sh
+// run server-side; import restores from a file already listed by
+// listDatabaseBackups(), not a browser upload - see DatabaseBackupController's
+// own doc for why)
+export const exportDatabase = () => api.post('/admin/database/export');
+export const importDatabase = (filename) => api.post('/admin/database/import', { filename });
+export const getDatabaseBackupStatus = () => api.get('/admin/database/status');
+export const listDatabaseBackups = () => api.get('/admin/database/backups');
+export const downloadDatabaseBackup = (filename) =>
+  api.get(`/admin/database/backups/${encodeURIComponent(filename)}`, { responseType: 'blob' });
 
 // Admin: Timeslots
 export const getTimeslots = () => api.get('/admin/timeslots');

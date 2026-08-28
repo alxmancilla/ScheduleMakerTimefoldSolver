@@ -274,7 +274,9 @@ function Layout() {
             ) : (
               <>
                 <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
-                <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
+                <AdminOnly>
+                  <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
+                </AdminOnly>
                 <SetupNavDropdown />
                 <ToolsNavDropdown />
                 <AdminOnly>
@@ -315,12 +317,12 @@ function App() {
             <Route path="/courses" element={<Courses />} />
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/groups" element={<Groups />} />
-            <Route path="/assignments" element={<Assignments />} />
             <Route path="/reports" element={<Reports />} />
             <Route element={<WriteRoute />}>
               <Route path="/import" element={<ImportExcel />} />
             </Route>
             <Route element={<AdminRoute />}>
+              <Route path="/assignments" element={<Assignments />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/users" element={<Users />} />
             </Route>

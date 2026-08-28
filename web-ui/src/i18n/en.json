@@ -321,6 +321,18 @@
     "deleteFailedPrefix": "Failed to delete assignment: ",
     "confirmDelete": "Are you sure you want to delete this assignment?",
     "showing": "Showing {{filtered}} of {{total}} assignments",
+    "exportFailedPrefix": "Failed to export assignments: ",
+    "importFailedPrefix": "Failed to import assignments: ",
+    "backup": {
+      "title": "Export / Import",
+      "description": "Export every assignment to a spreadsheet, or import one to update assignments by ID (rows not in the file are left untouched).",
+      "exportButton": "Export Assignments",
+      "exporting": "Exporting...",
+      "importButton": "Import Assignments",
+      "importing": "Importing...",
+      "importedSummary": "Imported {{count}} assignment(s).",
+      "rejected": "Import rejected - no changes were made:"
+    },
     "filters": {
       "all": "All",
       "assigned": "Assigned",
@@ -482,6 +494,28 @@
       "none": "No timeslots defined",
       "savedMessage": "Timeslot saved",
       "deletedMessage": "Timeslot deleted"
+    },
+    "databaseBackups": {
+      "title": "Database Backups",
+      "exportButton": "Export Whole Database",
+      "running": "Running…",
+      "description": "Dumps the entire PostgreSQL database (scripts/db-export.sh) to a timestamped .sql file, so it can be recreated on any other Postgres instance. This can take a moment for a large database.",
+      "exportFailedPrefix": "Failed to start export: ",
+      "importFailedPrefix": "Failed to start restore: ",
+      "importConfirm": "Restore the database from \"{{filename}}\"? A safety backup of the CURRENT database is taken automatically first, but this replaces every table's data right now, while the app may still be using it. This can't be undone from here.",
+      "lastOperation": "Last operation:",
+      "filesTitle": "Backup Files",
+      "filesDescription": "Every .sql file under database/backups/, newest first. \"Restore\" runs scripts/db-import.sh, which always takes its own pre_restore_*.sql safety backup first.",
+      "loadFailedPrefix": "Failed to load backup files: ",
+      "downloadFailedPrefix": "Failed to download ",
+      "none": "No backup files yet — export the database above to create one.",
+      "table": {
+        "filename": "Filename",
+        "size": "Size",
+        "modified": "Modified"
+      },
+      "download": "Download",
+      "restore": "Restore"
     },
     "term": {
       "title": "Current Term",

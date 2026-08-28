@@ -321,6 +321,18 @@
     "deleteFailedPrefix": "Error al eliminar asignación: ",
     "confirmDelete": "¿Está seguro de que desea eliminar esta asignación?",
     "showing": "Mostrando {{filtered}} de {{total}} asignaciones",
+    "exportFailedPrefix": "Error al exportar asignaciones: ",
+    "importFailedPrefix": "Error al importar asignaciones: ",
+    "backup": {
+      "title": "Exportar / Importar",
+      "description": "Exporte todas las asignaciones a una hoja de cálculo, o importe una para actualizar asignaciones por ID (las filas que no estén en el archivo no se modifican).",
+      "exportButton": "Exportar Asignaciones",
+      "exporting": "Exportando...",
+      "importButton": "Importar Asignaciones",
+      "importing": "Importando...",
+      "importedSummary": "Se importaron {{count}} asignación(es).",
+      "rejected": "Importación rechazada - no se realizaron cambios:"
+    },
     "filters": {
       "all": "Todas",
       "assigned": "Asignadas",
@@ -482,6 +494,28 @@
       "none": "No hay horarios definidos",
       "savedMessage": "Horario guardado",
       "deletedMessage": "Horario eliminado"
+    },
+    "databaseBackups": {
+      "title": "Respaldos de la Base de Datos",
+      "exportButton": "Exportar Base de Datos Completa",
+      "running": "Ejecutando…",
+      "description": "Vuelca toda la base de datos PostgreSQL (scripts/db-export.sh) a un archivo .sql con marca de tiempo, para poder recrearla en cualquier otra instancia de Postgres. Puede tardar un momento en una base de datos grande.",
+      "exportFailedPrefix": "Error al iniciar la exportación: ",
+      "importFailedPrefix": "Error al iniciar la restauración: ",
+      "importConfirm": "¿Restaurar la base de datos desde \"{{filename}}\"? Se toma automáticamente un respaldo de seguridad de la base de datos ACTUAL primero, pero esto reemplaza los datos de cada tabla ahora mismo, mientras la app podría estar usándola. Esto no se puede deshacer desde aquí.",
+      "lastOperation": "Última operación:",
+      "filesTitle": "Archivos de Respaldo",
+      "filesDescription": "Cada archivo .sql en database/backups/, el más reciente primero. \"Restaurar\" ejecuta scripts/db-import.sh, que siempre toma primero su propio respaldo de seguridad pre_restore_*.sql.",
+      "loadFailedPrefix": "Error al cargar los archivos de respaldo: ",
+      "downloadFailedPrefix": "Error al descargar ",
+      "none": "Aún no hay archivos de respaldo — exporte la base de datos arriba para crear uno.",
+      "table": {
+        "filename": "Archivo",
+        "size": "Tamaño",
+        "modified": "Modificado"
+      },
+      "download": "Descargar",
+      "restore": "Restaurar"
     },
     "term": {
       "title": "Periodo Actual",

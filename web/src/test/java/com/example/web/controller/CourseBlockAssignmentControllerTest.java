@@ -6,6 +6,7 @@ import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
+import com.example.web.service.AssignmentExcelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -61,6 +62,9 @@ public class CourseBlockAssignmentControllerTest {
 
     @MockBean
     private RoomRepository roomRepository;
+
+    @MockBean
+    private AssignmentExcelService assignmentExcelService;
 
     private CourseBlockAssignmentEntity assignment;
 

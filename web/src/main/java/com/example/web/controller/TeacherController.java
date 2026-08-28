@@ -5,11 +5,13 @@ import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.entity.TeacherQualificationEntity;
+import com.example.web.entity.TeacherWorkloadEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
+import com.example.web.repository.TeacherWorkloadRepository;
 import com.example.common.RoomTypeCompatibility;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
@@ -30,19 +32,33 @@ public class TeacherController {
     private final CourseBlockAssignmentRepository assignmentRepository;
     private final RoomRepository roomRepository;
     private final CourseRepository courseRepository;
+    private final TeacherWorkloadRepository teacherWorkloadRepository;
 
     public TeacherController(TeacherRepository teacherRepository,
             CourseBlockAssignmentRepository assignmentRepository, RoomRepository roomRepository,
-            CourseRepository courseRepository) {
+            CourseRepository courseRepository, TeacherWorkloadRepository teacherWorkloadRepository) {
         this.teacherRepository = teacherRepository;
         this.assignmentRepository = assignmentRepository;
         this.roomRepository = roomRepository;
         this.courseRepository = courseRepository;
+        this.teacherWorkloadRepository = teacherWorkloadRepository;
     }
 
     @GetMapping
     public List<TeacherEntity> getAllTeachers() {
         return teacherRepository.findAll();
+    }
+
+    /**
+     * Backed by v_teacher_workload (assigned hours summed server-side from
+     * course_block_assignment.block_length, regardless of solved/pinned
+     * status). Deliberately its own endpoint rather than requiring
+     * /api/assignments/** access - that path is ADMIN-only, but this workload
+     * summary is shown to any role that can view the Teachers page.
+     */
+    @GetMapping("/workload")
+    public List<TeacherWorkloadEntity> getWorkload() {
+        return teacherWorkloadRepository.findAll();
     }
 
     @GetMapping("/{id}")

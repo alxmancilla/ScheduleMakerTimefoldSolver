@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses, getAssignments, getRooms } from '../api';
+import { getTeachers, createTeacher, updateTeacher, deleteTeacher, getCourses, getTeacherWorkload, getRooms } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
@@ -60,17 +60,18 @@ function Teachers() {
     }
   };
 
-  // Current teacher workload: hours already placed on the schedule, computed
-  // client-side from the existing assignments list (blockLength summed per
-  // teacher, assigned blocks only) rather than a dedicated backend endpoint.
+  // Current teacher workload: total hours of course blocks assigned to each
+  // teacher (regardless of whether the solver has placed them in a timeslot
+  // yet), computed server-side by v_teacher_workload via GET /api/teachers/workload.
+  // Previously computed client-side from getAssignments() (assigned/solved
+  // blocks only) - moved off that endpoint since /api/assignments/** is now
+  // ADMIN-only and this column is shown to any role that can view this page.
   const loadWorkload = async () => {
     try {
-      const response = await getAssignments();
+      const response = await getTeacherWorkload();
       const hours = {};
-      response.data.forEach((a) => {
-        if (a.teacherId && a.blockTimeslotId) {
-          hours[a.teacherId] = (hours[a.teacherId] || 0) + (a.blockLength || 0);
-        }
+      response.data.forEach((w) => {
+        hours[w.id] = w.assignedHours || 0;
       });
       setAssignedHoursByTeacher(hours);
     } catch (err) {

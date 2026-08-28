@@ -1,5 +1,6 @@
 package com.example.web.controller;
 
+import com.example.web.dto.AssignmentImportResponse;
 import com.example.web.dto.CourseBlockAssignmentDTO;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.RoomEntity;
@@ -8,14 +9,21 @@ import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
+import com.example.web.service.AssignmentExcelService;
 import com.example.common.RoomTypeCompatibility;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -30,6 +38,9 @@ public class CourseBlockAssignmentController {
 
     @Autowired
     private RoomRepository roomRepository;
+
+    @Autowired
+    private AssignmentExcelService assignmentExcelService;
 
     @GetMapping
     public List<CourseBlockAssignmentEntity> getAllAssignments() {
@@ -142,5 +153,31 @@ public class CourseBlockAssignmentController {
             return;
         }
         assignment.setRoomName(teacher.getRequiredRoomName());
+    }
+
+    // ---- Excel export/import (whole table, ADMIN-only same as everything
+    // else under /api/assignments/**) - see AssignmentExcelService's own doc
+    // for why this is separate from ImportController's base-data flow. ----
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportExcel() throws IOException {
+        byte[] workbook = assignmentExcelService.exportToExcel();
+        String filename = "assignments-export-" + LocalDate.now() + ".xlsx";
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(workbook);
+    }
+
+    @PostMapping("/import")
+    public ResponseEntity<AssignmentImportResponse> importExcel(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("No file was uploaded");
+        }
+        AssignmentExcelService.ImportResult result = assignmentExcelService.importFromExcel(file.getInputStream());
+        AssignmentImportResponse response = new AssignmentImportResponse(result);
+        HttpStatus status = result.isSuccess() ? HttpStatus.OK : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(response);
     }
 }
