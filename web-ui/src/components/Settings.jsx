@@ -1089,6 +1089,7 @@ function Settings() {
             <thead>
               <tr>
                 <th>{t('settings.constraintWeights.table.constraint')}</th>
+                <th>{t('settings.constraintWeights.table.severity')}</th>
                 <th>{t('settings.constraintWeights.table.defaultWeight')}</th>
                 <th>{t('settings.constraintWeights.table.currentWeight')}</th>
                 <th>{t('common.actions')}</th>
@@ -1100,6 +1101,8 @@ function Settings() {
                 const isOverridden = row.overrideWeight !== null && row.overrideWeight !== undefined;
                 const isDirty = String(draft) !== String(row.effectiveWeight);
                 const isSaving = savingWeightFor === row.constraintName;
+                const isConfigurableHard = row.defaultSeverity === 'HARD';
+                const severityColor = row.effectiveSeverity === 'HARD' ? 'var(--color-danger)' : 'var(--color-success)';
                 return (
                   <tr key={row.constraintName}>
                     <td>
@@ -1109,6 +1112,21 @@ function Settings() {
                           {t('settings.constraintWeights.overridden')}
                         </span>
                       )}
+                      {isConfigurableHard && !isOverridden && (
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                          {t('settings.constraintWeights.hardToSoftHint')}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        style={{
+                          display: 'inline-block', padding: '2px 10px', borderRadius: '12px',
+                          fontSize: '12px', fontWeight: 600, color: '#fff', background: severityColor,
+                        }}
+                      >
+                        {t(`settings.constraintWeights.severities.${row.effectiveSeverity}`)}
+                      </span>
                     </td>
                     <td>{row.defaultWeight}</td>
                     <td>
@@ -1135,7 +1153,9 @@ function Settings() {
                         onClick={() => handleResetWeight(row.constraintName)}
                         disabled={!isOverridden || isSaving}
                       >
-                        {t('settings.blockRules.resetToDefault')}
+                        {isConfigurableHard
+                          ? t('settings.constraintWeights.resetToHard')
+                          : t('settings.blockRules.resetToDefault')}
                       </button>
                     </td>
                   </tr>

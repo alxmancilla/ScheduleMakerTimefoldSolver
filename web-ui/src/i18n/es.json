@@ -621,7 +621,7 @@
     },
     "constraintWeights": {
       "title": "Pesos de Restricciones",
-      "description": "Ajusta la influencia de cada restricción suave (de preferencia) en la puntuación del solucionador. Mayor peso = mayor prioridad. Las restricciones duras (integridad de datos, doble reserva, etc.) nunca son ajustables aquí — siempre deben cumplirse. Un cambio se aplica en la siguiente ejecución, sin necesidad de redesplegar.",
+      "description": "Ajusta la influencia de cada restricción suave (de preferencia) en la puntuación del solucionador, o — para las pocas restricciones Duras marcadas como configurables abajo — cámbialas a Suave con un peso elegido. La mayoría de las restricciones Duras (doble reserva, integridad de datos, etc.) nunca son ajustables aquí — siempre deben cumplirse, ya que relajarlas podría producir un horario que no solo sería peor, sino físicamente imposible. Un cambio se aplica en la siguiente ejecución, sin necesidad de redesplegar.",
       "loadFailedPrefix": "Error al cargar los pesos de restricciones: ",
       "saveFailedPrefix": "Error al guardar el peso de la restricción: ",
       "savedMessage": "Peso de restricción guardado",
@@ -629,8 +629,15 @@
       "none": "No se encontraron restricciones suaves.",
       "overridden": "(anulado)",
       "saving": "Guardando...",
+      "hardToSoftHint": "Dura por defecto. Al definir un peso y guardar, se cambia a Suave.",
+      "resetToHard": "Restablecer a Dura",
+      "severities": {
+        "HARD": "Dura",
+        "SOFT": "Suave"
+      },
       "table": {
         "constraint": "Restricción",
+        "severity": "Severidad",
         "defaultWeight": "Peso por Defecto",
         "currentWeight": "Peso Actual"
       }

@@ -621,7 +621,7 @@
     },
     "constraintWeights": {
       "title": "Constraint Weights",
-      "description": "Tune how strongly each soft (preference) constraint influences the solver's score. Higher weight = higher priority. Hard constraints (data integrity, double-booking, etc.) are never adjustable here - they must always hold. A change applies on the next solve, no redeploy needed.",
+      "description": "Tune how strongly each soft (preference) constraint influences the solver's score, or - for the few Hard constraints marked configurable below - switch them to Soft at a chosen weight. Most Hard constraints (double-booking, data integrity, etc.) are never adjustable here - they must always hold, since relaxing them could produce a schedule that isn't just worse but physically impossible. A change applies on the next solve, no redeploy needed.",
       "loadFailedPrefix": "Failed to load constraint weights: ",
       "saveFailedPrefix": "Failed to save constraint weight: ",
       "savedMessage": "Constraint weight saved",
@@ -629,8 +629,15 @@
       "none": "No soft constraints found.",
       "overridden": "(overridden)",
       "saving": "Saving...",
+      "hardToSoftHint": "Hard by default. Setting a weight and saving switches this to Soft.",
+      "resetToHard": "Reset to Hard",
+      "severities": {
+        "HARD": "Hard",
+        "SOFT": "Soft"
+      },
       "table": {
         "constraint": "Constraint",
+        "severity": "Severity",
         "defaultWeight": "Default Weight",
         "currentWeight": "Current Weight"
       }

@@ -58,12 +58,46 @@ public class ConstraintConfigControllerTest {
 
         mockMvc.perform(get("/api/admin/constraint-config"))
                 .andExpect(status().isOk())
-                // 9 known soft constraints, regardless of how many have an override.
-                .andExpect(jsonPath("$.length()").value(9))
+                // 9 SOFT-by-default + 4 severity-configurable HARD constraints,
+                // regardless of how many have an override.
+                .andExpect(jsonPath("$.length()").value(13))
                 .andExpect(jsonPath("$[0].constraintName").value("Non-standard rooms should finish by 2pm"))
+                .andExpect(jsonPath("$[0].defaultSeverity").value("SOFT"))
                 .andExpect(jsonPath("$[0].defaultWeight").value(10))
                 .andExpect(jsonPath("$[0].overrideWeight").doesNotExist())
+                .andExpect(jsonPath("$[0].effectiveSeverity").value("SOFT"))
                 .andExpect(jsonPath("$[0].effectiveWeight").value(10));
+    }
+
+    @Test
+    public void getAllWeights_includesConfigurableHardConstraintsAsHardByDefault() throws Exception {
+        when(configRepository.findAll()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/constraint-config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].defaultSeverity")
+                        .value("HARD"))
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].overrideWeight")
+                        .value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())))
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].effectiveSeverity")
+                        .value("HARD"));
+    }
+
+    @Test
+    public void getAllWeights_overriddenConfigurableHardConstraintBecomesSoft() throws Exception {
+        when(configRepository.findAll()).thenReturn(
+                List.of(new ConstraintConfigEntity("Teacher must be qualified", 8)));
+
+        mockMvc.perform(get("/api/admin/constraint-config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].defaultSeverity")
+                        .value("HARD"))
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].overrideWeight")
+                        .value(8))
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].effectiveSeverity")
+                        .value("SOFT"))
+                .andExpect(jsonPath("$[?(@.constraintName=='Teacher must be qualified')].effectiveWeight")
+                        .value(8));
     }
 
     @Test
@@ -105,8 +139,26 @@ public class ConstraintConfigControllerTest {
         mockMvc.perform(put("/api/admin/constraint-config/{name}", "Not A Real Constraint")
                         .contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("not a known soft constraint")));
+                .andExpect(jsonPath("$.message", containsString("not a known constraint")));
         verify(configRepository, never()).save(any(ConstraintConfigEntity.class));
+    }
+
+    @Test
+    public void upsertWeight_configurableHardConstraint_returnsSaved() throws Exception {
+        // A HARD-by-default constraint (ConfigurableHardConstraints, not
+        // SoftConstraintDefaults) must also be accepted by the upsert.
+        when(configRepository.findById("Course blocks must be consecutive")).thenReturn(Optional.empty());
+        when(configRepository.save(any(ConstraintConfigEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("weightSoft", 5);
+
+        mockMvc.perform(put("/api/admin/constraint-config/{name}", "Course blocks must be consecutive")
+                        .contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.constraintName").value("Course blocks must be consecutive"))
+                .andExpect(jsonPath("$.weightSoft").value(5));
+        verify(configRepository).save(any(ConstraintConfigEntity.class));
     }
 
     @Test
