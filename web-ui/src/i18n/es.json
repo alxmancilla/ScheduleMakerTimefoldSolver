@@ -635,6 +635,37 @@
         "currentWeight": "Peso Actual"
       }
     },
+    "semesterHourLimits": {
+      "title": "Límites de Hora por Semestre",
+      "description": "Configura, por semestre, la última hora en que un bloque puede terminar. Duro es una garantía genuina — el solucionador nunca puede colocar un bloque después de esa hora. Suave lo permite, pero penaliza el exceso (ajusta el peso de esa penalización en Pesos de Restricciones, bajo \"Semester hour limits should be respected (soft)\"). Un semestre sin límite configurado aquí no tiene restricción.",
+      "addLimit": "+ Agregar Límite",
+      "editLimit": "Editar Límite de Hora por Semestre",
+      "newLimit": "Nuevo Límite de Hora por Semestre",
+      "loadFailedPrefix": "Error al cargar los límites de hora por semestre: ",
+      "saveFailedPrefix": "Error al guardar el límite de hora por semestre: ",
+      "deleteFailedPrefix": "Error al eliminar el límite de hora por semestre: ",
+      "confirmDelete": "¿Eliminar el límite de hora del semestre {{semester}}? Sus bloques quedarán sin restricción.",
+      "savedMessage": "Límite de hora por semestre guardado",
+      "deletedMessage": "Límite de hora por semestre eliminado",
+      "none": "No hay límites de hora por semestre configurados — todos los semestres están sin restricción.",
+      "saving": "Guardando...",
+      "hardHint": "Duro: los bloques de este semestre nunca pueden asignarse a un horario que termine después de esta hora — el solucionador lo excluye estructuralmente.",
+      "softHint": "Suave: los bloques de este semestre pueden terminar después de esta hora, pero el solucionador es penalizado por ello, en proporción al exceso.",
+      "severities": {
+        "HARD": "Duro",
+        "SOFT": "Suave"
+      },
+      "fields": {
+        "semester": "Semestre:",
+        "latestEndHour": "Última Hora de Finalización:",
+        "severity": "Severidad:"
+      },
+      "table": {
+        "semester": "Semestre",
+        "latestEndHour": "Última Hora de Finalización",
+        "severity": "Severidad"
+      }
+    },
     "calendar": {
       "title": "Calendario",
       "description": "Registra los días festivos, de examen y medios días del ciclo escolar. Por ahora es solo un registro informativo — todavía no se usa al generar bloques ni en el solucionador.",

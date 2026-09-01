@@ -122,40 +122,39 @@ public class CourseBlockAssignment {
         this.allTimeslots = allTimeslots;
     }
 
-    // A first-semester group's blocks may never run past this hour - see
-    // getMatchingBlockTimeslots() below. Chosen over a soft penalty (like
-    // preferSemesterOneBlocksStartEarly's 7:00 target) because the school's
-    // capacity comfortably covers every first-semester group's weekly hours
-    // within 7:00-14:00 (24h needed vs. 35h available), so this can be a
-    // genuine guarantee rather than a mere preference.
-    private static final int SEMESTER_ONE_LATEST_END_HOUR = 14;
-
     /**
      * This block's valid timeslot candidates: every timeslot whose length
-     * matches blockLength, and - if this block belongs to a first-semester
-     * (semester == 1) course - whose end hour doesn't run past
-     * SEMESTER_ONE_LATEST_END_HOUR. Entity-scoped value range, so neither
-     * mismatch is something the solver can ever pick in the first place: a
-     * 1h block's candidates can never include a 3h timeslot (that mismatch is
-     * also the HARD constraint blockLengthMustMatchTimeslotLength), and a
-     * first-semester block's candidates can never include a slot ending after
-     * 14:00 (mirrored by the HARD constraint
-     * semesterOneBlocksMustFinishBy2pm, which exists only to catch a pinned
-     * row whose timeslot predates this rule - see that constraint's doc).
+     * matches blockLength, and - if this block's course has a HARD-severity
+     * semester_hour_limit configured (see Course.getLatestEndHour()/
+     * getLatestEndHourSeverity(), sourced from the semester_hour_limit
+     * table) - whose end hour doesn't run past that limit. A SOFT-severity
+     * limit does NOT filter here; the solver may still place such a block
+     * past its limit, penalized instead by the soft constraint
+     * preferSemesterHourLimits (see BlockScheduleMath.softSemesterHourLimitExcess()).
+     * Entity-scoped value range, so a HARD limit's mismatch is something the
+     * solver can never pick in the first place: a 1h block's candidates can
+     * never include a 3h timeslot (that mismatch is also the HARD constraint
+     * blockLengthMustMatchTimeslotLength), and a HARD-limited course's block
+     * candidates can never include a slot ending after its limit (mirrored
+     * by the HARD constraint semesterHourLimitsMustBeRespected, which exists
+     * only to catch a pinned row whose timeslot predates the limit - see
+     * that constraint's doc).
      */
     @ValueRangeProvider(id = "matchingBlockTimeslotRange")
     public List<BlockTimeslot> getMatchingBlockTimeslots() {
         if (allTimeslots == null) {
             return Collections.emptyList();
         }
-        boolean mustFinishEarly = isSemesterOne();
+        Integer hardLatestEndHour = course != null && "HARD".equals(course.getLatestEndHourSeverity())
+                ? course.getLatestEndHour()
+                : null;
         List<BlockTimeslot> matching = new ArrayList<>();
         for (BlockTimeslot candidate : allTimeslots) {
             if (candidate.getLengthHours() != blockLength) {
                 continue;
             }
-            if (mustFinishEarly
-                    && candidate.getStartHour() + candidate.getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR) {
+            if (hardLatestEndHour != null
+                    && candidate.getStartHour() + candidate.getLengthHours() > hardLatestEndHour) {
                 continue;
             }
             matching.add(candidate);

@@ -635,6 +635,37 @@
         "currentWeight": "Current Weight"
       }
     },
+    "semesterHourLimits": {
+      "title": "Semester Hour Limits",
+      "description": "Configure, per semester, the latest hour a block may end. HARD is a genuine guarantee — the solver can never place a block past it. SOFT allows it, but penalizes the overrun (tune that penalty's weight in Constraint Weights, under \"Semester hour limits should be respected (soft)\"). A semester with no limit configured here is unrestricted.",
+      "addLimit": "+ Add Limit",
+      "editLimit": "Edit Semester Hour Limit",
+      "newLimit": "New Semester Hour Limit",
+      "loadFailedPrefix": "Failed to load semester hour limits: ",
+      "saveFailedPrefix": "Failed to save semester hour limit: ",
+      "deleteFailedPrefix": "Failed to delete semester hour limit: ",
+      "confirmDelete": "Remove the hour limit for semester {{semester}}? Its blocks will become unrestricted.",
+      "savedMessage": "Semester hour limit saved",
+      "deletedMessage": "Semester hour limit removed",
+      "none": "No semester hour limits configured — every semester is unrestricted.",
+      "saving": "Saving...",
+      "hardHint": "HARD: blocks of this semester can never be assigned a timeslot ending after this hour — the solver structurally excludes it.",
+      "softHint": "SOFT: blocks of this semester may still end after this hour, but the solver is penalized for it, proportional to the overrun.",
+      "severities": {
+        "HARD": "Hard",
+        "SOFT": "Soft"
+      },
+      "fields": {
+        "semester": "Semester:",
+        "latestEndHour": "Latest End Hour:",
+        "severity": "Severity:"
+      },
+      "table": {
+        "semester": "Semester",
+        "latestEndHour": "Latest End Hour",
+        "severity": "Severity"
+      }
+    },
     "calendar": {
       "title": "Calendar",
       "description": "Track the school's holiday, exam, and half-day dates. Record-keeping only for now — not yet used by block generation or the solver.",

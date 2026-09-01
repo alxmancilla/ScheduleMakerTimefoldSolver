@@ -884,6 +884,32 @@ COMMENT ON COLUMN constraint_config.constraint_name IS 'Must exactly match the c
 COMMENT ON COLUMN constraint_config.weight_soft IS 'The HardSoftScore soft-weight to use instead of the constraint''s hardcoded default.';
 
 -- ============================================================================
+-- SEMESTER HOUR LIMIT TABLE
+-- ============================================================================
+-- Per-semester "blocks must/should finish by this hour" limit, read onto
+-- Course.latestEndHour/latestEndHourSeverity by DataLoader. A semester with
+-- no row here is unrestricted. severity = HARD structurally excludes late
+-- timeslots from that semester's blocks' value range (a genuine guarantee);
+-- severity = SOFT allows them, penalized instead in proportion to the
+-- overrun by SchoolConstraintProvider.preferSemesterHourLimits.
+CREATE TABLE IF NOT EXISTS semester_hour_limit (
+    semester INTEGER PRIMARY KEY,
+    latest_end_hour INTEGER NOT NULL CHECK (latest_end_hour BETWEEN 1 AND 24),
+    severity VARCHAR(10) NOT NULL CHECK (severity IN ('HARD', 'SOFT')),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO semester_hour_limit (semester, latest_end_hour, severity)
+VALUES (1, 14, 'HARD')
+ON CONFLICT (semester) DO NOTHING;
+
+COMMENT ON TABLE semester_hour_limit IS 'Per-semester "blocks must/should finish by this hour" limit, read onto Course.latestEndHour/latestEndHourSeverity by DataLoader. A semester with no row here is unrestricted.';
+COMMENT ON COLUMN semester_hour_limit.semester IS 'Matches course.semester.';
+COMMENT ON COLUMN semester_hour_limit.latest_end_hour IS 'A block of this semester may never (HARD) or should not (SOFT) be assigned a timeslot ending after this hour.';
+COMMENT ON COLUMN semester_hour_limit.severity IS 'HARD: structurally excluded from the value range, enforced as a genuine guarantee. SOFT: allowed, but penalized by SchoolConstraintProvider.preferSemesterHourLimits in proportion to the overrun.';
+
+-- ============================================================================
 -- CALENDAR EXCEPTIONS TABLE
 -- ============================================================================
 -- Record-keeping only (v1): tracks the school's holiday/exam/half-day dates,

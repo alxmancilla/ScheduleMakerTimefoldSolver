@@ -59,6 +59,7 @@ database/migrations/*
 !database/migrations/trim_course_designations_to_four.sql
 !database/migrations/add_group_room_ranges.sql
 !database/migrations/add_constraint_config.sql
+!database/migrations/add_semester_hour_limit.sql
 md_files/
 
 # Build artifacts

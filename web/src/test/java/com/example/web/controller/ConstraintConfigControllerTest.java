@@ -58,8 +58,8 @@ public class ConstraintConfigControllerTest {
 
         mockMvc.perform(get("/api/admin/constraint-config"))
                 .andExpect(status().isOk())
-                // 8 known soft constraints, regardless of how many have an override.
-                .andExpect(jsonPath("$.length()").value(8))
+                // 9 known soft constraints, regardless of how many have an override.
+                .andExpect(jsonPath("$.length()").value(9))
                 .andExpect(jsonPath("$[0].constraintName").value("Non-standard rooms should finish by 2pm"))
                 .andExpect(jsonPath("$[0].defaultWeight").value(10))
                 .andExpect(jsonPath("$[0].overrideWeight").doesNotExist())

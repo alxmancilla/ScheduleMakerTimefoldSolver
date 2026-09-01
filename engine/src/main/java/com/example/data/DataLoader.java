@@ -415,6 +415,45 @@ public class DataLoader {
     }
 
     /**
+     * Load per-semester "must/should finish by hour X" limits from
+     * semester_hour_limit onto each course of that semester (see
+     * Course.getLatestEndHour()/getLatestEndHourSeverity(),
+     * CourseBlockAssignment.getMatchingBlockTimeslots(), and
+     * BlockScheduleMath.violatesHardSemesterHourLimit()/softSemesterHourLimitExcess()
+     * for how the engine actually uses this). A semester with no row here
+     * leaves every course of that semester unrestricted - same "absent row =
+     * unrestricted" convention as loadComponentBlockRules above.
+     *
+     * @return the number of semesters with a configured limit (for the
+     *         startup log line - see loadDataForBlockScheduling below).
+     */
+    private int loadSemesterHourLimits(Connection conn, List<com.example.domain.Course> courses)
+            throws SQLException {
+        String sql = "SELECT semester, latest_end_hour, severity FROM semester_hour_limit";
+
+        Map<Integer, Integer> hourBySemester = new HashMap<>();
+        Map<Integer, String> severityBySemester = new HashMap<>();
+
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                int semester = rs.getInt("semester");
+                hourBySemester.put(semester, rs.getInt("latest_end_hour"));
+                severityBySemester.put(semester, rs.getString("severity"));
+            }
+        }
+
+        for (com.example.domain.Course course : courses) {
+            Integer semester = course.getSemester();
+            if (semester != null && hourBySemester.containsKey(semester)) {
+                course.setLatestEndHour(hourBySemester.get(semester));
+                course.setLatestEndHourSeverity(severityBySemester.get(semester));
+            }
+        }
+        return hourBySemester.size();
+    }
+
+    /**
      * Load per-constraint soft-weight overrides from constraint_config,
      * built into a ConstraintWeightOverrides Timefold applies transparently
      * on top of each constraint's hardcoded-default weight (see
@@ -472,6 +511,7 @@ public class DataLoader {
             loadRoomRequirements(conn, courses);
             loadBlockTemplates(conn, courses);
             loadComponentBlockRules(conn, courses);
+            int semesterHourLimitCount = loadSemesterHourLimits(conn, courses);
 
             List<Room> rooms = loadRooms(conn);
             List<BlockTimeslot> blockTimeslots = loadBlockTimeslots(conn);
@@ -489,6 +529,7 @@ public class DataLoader {
             System.out.println("  - " + blockAssignments.size() + " course block assignments");
             System.out.println(
                     "  - " + constraintWeightOverrides.getKnownConstraintNames().size() + " constraint weight overrides");
+            System.out.println("  - " + semesterHourLimitCount + " semester hour limits");
 
             SchoolSchedule schedule = SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses,
                     groups, blockAssignments);

@@ -278,6 +278,17 @@ export const setConstraintWeight = (constraintName, weightSoft) =>
 export const deleteConstraintWeight = (constraintName) =>
   api.delete(`/admin/constraint-config/${encodeURIComponent(constraintName)}`);
 
+// Admin: per-semester "blocks must/should finish by this hour" limits. A
+// semester with no row here is unrestricted. severity is 'HARD' (structural
+// guarantee - blocks can never land past the limit) or 'SOFT' (allowed, but
+// penalized in proportion to the overrun - see the constraint-weight tab
+// for tuning that penalty's weight).
+export const getSemesterHourLimits = () => api.get('/admin/semester-hour-limits');
+export const setSemesterHourLimit = (semester, latestEndHour, severity) =>
+  api.put(`/admin/semester-hour-limits/${encodeURIComponent(semester)}`, { latestEndHour, severity });
+export const deleteSemesterHourLimit = (semester) =>
+  api.delete(`/admin/semester-hour-limits/${encodeURIComponent(semester)}`);
+
 // Admin: calendar exceptions (holidays, half-days, exam days). Record-keeping
 // only for now - not yet read by block generation or the solver, since
 // block_timeslot has no calendar-date concept at all (pure recurring weekly

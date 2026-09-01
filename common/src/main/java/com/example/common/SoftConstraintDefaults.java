@@ -42,6 +42,7 @@ public final class SoftConstraintDefaults {
         defaults.put("Non-standard rooms should finish by 2pm", 10);
         defaults.put("Prefer first-semester blocks to start early", 6);
         defaults.put("Minimize first-semester group idle gaps", 6);
+        defaults.put("Semester hour limits should be respected (soft)", 6);
         defaults.put("Teacher exceeds max hours per week", 5);
         defaults.put("Room capacity should fit group size", 4);
         defaults.put("Prefer block's specified room", 3);

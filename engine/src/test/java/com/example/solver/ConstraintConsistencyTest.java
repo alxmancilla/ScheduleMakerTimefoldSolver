@@ -49,7 +49,7 @@ public class ConstraintConsistencyTest {
                                 "No room double-booking",
                                 "Room type must satisfy course requirement",
                                 "Teacher's required room must be used",
-                                "First-semester blocks must finish by 2pm",
+                                "Semester hour limits must be respected (hard)",
                                 "Group cannot have two courses at same time",
                                 "Maximum blocks per course per group per day",
                                 "Course blocks must be consecutive"
@@ -100,7 +100,8 @@ public class ConstraintConsistencyTest {
                                 // DISABLED 2026-08-26, see SchoolConstraintProvider. Re-add
                                 // here when re-enabled.
                                 "Prefer first-semester blocks to start early",
-                                "Minimize first-semester group idle gaps"));
+                                "Minimize first-semester group idle gaps",
+                                "Semester hour limits should be respected (soft)"));
 
                 // Assert all expected soft constraints are present
                 for (String expected : expectedSoftConstraints) {
@@ -156,12 +157,18 @@ public class ConstraintConsistencyTest {
                 // "Prefer Core 1h blocks at the same time across days" also TEMP
                 // DISABLED - see SchoolConstraintProvider - was 10 hard / 9 soft / 19
                 // total before. Also as of 2026-08-27: added "First-semester blocks
-                // must finish by 2pm" (HARD) - was 10 hard / 8 soft / 18 total before)
+                // must finish by 2pm" (HARD) - was 10 hard / 8 soft / 18 total before.
+                // As of 2026-09-01: "First-semester blocks must finish by 2pm"
+                // generalized into "Semester hour limits must be respected (hard)"
+                // (still HARD, same count) plus a new SOFT counterpart "Semester hour
+                // limits should be respected (soft)" (see semester_hour_limit /
+                // Course.getLatestEndHourSeverity()) - was 11 hard / 8 soft / 19 total
+                // before.
                 assertEquals("Expected 11 HARD constraints", 11, hardCount);
-                assertEquals("Expected 8 SOFT constraints", 8, softCount);
+                assertEquals("Expected 9 SOFT constraints", 9, softCount);
 
-                // Total should be 19 (11 hard + 8 soft)
-                assertEquals("Total constraint count mismatch", 19, hardCount + softCount);
+                // Total should be 20 (11 hard + 9 soft)
+                assertEquals("Total constraint count mismatch", 20, hardCount + softCount);
         }
 
         /**

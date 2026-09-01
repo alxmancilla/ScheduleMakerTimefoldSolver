@@ -7,6 +7,7 @@ import {
   getTerm, updateTerm, getAuditLog,
   getComponentBlockRules, setComponentBlockRule, deleteComponentBlockRule, getCourseDesignations,
   getConstraintWeights, setConstraintWeight, deleteConstraintWeight,
+  getSemesterHourLimits, setSemesterHourLimit, deleteSemesterHourLimit,
   getCalendarExceptions, setCalendarException, deleteCalendarException,
   exportDatabase, importDatabase, getDatabaseBackupStatus, listDatabaseBackups, downloadDatabaseBackup,
 } from '../api';
@@ -30,6 +31,8 @@ const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 const BLOCK_SIZES = [1, 2, 3, 4];
 const EMPTY_BLOCK_RULE_FORM = { component: '', preferredBlockSize: 2, maxBlocksPerDay: 2 };
+const SEVERITY_OPTIONS = ['HARD', 'SOFT'];
+const EMPTY_SEMESTER_HOUR_LIMIT_FORM = { semester: '', latestEndHour: 14, severity: 'HARD' };
 const CALENDAR_EXCEPTION_TYPES = ['HOLIDAY', 'HALF_DAY', 'EXAM_DAY'];
 const EMPTY_CALENDAR_EXCEPTION_FORM = { date: '', type: 'HOLIDAY', label: '', endHour: 12 };
 
@@ -40,6 +43,7 @@ const SETTINGS_TABS = [
   { key: 'generateBlocks', labelKey: 'settings.generateBlocks.title' },
   { key: 'blockRules', labelKey: 'settings.blockRules.title' },
   { key: 'constraintWeights', labelKey: 'settings.constraintWeights.title' },
+  { key: 'semesterHourLimits', labelKey: 'settings.semesterHourLimits.title' },
   { key: 'calendar', labelKey: 'settings.calendar.title' },
   { key: 'timeslots', labelKey: 'settings.timeslots.title' },
   { key: 'databaseBackups', labelKey: 'settings.databaseBackups.title' },
@@ -99,6 +103,13 @@ function Settings() {
   const [weightDrafts, setWeightDrafts] = useState({});
   const [savingWeightFor, setSavingWeightFor] = useState(null);
 
+  const [semesterHourLimits, setSemesterHourLimits] = useState([]);
+  const [semesterHourLimitsError, setSemesterHourLimitsError] = useState(null);
+  const [showSemesterHourLimitForm, setShowSemesterHourLimitForm] = useState(false);
+  const [editingSemester, setEditingSemester] = useState(null);
+  const [semesterHourLimitForm, setSemesterHourLimitForm] = useState(EMPTY_SEMESTER_HOUR_LIMIT_FORM);
+  const [savingSemesterHourLimit, setSavingSemesterHourLimit] = useState(false);
+
   const [calendarExceptions, setCalendarExceptions] = useState([]);
   const [calendarExceptionsError, setCalendarExceptionsError] = useState(null);
   const [showCalendarExceptionForm, setShowCalendarExceptionForm] = useState(false);
@@ -121,6 +132,7 @@ function Settings() {
     loadBlockRules();
     loadCourseDesignations();
     loadConstraintWeights();
+    loadSemesterHourLimits();
     loadCalendarExceptions();
     loadAdminReports();
     loadTerm();
@@ -472,6 +484,74 @@ function Settings() {
       setConstraintWeightsError(err.response?.data?.message || t('settings.constraintWeights.saveFailedPrefix') + err.message);
     } finally {
       setSavingWeightFor(null);
+    }
+  };
+
+  // Per-semester finish-by-hour limits: an open-ended set of semesters (not
+  // a fixed list like constraint weights), so this follows the Block Rules
+  // add/edit-modal pattern instead of the constraint-weights fixed-table one.
+  const loadSemesterHourLimits = async () => {
+    try {
+      const response = await getSemesterHourLimits();
+      setSemesterHourLimits(response.data);
+      setSemesterHourLimitsError(null);
+    } catch (err) {
+      setSemesterHourLimitsError(t('settings.semesterHourLimits.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const handleAddSemesterHourLimit = () => {
+    setEditingSemester(null);
+    setSemesterHourLimitForm(EMPTY_SEMESTER_HOUR_LIMIT_FORM);
+    setSemesterHourLimitsError(null);
+    setShowSemesterHourLimitForm(true);
+  };
+
+  const handleEditSemesterHourLimit = (limit) => {
+    setEditingSemester(limit.semester);
+    setSemesterHourLimitForm({
+      semester: limit.semester,
+      latestEndHour: limit.latestEndHour,
+      severity: limit.severity,
+    });
+    setSemesterHourLimitsError(null);
+    setShowSemesterHourLimitForm(true);
+  };
+
+  const handleCancelSemesterHourLimit = () => {
+    setShowSemesterHourLimitForm(false);
+    setEditingSemester(null);
+    setSemesterHourLimitsError(null);
+  };
+
+  const handleSubmitSemesterHourLimit = async (e) => {
+    e.preventDefault();
+    setSavingSemesterHourLimit(true);
+    setSemesterHourLimitsError(null);
+    try {
+      await setSemesterHourLimit(
+        semesterHourLimitForm.semester,
+        semesterHourLimitForm.latestEndHour,
+        semesterHourLimitForm.severity
+      );
+      handleCancelSemesterHourLimit();
+      loadSemesterHourLimits();
+      showToast(t('settings.semesterHourLimits.savedMessage'));
+    } catch (err) {
+      setSemesterHourLimitsError(err.response?.data?.message || t('settings.semesterHourLimits.saveFailedPrefix') + err.message);
+    } finally {
+      setSavingSemesterHourLimit(false);
+    }
+  };
+
+  const handleDeleteSemesterHourLimit = async (semester) => {
+    if (!(await confirmAction(t('settings.semesterHourLimits.confirmDelete', { semester })))) return;
+    try {
+      await deleteSemesterHourLimit(semester);
+      loadSemesterHourLimits();
+      showToast(t('settings.semesterHourLimits.deletedMessage'));
+    } catch (err) {
+      setSemesterHourLimitsError(err.response?.data?.message || t('settings.semesterHourLimits.deleteFailedPrefix') + err.message);
     }
   };
 
@@ -1061,6 +1141,110 @@ function Settings() {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      </div>
+      )}
+
+      {activeTab === 'semesterHourLimits' && (
+      <div role="tabpanel" id="settings-panel-semesterHourLimits" aria-labelledby="settings-tab-semesterHourLimits">
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>{t('settings.semesterHourLimits.title')}</h3>
+          <button className="btn btn-success" onClick={handleAddSemesterHourLimit}>
+            {t('settings.semesterHourLimits.addLimit')}
+          </button>
+        </div>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+          {t('settings.semesterHourLimits.description')}
+        </p>
+        {semesterHourLimitsError && <div className="error" role="alert">{semesterHourLimitsError}</div>}
+      </div>
+
+      {showSemesterHourLimitForm && (
+        <div className="card">
+          <h3>{editingSemester !== null ? t('settings.semesterHourLimits.editLimit') : t('settings.semesterHourLimits.newLimit')}</h3>
+          <form onSubmit={handleSubmitSemesterHourLimit}>
+            <div className="form-group">
+              <label>{t('settings.semesterHourLimits.fields.semester')}</label>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={semesterHourLimitForm.semester}
+                onChange={(e) => setSemesterHourLimitForm({ ...semesterHourLimitForm, semester: e.target.value })}
+                disabled={editingSemester !== null}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>{t('settings.semesterHourLimits.fields.latestEndHour')}</label>
+              <select
+                value={semesterHourLimitForm.latestEndHour}
+                onChange={(e) => setSemesterHourLimitForm({ ...semesterHourLimitForm, latestEndHour: parseInt(e.target.value, 10) })}
+              >
+                {START_HOURS.map((hour) => (
+                  <option key={hour} value={hour}>{formatHour(hour)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>{t('settings.semesterHourLimits.fields.severity')}</label>
+              <select
+                value={semesterHourLimitForm.severity}
+                onChange={(e) => setSemesterHourLimitForm({ ...semesterHourLimitForm, severity: e.target.value })}
+              >
+                {SEVERITY_OPTIONS.map((severity) => (
+                  <option key={severity} value={severity}>{t(`settings.semesterHourLimits.severities.${severity}`)}</option>
+                ))}
+              </select>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+                {semesterHourLimitForm.severity === 'HARD'
+                  ? t('settings.semesterHourLimits.hardHint')
+                  : t('settings.semesterHourLimits.softHint')}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="submit" className="btn btn-primary" disabled={savingSemesterHourLimit || !semesterHourLimitForm.semester}>
+                {savingSemesterHourLimit ? t('settings.semesterHourLimits.saving') : t('common.save')}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={handleCancelSemesterHourLimit}>{t('common.cancel')}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="card">
+        {semesterHourLimits.length === 0 ? (
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('settings.semesterHourLimits.none')}</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>{t('settings.semesterHourLimits.table.semester')}</th>
+                <th>{t('settings.semesterHourLimits.table.latestEndHour')}</th>
+                <th>{t('settings.semesterHourLimits.table.severity')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {semesterHourLimits.map((limit) => (
+                <tr key={limit.semester}>
+                  <td>{limit.semester}</td>
+                  <td>{formatHour(limit.latestEndHour)}</td>
+                  <td>{t(`settings.semesterHourLimits.severities.${limit.severity}`)}</td>
+                  <td>
+                    <button className="btn btn-primary" onClick={() => handleEditSemesterHourLimit(limit)} style={{ marginRight: '5px' }}>
+                      {t('common.edit')}
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDeleteSemesterHourLimit(limit.semester)}>
+                      {t('common.delete')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}

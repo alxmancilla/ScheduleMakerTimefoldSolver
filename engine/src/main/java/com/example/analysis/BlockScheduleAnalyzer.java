@@ -128,21 +128,20 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
 
-        // First-semester blocks must finish by 2pm - NOT excluded for pinned
-        // assignments (mirrors SchoolConstraintProvider.semesterOneBlocksMustFinishBy2pm:
-        // a non-pinned first-semester block can never be assigned a timeslot
-        // ending after 14:00 in the first place - CourseBlockAssignment.
-        // getMatchingBlockTimeslots() excludes it from the value range - so
-        // this only ever fires for a pinned row whose timeslot predates the
-        // rule).
-        int semesterOneFinishBy2pmViolations = 0;
+        // Semester hour limits must be respected (hard) - NOT excluded for
+        // pinned assignments (mirrors SchoolConstraintProvider.semesterHourLimitsMustBeRespected:
+        // a non-pinned block of a HARD-limited course can never be assigned
+        // a timeslot ending past its limit in the first place -
+        // CourseBlockAssignment.getMatchingBlockTimeslots() excludes it from
+        // the value range - so this only ever fires for a pinned row whose
+        // timeslot predates the limit).
+        int semesterHourLimitHardViolations = 0;
         for (CourseBlockAssignment a : list) {
-            if (isSemesterOneBlock(a) && a.getTimeslot() != null
-                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > BlockScheduleMath.SEMESTER_ONE_LATEST_END_HOUR) {
-                semesterOneFinishBy2pmViolations++;
+            if (BlockScheduleMath.violatesHardSemesterHourLimit(a)) {
+                semesterHourLimitHardViolations++;
             }
         }
-        result.put("First-semester blocks must finish by 2pm", semesterOneFinishBy2pmViolations);
+        result.put("Semester hour limits must be respected (hard)", semesterHourLimitHardViolations);
 
         // Group cannot have two courses at same time (blocks overlap)
         int groupConflict = 0;
@@ -374,16 +373,16 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
 
-        // First-semester blocks must finish by 2pm - NOT excluded for pinned
-        // assignments, see the count version above for why.
-        List<String> semesterOneFinishBy2pm = new ArrayList<>();
+        // Semester hour limits must be respected (hard) - NOT excluded for
+        // pinned assignments, see the count version above for why.
+        List<String> semesterHourLimitHard = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
-            if (isSemesterOneBlock(a) && a.getTimeslot() != null
-                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > BlockScheduleMath.SEMESTER_ONE_LATEST_END_HOUR) {
-                semesterOneFinishBy2pm.add(blockAssignmentToString(a));
+            if (BlockScheduleMath.violatesHardSemesterHourLimit(a)) {
+                semesterHourLimitHard.add(blockAssignmentToString(a) +
+                        String.format(" (limit=%d:00, severity=HARD)", a.getCourse().getLatestEndHour()));
             }
         }
-        details.put("First-semester blocks must finish by 2pm", semesterOneFinishBy2pm);
+        details.put("Semester hour limits must be respected (hard)", semesterHourLimitHard);
 
         // Group cannot have two courses at same time
         List<String> groupConflict = new ArrayList<>();
@@ -870,6 +869,18 @@ public final class BlockScheduleAnalyzer {
             }
         }
         result.put("Minimize first-semester group idle gaps", semesterOneIdleGaps);
+
+        // Semester hour limits should be respected (soft) - mirrors
+        // SchoolConstraintProvider.preferSemesterHourLimits: excludes pinned
+        // assignments, sums BlockScheduleMath.softSemesterHourLimitExcess()
+        // over every block of a SOFT-severity-limited course.
+        int semesterHourLimitSoftExcess = 0;
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned()) {
+                semesterHourLimitSoftExcess += BlockScheduleMath.softSemesterHourLimitExcess(a);
+            }
+        }
+        result.put("Semester hour limits should be respected (soft)", semesterHourLimitSoftExcess);
 
         // Prefer block's specified room (SOFT, weight 3)
         int blockSpecifiedRoomViolations = 0;

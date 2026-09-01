@@ -52,7 +52,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 teacherMustBeQualified(constraintFactory), // #2: Second most likely (~20% rejection rate)
                 roomTypeMustSatisfyRequirement(constraintFactory), // #3: Cheap, medium selectivity (~10% rejection)
                 teacherRequiredRoomMustBeUsed(constraintFactory), // #3b: Pinned blocks only - see method doc
-                semesterOneBlocksMustFinishBy2pm(constraintFactory), // #3c: Pinned blocks only - see method doc
+                semesterHourLimitsMustBeRespected(constraintFactory), // #3c: Pinned blocks only - see method doc
 
                 // ========== High-Selectivity HARD Pair Constraints ==========
                 // Optimized with Joiners (very few pairs evaluated) - the pruning here
@@ -83,6 +83,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                                                                        // their day as early as possible
                 minimizeSemesterOneGroupIdleGaps(constraintFactory), // SOFT (weight 6): first-semester groups run
                                                                       // gap-free
+                preferSemesterHourLimits(constraintFactory), // SOFT (weight 6): SOFT-severity semester_hour_limit rows
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
                 roomCapacityShouldFitGroupSize(constraintFactory), // SOFT (weight 4): group shouldn't exceed room capacity
                 // TEMP DISABLED 2026-08-24 (per request - replaced for first-semester groups
@@ -271,22 +272,44 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     /**
      * HARD, data-integrity constraint (like blockLengthMustMatchTimeslotLength
      * and teacherRequiredRoomMustBeUsed): NOT excluded for pinned assignments,
-     * because pinned rows are exactly the case this exists to catch. A
-     * non-pinned first-semester block can never be assigned a timeslot ending
-     * after 14:00 in the first place -
+     * because pinned rows are exactly the case this exists to catch. Applies
+     * to every course whose semester has a HARD-severity semester_hour_limit
+     * configured (see Course.getLatestEndHour()/getLatestEndHourSeverity()) -
+     * a non-pinned block of such a course can never be assigned a timeslot
+     * ending past its limit in the first place -
      * CourseBlockAssignment.getMatchingBlockTimeslots() excludes any such
      * timeslot from its entity-scoped value range - so this can only ever
-     * fire for a pinned row whose timeslot predates this rule (or was pinned
-     * before its course's semester was set to 1).
+     * fire for a pinned row whose timeslot predates the limit (or was pinned
+     * before its course's semester was configured with one). A SOFT-severity
+     * limit never reaches this constraint - see preferSemesterHourLimits below.
      */
-    private Constraint semesterOneBlocksMustFinishBy2pm(ConstraintFactory constraintFactory) {
+    private Constraint semesterHourLimitsMustBeRespected(ConstraintFactory constraintFactory) {
         return constraintFactory
                 .forEachIncludingUnassigned(CourseBlockAssignment.class)
-                .filter(a -> a.isSemesterOne() && a.getTimeslot() != null
-                        && a.getTimeslot().getStartHour()
-                                + a.getTimeslot().getLengthHours() > BlockScheduleMath.SEMESTER_ONE_LATEST_END_HOUR)
+                .filter(BlockScheduleMath::violatesHardSemesterHourLimit)
                 .penalize(HardSoftScore.ONE_HARD)
-                .asConstraint("First-semester blocks must finish by 2pm");
+                .asConstraint("Semester hour limits must be respected (hard)");
+    }
+
+    /**
+     * SOFT: for every course whose semester has a SOFT-severity
+     * semester_hour_limit configured, prefer its blocks finish by that
+     * limit - but unlike the HARD variant above, the solver is free to
+     * place them later, penalized proportionally to how far past the limit
+     * they end (BlockScheduleMath.softSemesterHourLimitExcess(), a
+     * deviation gradient like preferSemesterOneBlocksStartEarly's, not a
+     * flat penalty). Pinned assignments are excluded (fixed from the
+     * database, not something the solver can improve) - same convention as
+     * nonStandardRoomsShouldFinishBy2pm/groupPreferredRoomConstraint.
+     * WEIGHT: configurable, see SoftConstraintDefaults.
+     */
+    private Constraint preferSemesterHourLimits(ConstraintFactory constraintFactory) {
+        return constraintFactory
+                .forEachIncludingUnassigned(CourseBlockAssignment.class)
+                .filter(a -> !a.isPinned() && BlockScheduleMath.softSemesterHourLimitExcess(a) > 0)
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Semester hour limits should be respected (soft)")),
+                        BlockScheduleMath::softSemesterHourLimitExcess)
+                .asConstraint("Semester hour limits should be respected (soft)");
     }
 
     private Constraint groupCannotHaveTwoCoursesAtSameTime(ConstraintFactory constraintFactory) {

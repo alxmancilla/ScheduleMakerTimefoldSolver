@@ -41,12 +41,6 @@ public final class BlockScheduleMath {
     // preferSemesterOneBlocksStartEarly penalizes deviation from.
     public static final int EARLIEST_START_HOUR = 7;
 
-    // A first-semester group's blocks may never run past this hour. Chosen as
-    // a HARD guarantee (not a soft preference like EARLIEST_START_HOUR above)
-    // because the school's capacity comfortably covers every first-semester
-    // group's weekly hours within 7:00-14:00 (24h needed vs 35h available).
-    public static final int SEMESTER_ONE_LATEST_END_HOUR = 14;
-
     /** This course's configured per-day block cap, or DEFAULT_MAX_BLOCKS_PER_DAY when none is set. */
     public static int maxBlocksPerDay(Course course) {
         Integer configured = course.getMaxBlocksPerDay();
@@ -228,5 +222,50 @@ public final class BlockScheduleMath {
             hourCounts.merge(a.getTimeslot().getStartHour(), 1, Integer::sum);
         }
         return blocks.size() - Collections.max(hourCounts.values());
+    }
+
+    /**
+     * True when this block's course has a HARD-severity semester_hour_limit
+     * configured (see Course.getLatestEndHourSeverity()) and its timeslot
+     * ends after that limit. In practice this can only ever fire for a
+     * pinned row whose timeslot predates the limit (or was pinned before its
+     * course's semester was configured with one): a non-pinned block's
+     * timeslot is already structurally guaranteed correct by
+     * CourseBlockAssignment.getMatchingBlockTimeslots(), which excludes any
+     * such timeslot from a HARD-limited course's entity-scoped value range
+     * entirely - same "structural guarantee + pinned-row backstop" shape as
+     * blockLengthMustMatchTimeslotLength. A SOFT-severity limit never
+     * reaches this check - see softSemesterHourLimitExcess() below instead.
+     */
+    public static boolean violatesHardSemesterHourLimit(CourseBlockAssignment a) {
+        Course course = a.getCourse();
+        if (course == null || a.getTimeslot() == null || !"HARD".equals(course.getLatestEndHourSeverity())) {
+            return false;
+        }
+        Integer limit = course.getLatestEndHour();
+        return limit != null
+                && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > limit;
+    }
+
+    /**
+     * How many hours past a SOFT-severity semester_hour_limit this block's
+     * timeslot ends (0 if its course has no limit, the limit isn't SOFT, or
+     * it doesn't exceed it). Unlike the HARD case, a SOFT-limited course's
+     * blocks are NOT excluded from the value range - the solver is free to
+     * place them past the limit, just penalized proportionally to the
+     * overrun when it does (a deviation gradient, like
+     * preferSemesterOneBlocksStartEarly's, not a flat penalty).
+     */
+    public static int softSemesterHourLimitExcess(CourseBlockAssignment a) {
+        Course course = a.getCourse();
+        if (course == null || a.getTimeslot() == null || !"SOFT".equals(course.getLatestEndHourSeverity())) {
+            return 0;
+        }
+        Integer limit = course.getLatestEndHour();
+        if (limit == null) {
+            return 0;
+        }
+        int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
+        return Math.max(0, endHour - limit);
     }
 }

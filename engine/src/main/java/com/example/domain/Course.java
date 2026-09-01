@@ -23,6 +23,20 @@ public class Course {
     // DataLoader populates it; the solver falls back to a code default when null.
     private Integer maxBlocksPerDay;
 
+    // Per-semester "must/should finish by this hour" limit, sourced from
+    // semester_hour_limit (keyed by course.semester, not course.id - every
+    // course of the same semester shares the same limit). Null until
+    // DataLoader populates it, meaning "no limit for this semester" - the
+    // same "absent row = unrestricted" convention as maxBlocksPerDay above.
+    // latestEndHourSeverity is "HARD" (structurally excluded from this
+    // course's blocks' timeslot value range - see
+    // CourseBlockAssignment.getMatchingBlockTimeslots()) or "SOFT" (blocks
+    // may still land past the limit, but SchoolConstraintProvider's soft
+    // constraint penalizes it) - see BlockScheduleMath's
+    // violatesHardSemesterHourLimit()/softSemesterHourLimitExcess().
+    private Integer latestEndHour;
+    private String latestEndHourSeverity;
+
     public Course(String id, String name, String abbreviation, Integer semester, String designation,
             String roomRequirement, int requiredHoursPerWeek, Boolean active) {
         this.id = id;
@@ -103,6 +117,22 @@ public class Course {
 
     public void setMaxBlocksPerDay(Integer maxBlocksPerDay) {
         this.maxBlocksPerDay = maxBlocksPerDay;
+    }
+
+    public Integer getLatestEndHour() {
+        return latestEndHour;
+    }
+
+    public void setLatestEndHour(Integer latestEndHour) {
+        this.latestEndHour = latestEndHour;
+    }
+
+    public String getLatestEndHourSeverity() {
+        return latestEndHourSeverity;
+    }
+
+    public void setLatestEndHourSeverity(String latestEndHourSeverity) {
+        this.latestEndHourSeverity = latestEndHourSeverity;
     }
 
     // NEW: Helper methods
