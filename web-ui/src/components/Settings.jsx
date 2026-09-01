@@ -27,6 +27,13 @@ const DAY_LABELS = [
 ];
 const formatTimestamp = (value) => (value ? value.replace('T', ' ').split('.')[0] : '-');
 const START_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15];
+// Guardrail #1's valid range for semester-hour-limit's latestEndHour - the
+// school's real operating hours, one narrower than START_HOURS at the
+// bottom (mirrors SchoolCalendarConstants.EARLIEST_START_HOUR + 1 to
+// LATEST_HOUR in the web module): a 1h block starting at the earliest
+// possible hour (7:00) can't finish before 8:00, so 7 itself is never a
+// valid "must finish by" value.
+const LATEST_END_HOURS = [8, 9, 10, 11, 12, 13, 14, 15];
 const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 const BLOCK_SIZES = [1, 2, 3, 4];
@@ -549,7 +556,16 @@ function Settings() {
       setSemesterHourLimitWarnings(response.data.warnings || []);
       showToast(t('settings.semesterHourLimits.savedMessage'));
     } catch (err) {
-      setSemesterHourLimitsError(err.response?.data?.message || t('settings.semesterHourLimits.saveFailedPrefix') + err.message);
+      // Guardrail #1's bounds violations land in errors.latestEndHour (a
+      // MethodArgumentNotValidException field error), with only the generic
+      // "Validation failed" in the top-level message - check the specific
+      // field first so the actual bounds explanation is what's shown.
+      setSemesterHourLimitsError(
+        err.response?.data?.errors?.latestEndHour
+          || err.response?.data?.errors?.severity
+          || err.response?.data?.message
+          || t('settings.semesterHourLimits.saveFailedPrefix') + err.message
+      );
     } finally {
       setSavingSemesterHourLimit(false);
     }
@@ -1233,7 +1249,7 @@ function Settings() {
                 value={semesterHourLimitForm.latestEndHour}
                 onChange={(e) => setSemesterHourLimitForm({ ...semesterHourLimitForm, latestEndHour: parseInt(e.target.value, 10) })}
               >
-                {START_HOURS.map((hour) => (
+                {LATEST_END_HOURS.map((hour) => (
                   <option key={hour} value={hour}>{formatHour(hour)}</option>
                 ))}
               </select>
