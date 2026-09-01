@@ -648,6 +648,7 @@
       "addLimit": "+ Add Limit",
       "editLimit": "Edit Semester Hour Limit",
       "newLimit": "New Semester Hour Limit",
+      "warningsTitle": "Saved, but worth checking:",
       "loadFailedPrefix": "Failed to load semester hour limits: ",
       "saveFailedPrefix": "Failed to save semester hour limit: ",
       "deleteFailedPrefix": "Failed to delete semester hour limit: ",

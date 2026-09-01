@@ -109,6 +109,10 @@ function Settings() {
   const [editingSemester, setEditingSemester] = useState(null);
   const [semesterHourLimitForm, setSemesterHourLimitForm] = useState(EMPTY_SEMESTER_HOUR_LIMIT_FORM);
   const [savingSemesterHourLimit, setSavingSemesterHourLimit] = useState(false);
+  // Guardrail #3's capacity warnings from the last successful save - not
+  // per-row state, since they describe the save that just happened, not
+  // any one row currently on screen.
+  const [semesterHourLimitWarnings, setSemesterHourLimitWarnings] = useState([]);
 
   const [calendarExceptions, setCalendarExceptions] = useState([]);
   const [calendarExceptionsError, setCalendarExceptionsError] = useState(null);
@@ -504,6 +508,7 @@ function Settings() {
     setEditingSemester(null);
     setSemesterHourLimitForm(EMPTY_SEMESTER_HOUR_LIMIT_FORM);
     setSemesterHourLimitsError(null);
+    setSemesterHourLimitWarnings([]);
     setShowSemesterHourLimitForm(true);
   };
 
@@ -515,6 +520,7 @@ function Settings() {
       severity: limit.severity,
     });
     setSemesterHourLimitsError(null);
+    setSemesterHourLimitWarnings([]);
     setShowSemesterHourLimitForm(true);
   };
 
@@ -529,13 +535,18 @@ function Settings() {
     setSavingSemesterHourLimit(true);
     setSemesterHourLimitsError(null);
     try {
-      await setSemesterHourLimit(
+      // Guardrail #2 (blocking, pinned-data conflict) throws and lands in
+      // the catch block below; guardrail #3 (capacity warning) never blocks
+      // the save - it comes back in the response and is shown separately,
+      // surviving the form close so it stays visible.
+      const response = await setSemesterHourLimit(
         semesterHourLimitForm.semester,
         semesterHourLimitForm.latestEndHour,
         semesterHourLimitForm.severity
       );
       handleCancelSemesterHourLimit();
       loadSemesterHourLimits();
+      setSemesterHourLimitWarnings(response.data.warnings || []);
       showToast(t('settings.semesterHourLimits.savedMessage'));
     } catch (err) {
       setSemesterHourLimitsError(err.response?.data?.message || t('settings.semesterHourLimits.saveFailedPrefix') + err.message);
@@ -1181,6 +1192,23 @@ function Settings() {
           {t('settings.semesterHourLimits.description')}
         </p>
         {semesterHourLimitsError && <div className="error" role="alert">{semesterHourLimitsError}</div>}
+        {semesterHourLimitWarnings.length > 0 && (
+          <div
+            role="alert"
+            style={{
+              marginTop: '10px', padding: '10px 14px', borderRadius: '8px',
+              background: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+              border: '1px solid var(--color-warning)', color: 'var(--color-text)', fontSize: '13px',
+            }}
+          >
+            <strong>{t('settings.semesterHourLimits.warningsTitle')}</strong>
+            <ul style={{ margin: '6px 0 0', paddingLeft: '20px' }}>
+              {semesterHourLimitWarnings.map((warning, idx) => (
+                <li key={idx}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {showSemesterHourLimitForm && (

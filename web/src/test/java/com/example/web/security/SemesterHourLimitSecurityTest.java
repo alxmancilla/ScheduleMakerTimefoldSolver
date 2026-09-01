@@ -1,6 +1,7 @@
 package com.example.web.security;
 
 import com.example.web.controller.SemesterHourLimitController;
+import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.SemesterHourLimitRepository;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,6 +37,9 @@ public class SemesterHourLimitSecurityTest {
 
     @MockBean
     private SemesterHourLimitRepository limitRepository;
+
+    @MockBean
+    private CourseBlockAssignmentRepository assignmentRepository;
 
     @MockBean
     private AppUserDetailsService appUserDetailsService;

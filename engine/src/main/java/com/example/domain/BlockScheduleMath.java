@@ -1,5 +1,7 @@
 package com.example.domain;
 
+import com.example.common.SchoolCalendarConstants;
+
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,8 +40,10 @@ public final class BlockScheduleMath {
 
     // The school day's earliest possible start hour (matches the earliest
     // BlockTimeslot start hour, 7:00) - the target
-    // preferSemesterOneBlocksStartEarly penalizes deviation from.
-    public static final int EARLIEST_START_HOUR = 7;
+    // preferSemesterOneBlocksStartEarly penalizes deviation from. Delegates
+    // to scheduler-common's SchoolCalendarConstants, the single source of
+    // truth also used by web's semester-hour-limit guardrails.
+    public static final int EARLIEST_START_HOUR = SchoolCalendarConstants.EARLIEST_START_HOUR;
 
     /** This course's configured per-day block cap, or DEFAULT_MAX_BLOCKS_PER_DAY when none is set. */
     public static int maxBlocksPerDay(Course course) {

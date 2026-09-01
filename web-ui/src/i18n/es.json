@@ -648,6 +648,7 @@
       "addLimit": "+ Agregar Límite",
       "editLimit": "Editar Límite de Hora por Semestre",
       "newLimit": "Nuevo Límite de Hora por Semestre",
+      "warningsTitle": "Guardado, pero vale la pena revisar:",
       "loadFailedPrefix": "Error al cargar los límites de hora por semestre: ",
       "saveFailedPrefix": "Error al guardar el límite de hora por semestre: ",
       "deleteFailedPrefix": "Error al eliminar el límite de hora por semestre: ",
