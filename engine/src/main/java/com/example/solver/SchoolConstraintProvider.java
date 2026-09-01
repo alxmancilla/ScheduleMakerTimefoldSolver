@@ -11,6 +11,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
 
+import com.example.common.SoftConstraintDefaults;
 import com.example.domain.CourseBlockAssignment;
 import com.example.domain.BlockScheduleMath;
 import com.example.domain.Room;
@@ -360,7 +361,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
 
                     return isNonStandard; // Penalize if non-standard room after 2pm
                 })
-                .penalize(HardSoftScore.ofSoft(10)) // SOFT constraint (weight 10) - strong preference
+                // Weight is a DEFAULT here, transparently overridden per-solve by
+                // SchoolSchedule.getConstraintWeightOverrides() when the
+                // constraint_config table has a row for this constraint's name -
+                // see SoftConstraintDefaults for the canonical default list.
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Non-standard rooms should finish by 2pm")))
                 .asConstraint("Non-standard rooms should finish by 2pm");
     }
 
@@ -515,7 +520,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Penalize if NOT using one of the acceptable rooms
                     return !acceptableRooms.contains(assignment.getRoom());
                 })
-                .penalize(HardSoftScore.ofSoft(2))
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Prefer group's preferred room")))
                 .asConstraint("Prefer group's preferred room");
     }
 
@@ -560,7 +565,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     }
                     return studentCount > capacity;
                 })
-                .penalize(HardSoftScore.ofSoft(4))
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Room capacity should fit group size")))
                 .asConstraint("Room capacity should fit group size");
     }
 
@@ -621,8 +626,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .groupBy(CourseBlockAssignment::getTeacher,
                         ConstraintCollectors.sum(CourseBlockAssignment::getBlockLength))
                 .filter((teacher, totalHours) -> totalHours > teacher.getMaxHoursPerWeek())
-                .penalize(HardSoftScore.ONE_SOFT,
-                        (teacher, totalHours) -> (totalHours - teacher.getMaxHoursPerWeek()) * 5)
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Teacher exceeds max hours per week")),
+                        (teacher, totalHours) -> totalHours - teacher.getMaxHoursPerWeek())
                 .asConstraint("Teacher exceeds max hours per week");
     }
 
@@ -651,7 +656,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal((a1, a2) -> a1.getTeacher(), CourseBlockAssignment::getTeacher),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(2), (a1, a2) -> BlockScheduleMath.availableGapHours(a1, a2))
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize teacher idle gaps (availability-aware)")),
+                        (a1, a2) -> BlockScheduleMath.availableGapHours(a1, a2))
                 .asConstraint("Minimize teacher idle gaps (availability-aware)");
     }
 
@@ -678,7 +684,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         ConstraintCollectors.toList())
                 .filter((group, day, blocks) -> BlockScheduleMath.earliestStartHour(blocks)
                         > BlockScheduleMath.EARLIEST_START_HOUR)
-                .penalize(HardSoftScore.ofSoft(6),
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Prefer first-semester blocks to start early")),
                         (group, day, blocks) -> BlockScheduleMath.earliestStartHour(blocks)
                                 - BlockScheduleMath.EARLIEST_START_HOUR)
                 .asConstraint("Prefer first-semester blocks to start early");
@@ -718,7 +724,8 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(6), (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize first-semester group idle gaps")),
+                        (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
                 .asConstraint("Minimize first-semester group idle gaps");
     }
 
@@ -773,7 +780,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     // Penalize if NOT using the preferred room
                     return !preferredRoomHint.equals(assignment.getRoom().getName());
                 })
-                .penalize(HardSoftScore.ofSoft(3))
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Prefer block's specified room")))
                 .asConstraint("Prefer block's specified room");
     }
 

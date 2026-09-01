@@ -6,6 +6,7 @@ import {
   listAdminReports, downloadAdminReport,
   getTerm, updateTerm, getAuditLog,
   getComponentBlockRules, setComponentBlockRule, deleteComponentBlockRule, getCourseDesignations,
+  getConstraintWeights, setConstraintWeight, deleteConstraintWeight,
   getCalendarExceptions, setCalendarException, deleteCalendarException,
   exportDatabase, importDatabase, getDatabaseBackupStatus, listDatabaseBackups, downloadDatabaseBackup,
 } from '../api';
@@ -38,6 +39,7 @@ const SETTINGS_TABS = [
   { key: 'complianceSnapshots', labelKey: 'settings.complianceSnapshots.title' },
   { key: 'generateBlocks', labelKey: 'settings.generateBlocks.title' },
   { key: 'blockRules', labelKey: 'settings.blockRules.title' },
+  { key: 'constraintWeights', labelKey: 'settings.constraintWeights.title' },
   { key: 'calendar', labelKey: 'settings.calendar.title' },
   { key: 'timeslots', labelKey: 'settings.timeslots.title' },
   { key: 'databaseBackups', labelKey: 'settings.databaseBackups.title' },
@@ -92,6 +94,11 @@ function Settings() {
   const [blockRuleForm, setBlockRuleForm] = useState(EMPTY_BLOCK_RULE_FORM);
   const [savingBlockRule, setSavingBlockRule] = useState(false);
 
+  const [constraintWeights, setConstraintWeights] = useState([]);
+  const [constraintWeightsError, setConstraintWeightsError] = useState(null);
+  const [weightDrafts, setWeightDrafts] = useState({});
+  const [savingWeightFor, setSavingWeightFor] = useState(null);
+
   const [calendarExceptions, setCalendarExceptions] = useState([]);
   const [calendarExceptionsError, setCalendarExceptionsError] = useState(null);
   const [showCalendarExceptionForm, setShowCalendarExceptionForm] = useState(false);
@@ -113,6 +120,7 @@ function Settings() {
     loadEngineStatus();
     loadBlockRules();
     loadCourseDesignations();
+    loadConstraintWeights();
     loadCalendarExceptions();
     loadAdminReports();
     loadTerm();
@@ -413,6 +421,57 @@ function Settings() {
       showToast(t('settings.blockRules.deletedMessage'));
     } catch (err) {
       setBlockRulesError(err.response?.data?.message || t('settings.blockRules.deleteFailedPrefix') + err.message);
+    }
+  };
+
+  // Soft-constraint weight overrides: every known constraint (from
+  // scheduler-common's SoftConstraintDefaults, via GET /api/admin/constraint-config)
+  // with its default, current override (if any), and effective weight.
+  // weightDrafts holds each row's editable value locally until Saved.
+  const loadConstraintWeights = async () => {
+    try {
+      const response = await getConstraintWeights();
+      setConstraintWeights(response.data);
+      const drafts = {};
+      response.data.forEach((row) => {
+        drafts[row.constraintName] = row.effectiveWeight;
+      });
+      setWeightDrafts(drafts);
+      setConstraintWeightsError(null);
+    } catch (err) {
+      setConstraintWeightsError(t('settings.constraintWeights.loadFailedPrefix') + err.message);
+    }
+  };
+
+  const handleWeightDraftChange = (constraintName, value) => {
+    setWeightDrafts({ ...weightDrafts, [constraintName]: value });
+  };
+
+  const handleSaveWeight = async (constraintName) => {
+    const value = parseInt(weightDrafts[constraintName], 10);
+    if (Number.isNaN(value)) return;
+    setSavingWeightFor(constraintName);
+    try {
+      await setConstraintWeight(constraintName, value);
+      await loadConstraintWeights();
+      showToast(t('settings.constraintWeights.savedMessage'));
+    } catch (err) {
+      setConstraintWeightsError(err.response?.data?.message || t('settings.constraintWeights.saveFailedPrefix') + err.message);
+    } finally {
+      setSavingWeightFor(null);
+    }
+  };
+
+  const handleResetWeight = async (constraintName) => {
+    setSavingWeightFor(constraintName);
+    try {
+      await deleteConstraintWeight(constraintName);
+      await loadConstraintWeights();
+      showToast(t('settings.constraintWeights.resetMessage'));
+    } catch (err) {
+      setConstraintWeightsError(err.response?.data?.message || t('settings.constraintWeights.saveFailedPrefix') + err.message);
+    } finally {
+      setSavingWeightFor(null);
     }
   };
 
@@ -925,6 +984,83 @@ function Settings() {
                   </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      </div>
+      )}
+
+      {activeTab === 'constraintWeights' && (
+      <div role="tabpanel" id="settings-panel-constraintWeights" aria-labelledby="settings-tab-constraintWeights">
+      <div className="card">
+        <h3>{t('settings.constraintWeights.title')}</h3>
+        <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+          {t('settings.constraintWeights.description')}
+        </p>
+        {constraintWeightsError && <div className="error" role="alert">{constraintWeightsError}</div>}
+      </div>
+
+      <div className="card">
+        {constraintWeights.length === 0 ? (
+          <p style={{ color: 'var(--color-text-secondary)' }}>{t('settings.constraintWeights.none')}</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>{t('settings.constraintWeights.table.constraint')}</th>
+                <th>{t('settings.constraintWeights.table.defaultWeight')}</th>
+                <th>{t('settings.constraintWeights.table.currentWeight')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {constraintWeights.map((row) => {
+                const draft = weightDrafts[row.constraintName] ?? row.effectiveWeight;
+                const isOverridden = row.overrideWeight !== null && row.overrideWeight !== undefined;
+                const isDirty = String(draft) !== String(row.effectiveWeight);
+                const isSaving = savingWeightFor === row.constraintName;
+                return (
+                  <tr key={row.constraintName}>
+                    <td>
+                      {row.constraintName}
+                      {isOverridden && (
+                        <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--color-warning)' }}>
+                          {t('settings.constraintWeights.overridden')}
+                        </span>
+                      )}
+                    </td>
+                    <td>{row.defaultWeight}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1000}
+                        value={draft}
+                        onChange={(e) => handleWeightDraftChange(row.constraintName, e.target.value)}
+                        style={{ width: '80px' }}
+                      />
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => handleSaveWeight(row.constraintName)}
+                        disabled={!isDirty || isSaving}
+                        style={{ marginRight: '5px' }}
+                      >
+                        {isSaving ? t('settings.constraintWeights.saving') : t('common.save')}
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => handleResetWeight(row.constraintName)}
+                        disabled={!isOverridden || isSaving}
+                      >
+                        {t('settings.blockRules.resetToDefault')}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

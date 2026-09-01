@@ -1,5 +1,6 @@
 package com.example.domain;
 
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
 import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.ProblemFactCollectionProperty;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
@@ -35,6 +36,23 @@ public class SchoolSchedule {
 
     @PlanningScore
     private HardSoftScore score;
+
+    // Per-constraint soft-weight overrides, keyed by the constraint's own
+    // asConstraint(name) - see common's SoftConstraintDefaults for the
+    // canonical list of names/defaults. A .penalize(HardSoftScore.ofSoft(N))
+    // literal in SchoolConstraintProvider is the DEFAULT for that
+    // constraint; if this map (built from the constraint_config table by
+    // DataLoader) has an entry for that constraint's name, Timefold
+    // transparently substitutes it at score-calculation time - no change
+    // needed to the constraint methods themselves. Defaults to none() (no
+    // overrides at all) so every existing test/call site that doesn't set
+    // this explicitly keeps today's hardcoded-weight behavior unchanged.
+    // No annotation here - confirmed empirically that even pinned
+    // timefold.version 1.29.0 auto-discovers a ConstraintWeightOverrides
+    // member purely by type; adding the (deprecated) @ConstraintConfigurationProvider
+    // on top throws "has both a ConstraintWeightOverrides member and a
+    // ConstraintConfigurationProvider-annotated member" at solver build time.
+    private ConstraintWeightOverrides<HardSoftScore> constraintWeightOverrides = ConstraintWeightOverrides.none();
 
     public SchoolSchedule() {
         // No-arg constructor required by Timefold
@@ -98,6 +116,14 @@ public class SchoolSchedule {
 
     public void setScore(HardSoftScore score) {
         this.score = score;
+    }
+
+    public ConstraintWeightOverrides<HardSoftScore> getConstraintWeightOverrides() {
+        return constraintWeightOverrides;
+    }
+
+    public void setConstraintWeightOverrides(ConstraintWeightOverrides<HardSoftScore> constraintWeightOverrides) {
+        this.constraintWeightOverrides = constraintWeightOverrides;
     }
 
     /**

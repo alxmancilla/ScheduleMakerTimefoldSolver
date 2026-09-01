@@ -1,5 +1,7 @@
 package com.example.data;
 
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
+import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import com.example.domain.*;
 import java.sql.*;
 import java.time.DayOfWeek;
@@ -413,6 +415,30 @@ public class DataLoader {
     }
 
     /**
+     * Load per-constraint soft-weight overrides from constraint_config,
+     * built into a ConstraintWeightOverrides Timefold applies transparently
+     * on top of each constraint's hardcoded-default weight (see
+     * SchoolSchedule.getConstraintWeightOverrides() /
+     * SoftConstraintDefaults). A constraint with no row here keeps its
+     * hardcoded default - this table only ever holds explicit overrides,
+     * not a full copy of every known constraint's weight.
+     */
+    private ConstraintWeightOverrides<HardSoftScore> loadConstraintWeightOverrides(Connection conn)
+            throws SQLException {
+        String sql = "SELECT constraint_name, weight_soft FROM constraint_config";
+        Map<String, HardSoftScore> overrides = new HashMap<>();
+        try (Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                String constraintName = rs.getString("constraint_name");
+                int weightSoft = rs.getInt("weight_soft");
+                overrides.put(constraintName, HardSoftScore.ofSoft(weightSoft));
+            }
+        }
+        return overrides.isEmpty() ? ConstraintWeightOverrides.none() : ConstraintWeightOverrides.of(overrides);
+    }
+
+    /**
      * Load the complete dataset for block-based scheduling from the database,
      * resolving assignments to the current schedule (see the single-arg
      * overload below).
@@ -452,6 +478,7 @@ public class DataLoader {
             List<Group> groups = loadGroups(conn, rooms);
             List<CourseBlockAssignment> blockAssignments = loadCourseBlockAssignments(conn, groups, courses, teachers,
                     rooms, blockTimeslots, scheduleRunId);
+            ConstraintWeightOverrides<HardSoftScore> constraintWeightOverrides = loadConstraintWeightOverrides(conn);
 
             System.out.println("Loaded from database (block-based scheduling):");
             System.out.println("  - " + teachers.size() + " teachers");
@@ -460,9 +487,13 @@ public class DataLoader {
             System.out.println("  - " + blockTimeslots.size() + " block timeslots");
             System.out.println("  - " + groups.size() + " groups");
             System.out.println("  - " + blockAssignments.size() + " course block assignments");
+            System.out.println(
+                    "  - " + constraintWeightOverrides.getKnownConstraintNames().size() + " constraint weight overrides");
 
-            return SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses, groups,
-                    blockAssignments);
+            SchoolSchedule schedule = SchoolSchedule.forBlockScheduling(teachers, blockTimeslots, rooms, courses,
+                    groups, blockAssignments);
+            schedule.setConstraintWeightOverrides(constraintWeightOverrides);
+            return schedule;
         }
     }
 

@@ -619,6 +619,22 @@
         "maxBlocksPerDay": "Max Blocks/Day"
       }
     },
+    "constraintWeights": {
+      "title": "Constraint Weights",
+      "description": "Tune how strongly each soft (preference) constraint influences the solver's score. Higher weight = higher priority. Hard constraints (data integrity, double-booking, etc.) are never adjustable here - they must always hold. A change applies on the next solve, no redeploy needed.",
+      "loadFailedPrefix": "Failed to load constraint weights: ",
+      "saveFailedPrefix": "Failed to save constraint weight: ",
+      "savedMessage": "Constraint weight saved",
+      "resetMessage": "Constraint weight reset to default",
+      "none": "No soft constraints found.",
+      "overridden": "(overridden)",
+      "saving": "Saving...",
+      "table": {
+        "constraint": "Constraint",
+        "defaultWeight": "Default Weight",
+        "currentWeight": "Current Weight"
+      }
+    },
     "calendar": {
       "title": "Calendar",
       "description": "Track the school's holiday, exam, and half-day dates. Record-keeping only for now — not yet used by block generation or the solver.",

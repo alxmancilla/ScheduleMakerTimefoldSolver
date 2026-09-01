@@ -268,6 +268,16 @@ export const setComponentBlockRule = (component, preferredBlockSize, maxBlocksPe
 export const deleteComponentBlockRule = (component) =>
   api.delete(`/admin/component-block-rules/${encodeURIComponent(component)}`);
 
+// Admin: soft-constraint weight overrides. A constraint with no override
+// here keeps its hardcoded default in SchoolConstraintProvider, read into
+// a Timefold ConstraintWeightOverrides at solve time - no code change or
+// redeploy needed to retune one.
+export const getConstraintWeights = () => api.get('/admin/constraint-config');
+export const setConstraintWeight = (constraintName, weightSoft) =>
+  api.put(`/admin/constraint-config/${encodeURIComponent(constraintName)}`, { weightSoft });
+export const deleteConstraintWeight = (constraintName) =>
+  api.delete(`/admin/constraint-config/${encodeURIComponent(constraintName)}`);
+
 // Admin: calendar exceptions (holidays, half-days, exam days). Record-keeping
 // only for now - not yet read by block generation or the solver, since
 // block_timeslot has no calendar-date concept at all (pure recurring weekly

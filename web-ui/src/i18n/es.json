@@ -619,6 +619,22 @@
         "maxBlocksPerDay": "Máx. Bloques/Día"
       }
     },
+    "constraintWeights": {
+      "title": "Pesos de Restricciones",
+      "description": "Ajusta la influencia de cada restricción suave (de preferencia) en la puntuación del solucionador. Mayor peso = mayor prioridad. Las restricciones duras (integridad de datos, doble reserva, etc.) nunca son ajustables aquí — siempre deben cumplirse. Un cambio se aplica en la siguiente ejecución, sin necesidad de redesplegar.",
+      "loadFailedPrefix": "Error al cargar los pesos de restricciones: ",
+      "saveFailedPrefix": "Error al guardar el peso de la restricción: ",
+      "savedMessage": "Peso de restricción guardado",
+      "resetMessage": "Peso de restricción restablecido al valor por defecto",
+      "none": "No se encontraron restricciones suaves.",
+      "overridden": "(anulado)",
+      "saving": "Guardando...",
+      "table": {
+        "constraint": "Restricción",
+        "defaultWeight": "Peso por Defecto",
+        "currentWeight": "Peso Actual"
+      }
+    },
     "calendar": {
       "title": "Calendario",
       "description": "Registra los días festivos, de examen y medios días del ciclo escolar. Por ahora es solo un registro informativo — todavía no se usa al generar bloques ni en el solucionador.",
