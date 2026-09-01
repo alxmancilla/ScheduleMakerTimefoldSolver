@@ -2,6 +2,7 @@ package com.example.web.controller;
 
 import com.example.web.entity.RoomEntity;
 import com.example.web.repository.RoomRepository;
+import com.example.web.repository.RoomUtilizationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -52,6 +53,9 @@ public class RoomControllerTest {
     @MockBean
     private RoomRepository roomRepository;
 
+    @MockBean
+    private RoomUtilizationRepository roomUtilizationRepository;
+
     private RoomEntity room;
 
     @Before
@@ -80,6 +84,19 @@ public class RoomControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].name").value("A1"));
+    }
+
+    @Test
+    public void getUtilization_returnsList() throws Exception {
+        com.example.web.entity.RoomUtilizationEntity utilization =
+                new com.example.web.entity.RoomUtilizationEntity("A1", "Main", "estandar", 5L, 4L, 8L);
+        when(roomUtilizationRepository.findAll()).thenReturn(List.of(utilization));
+        mockMvc.perform(get("/api/rooms/utilization"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name").value("A1"))
+                .andExpect(jsonPath("$[0].assignmentsCount").value(5))
+                .andExpect(jsonPath("$[0].totalHoursUsed").value(8));
     }
 
     @Test

@@ -9,6 +9,7 @@ import Rooms from './components/Rooms';
 import Groups from './components/Groups';
 import Assignments from './components/Assignments';
 import CourseCoverage from './components/CourseCoverage';
+import TeacherAvailability from './components/TeacherAvailability';
 import Reports from './components/Reports';
 import ImportExcel from './components/Import';
 import Settings from './components/Settings';
@@ -38,6 +39,7 @@ const ADMIN_ITEMS = [
 const TOOLS_ITEMS = [
   { path: '/reports', labelKey: 'nav.reports' },
   { path: '/course-coverage', labelKey: 'nav.courseCoverage' },
+  { path: '/teacher-availability', labelKey: 'nav.teacherAvailability' },
   { path: '/import', labelKey: 'nav.import', writeOnly: true },
 ];
 
@@ -276,9 +278,7 @@ function Layout() {
             ) : (
               <>
                 <NavLink to="/" className={navLinkClass}>{t('nav.schedule')}</NavLink>
-                <AdminOnly>
-                  <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
-                </AdminOnly>
+                <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
                 <SetupNavDropdown />
                 <ToolsNavDropdown />
                 <AdminOnly>
@@ -319,13 +319,14 @@ function App() {
             <Route path="/courses" element={<Courses />} />
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/groups" element={<Groups />} />
+            <Route path="/assignments" element={<Assignments />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/course-coverage" element={<CourseCoverage />} />
+            <Route path="/teacher-availability" element={<TeacherAvailability />} />
             <Route element={<WriteRoute />}>
               <Route path="/import" element={<ImportExcel />} />
             </Route>
             <Route element={<AdminRoute />}>
-              <Route path="/assignments" element={<Assignments />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/users" element={<Users />} />
             </Route>

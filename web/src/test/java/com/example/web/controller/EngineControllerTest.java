@@ -112,7 +112,7 @@ public class EngineControllerTest {
     public void runEngine_outOfBoundsOverride_returns400() throws Exception {
         mockMvc.perform(post("/api/admin/engine/run")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"minutesSpentLimit\":60}"))
+                        .content("{\"minutesSpentLimit\":150}"))
                 .andExpect(status().isBadRequest());
     }
 

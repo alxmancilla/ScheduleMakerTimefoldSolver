@@ -23,11 +23,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the ADMIN-only exception carved out for /api/assignments/** in
- * {@link SecurityConfig}: unlike the general domain-data rules (any role can
- * read, WRITER/ADMIN can write), course block assignments are ADMIN-only for
- * every method - READER and WRITER are excluded from reading them too, not
- * just from writing.
+ * Verifies the ADMIN-only write exception carved out for /api/assignments/**
+ * in {@link SecurityConfig}: reads are open the same as everywhere else
+ * (READER/WRITER/ADMIN), but writes require ADMIN specifically - WRITER does
+ * not get its usual write access here, unlike every other domain-data
+ * resource.
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(CourseBlockAssignmentController.class)
@@ -63,25 +63,32 @@ public class AssignmentsSecurityTest {
 
     @Test
     @WithMockUser(roles = "READER")
-    public void reader_cannotRead() throws Exception {
-        // Unlike the general GET rule (any role can read), assignments carve
-        // out an ADMIN-only exception for every method.
+    public void reader_canRead() throws Exception {
+        when(assignmentRepository.findAll()).thenReturn(java.util.List.of());
         mockMvc.perform(get("/api/assignments"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "READER")
+    public void reader_cannotWrite() throws Exception {
+        mockMvc.perform(post("/api/assignments"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(roles = "WRITER")
-    public void writer_cannotRead() throws Exception {
+    public void writer_canRead() throws Exception {
+        when(assignmentRepository.findAll()).thenReturn(java.util.List.of());
         mockMvc.perform(get("/api/assignments"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
     @WithMockUser(roles = "WRITER")
     public void writer_cannotWrite() throws Exception {
-        // Previously WRITER could POST here under the general write rule;
-        // the assignments-specific ADMIN-only override now excludes it.
+        // Unlike the general write rule (WRITER or ADMIN), the
+        // assignments-specific ADMIN-only override excludes WRITER here.
         mockMvc.perform(post("/api/assignments"))
                 .andExpect(status().isForbidden());
     }

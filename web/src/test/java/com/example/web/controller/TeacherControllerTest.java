@@ -6,6 +6,7 @@ import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
+import com.example.web.repository.TeacherAvailabilityGridRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.repository.TeacherWorkloadRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -71,6 +72,9 @@ public class TeacherControllerTest {
     @MockBean
     private TeacherWorkloadRepository teacherWorkloadRepository;
 
+    @MockBean
+    private TeacherAvailabilityGridRepository teacherAvailabilityGridRepository;
+
     private TeacherEntity teacher;
 
     @Before
@@ -117,6 +121,20 @@ public class TeacherControllerTest {
                 .andExpect(jsonPath("$[0].assignedHours").value(12))
                 .andExpect(jsonPath("$[0].remainingCapacity").value(28))
                 .andExpect(jsonPath("$[0].utilizationPercent").value(30.00));
+    }
+
+    @Test
+    public void getAvailabilityGrid_returnsList() throws Exception {
+        com.example.web.entity.TeacherAvailabilityGridEntity grid =
+                new com.example.web.entity.TeacherAvailabilityGridEntity(
+                        "T1", "Ada Lovelace", "7, 8, 9", "7, 8, 9", "7, 8, 9", "7, 8, 9", "7, 8, 9", "", "");
+        when(teacherAvailabilityGridRepository.findAll()).thenReturn(List.of(grid));
+
+        mockMvc.perform(get("/api/teachers/availability-grid"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].teacherId").value("T1"))
+                .andExpect(jsonPath("$[0].mondayHours").value("7, 8, 9"));
     }
 
     @Test

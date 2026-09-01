@@ -5,7 +5,7 @@ import {
   getGroups, getCourses, getTeachers, getRooms, listTimeslots, getGroupRoomRanges,
   exportAssignments, importAssignments,
 } from '../api';
-import WriteOnly from '../auth/WriteOnly';
+import AdminOnly from '../auth/AdminOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { ROOM_TYPES, formatHour } from '../constants';
@@ -339,11 +339,11 @@ function Assignments() {
               <option value="unassigned">{t('assignments.filters.unassigned')}</option>
               <option value="pinned">{t('assignments.filters.pinned')}</option>
             </select>
-            <WriteOnly>
+            <AdminOnly>
               <button className="btn btn-success" onClick={handleAdd}>
                 {t('assignments.addAssignment')}
               </button>
-            </WriteOnly>
+            </AdminOnly>
           </div>
         </div>
         <p style={{ marginTop: '10px', color: 'var(--color-text-secondary)' }}>
@@ -363,39 +363,41 @@ function Assignments() {
             </button>
             {exportError && <div className="error" role="alert" style={{ marginTop: '8px' }}>{exportError}</div>}
           </div>
-          <div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <input
-                ref={importFileInputRef}
-                type="file"
-                accept=".xlsx"
-                onChange={(e) => setImportFile(e.target.files[0] || null)}
-              />
-              <button
-                className="btn btn-success"
-                onClick={handleImportAssignments}
-                disabled={!importFile || importing}
-              >
-                {importing ? t('assignments.backup.importing') : `⇪ ${t('assignments.backup.importButton')}`}
-              </button>
+          <AdminOnly>
+            <div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx"
+                  onChange={(e) => setImportFile(e.target.files[0] || null)}
+                />
+                <button
+                  className="btn btn-success"
+                  onClick={handleImportAssignments}
+                  disabled={!importFile || importing}
+                >
+                  {importing ? t('assignments.backup.importing') : `⇪ ${t('assignments.backup.importButton')}`}
+                </button>
+              </div>
+              {importError && <div className="error" role="alert" style={{ marginTop: '8px' }}>{importError}</div>}
+              {importResult && importResult.success && (
+                <div style={{ marginTop: '8px', fontSize: '13px', color: '#2e7d32' }}>
+                  {t('assignments.backup.importedSummary', { count: importResult.assignmentsImported })}
+                </div>
+              )}
+              {importResult && !importResult.success && (
+                <div style={{ marginTop: '8px' }}>
+                  <div className="error" role="alert">{t('assignments.backup.rejected')}</div>
+                  <ul style={{ marginTop: '6px', fontSize: '13px', color: 'var(--color-danger-dark)' }}>
+                    {importResult.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-            {importError && <div className="error" role="alert" style={{ marginTop: '8px' }}>{importError}</div>}
-            {importResult && importResult.success && (
-              <div style={{ marginTop: '8px', fontSize: '13px', color: '#2e7d32' }}>
-                {t('assignments.backup.importedSummary', { count: importResult.assignmentsImported })}
-              </div>
-            )}
-            {importResult && !importResult.success && (
-              <div style={{ marginTop: '8px' }}>
-                <div className="error" role="alert">{t('assignments.backup.rejected')}</div>
-                <ul style={{ marginTop: '6px', fontSize: '13px', color: 'var(--color-danger-dark)' }}>
-                  {importResult.errors.map((e, i) => (
-                    <li key={i}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          </AdminOnly>
         </div>
       </div>
 
@@ -622,14 +624,14 @@ function Assignments() {
                 <td>{assignment.roomName || '-'}</td>
                 <td>{assignment.pinned ? '📌' : ''}</td>
                 <td>
-                  <WriteOnly>
+                  <AdminOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(assignment)} style={{ marginRight: '5px' }}>
                       {t('common.edit')}
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDelete(assignment.id)}>
                       {t('common.delete')}
                     </button>
-                  </WriteOnly>
+                  </AdminOnly>
                 </td>
               </tr>
             ))}

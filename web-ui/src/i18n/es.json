@@ -43,6 +43,7 @@
     "tools": "Herramientas",
     "reports": "Reportes",
     "courseCoverage": "Cobertura de Cursos",
+    "teacherAvailability": "Disponibilidad de Maestros",
     "import": "Importar / Exportar",
     "admin": "Administración",
     "settings": "Configuración",
@@ -233,7 +234,8 @@
       "name": "Nombre",
       "building": "Edificio",
       "type": "Tipo",
-      "capacity": "Capacidad"
+      "capacity": "Capacidad",
+      "utilization": "Utilización"
     },
     "savedMessage": "Aula guardada",
     "deletedMessage": "Aula eliminada",
@@ -402,6 +404,26 @@
       "rooms": "Aulas"
     }
   },
+  "teacherAvailability": {
+    "title": "Disponibilidad de Maestros",
+    "description": "La disponibilidad semanal declarada de cada maestro, condensada en una fila - rangos de horas por día, de un vistazo.",
+    "loading": "Cargando disponibilidad de maestros...",
+    "loadFailedPrefix": "Error al cargar la disponibilidad de maestros: ",
+    "searchPlaceholder": "Buscar por nombre de maestro...",
+    "none": "No hay maestros que coincidan",
+    "days": {
+      "mon": "Lun",
+      "tue": "Mar",
+      "wed": "Mié",
+      "thu": "Jue",
+      "fri": "Vie",
+      "sat": "Sáb",
+      "sun": "Dom"
+    },
+    "table": {
+      "teacher": "Maestro"
+    }
+  },
   "reports": {
     "title": "Reportes",
     "refresh": "Actualizar",
@@ -458,7 +480,7 @@
       "startFailedPrefix": "Error al iniciar el motor: ",
       "minutesSpentLimit": "Límite de tiempo total (minutos)",
       "unimprovedMinutesSpentLimit": "Rendirse si no mejora en (minutos)",
-      "limitsDescription": "Aplica solo a esta ejecución — solverConfig.xml no se modifica. Deje los valores predeterminados (5 / 2) salvo que tenga motivo para ejecutar más o menos tiempo.",
+      "limitsDescription": "Aplica solo a esta ejecución — solverConfig.xml no se modifica. Deje los valores predeterminados (5 / 2) salvo que tenga motivo para ejecutar más o menos tiempo. El tiempo total puede llegar hasta 120 minutos, y el de \"rendirse si se estanca\" hasta 60.",
       "state": "Estado:",
       "started": "Iniciado:",
       "finished": "Finalizado:",

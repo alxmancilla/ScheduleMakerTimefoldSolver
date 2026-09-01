@@ -1,5 +1,6 @@
 package com.example.analysis;
 
+import com.example.domain.BlockScheduleMath;
 import com.example.domain.BlockTimeslot;
 import com.example.domain.CourseBlockAssignment;
 import com.example.domain.SchoolSchedule;
@@ -14,61 +15,12 @@ import java.util.*;
  */
 public final class BlockScheduleAnalyzer {
 
-    // Mirrors SchoolConstraintProvider.DEFAULT_MAX_BLOCKS_PER_DAY: the fallback
-    // used when a course's component has no row in component_block_rule.
-    private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
-
     private BlockScheduleAnalyzer() {
     }
-
-    private static int maxBlocksPerDay(com.example.domain.Course course) {
-        Integer configured = course.getMaxBlocksPerDay();
-        return configured != null ? configured : DEFAULT_MAX_BLOCKS_PER_DAY;
-    }
-
-    // Mirrors SchoolConstraintProvider.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK.
-    private static final int MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK = 4;
-
-    // Mirrors SchoolConstraintProvider.EARLIEST_START_HOUR.
-    private static final int EARLIEST_START_HOUR = 7;
-
-    // Mirrors SchoolConstraintProvider.SEMESTER_ONE_LATEST_END_HOUR.
-    private static final int SEMESTER_ONE_LATEST_END_HOUR = 14;
 
     /** True when this block belongs to a first-semester (semester == 1) course. */
     private static boolean isSemesterOneBlock(CourseBlockAssignment a) {
         return a.isSemesterOne();
-    }
-
-    /**
-     * The longest run of occupied hours (merging touching or overlapping
-     * blocks into one span) once sorted by start hour, tie-broken by id for a
-     * deterministic total order - see SchoolConstraintProvider's copy of this
-     * method for why interval-merge (not summing lengths) and the id
-     * tie-break both matter. Independent recomputation, not shared code, per
-     * this analyzer's own convention.
-     */
-    private static int longestConsecutiveRunHours(List<CourseBlockAssignment> blocks) {
-        List<CourseBlockAssignment> sorted = new ArrayList<>(blocks);
-        sorted.sort(Comparator
-                .comparingInt((CourseBlockAssignment a) -> a.getTimeslot().getStartHour())
-                .thenComparing(CourseBlockAssignment::getId));
-        int longest = 0;
-        int runStart = -1;
-        int runEnd = -1;
-        for (CourseBlockAssignment assignment : sorted) {
-            BlockTimeslot timeslot = assignment.getTimeslot();
-            int start = timeslot.getStartHour();
-            int end = start + timeslot.getLengthHours();
-            if (runEnd == -1 || start > runEnd) {
-                runStart = start;
-                runEnd = end;
-            } else {
-                runEnd = Math.max(runEnd, end);
-            }
-            longest = Math.max(longest, runEnd - runStart);
-        }
-        return longest;
     }
 
     /**
@@ -124,7 +76,7 @@ public final class BlockScheduleAnalyzer {
                 if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     teacherDouble++;
                 }
             }
@@ -142,7 +94,7 @@ public final class BlockScheduleAnalyzer {
                 if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     roomDouble++;
                 }
             }
@@ -186,7 +138,7 @@ public final class BlockScheduleAnalyzer {
         int semesterOneFinishBy2pmViolations = 0;
         for (CourseBlockAssignment a : list) {
             if (isSemesterOneBlock(a) && a.getTimeslot() != null
-                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR) {
+                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > BlockScheduleMath.SEMESTER_ONE_LATEST_END_HOUR) {
                 semesterOneFinishBy2pmViolations++;
             }
         }
@@ -203,7 +155,7 @@ public final class BlockScheduleAnalyzer {
                 if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getGroup().equals(a2.getGroup())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     groupConflict++;
                 }
             }
@@ -234,7 +186,7 @@ public final class BlockScheduleAnalyzer {
                     List<CourseBlockAssignment> assignments = dayEntry.getValue();
                     int count = assignments.size();
                     if (count > 0) {
-                        int limit = maxBlocksPerDay(assignments.get(0).getCourse());
+                        int limit = BlockScheduleMath.maxBlocksPerDay(assignments.get(0).getCourse());
                         if (count > limit) {
                             maxTwoBlocksPerCoursePerDay += (count - limit);
                         }
@@ -245,9 +197,10 @@ public final class BlockScheduleAnalyzer {
         result.put("Maximum blocks per course per group per day", maxTwoBlocksPerCoursePerDay);
 
         // Course blocks must be consecutive (HARD) - Count
-        // Mirror the solver: group unpinned blocks by (group, course, day), sort by
-        // start hour, and count the breaks (gaps or overlaps between adjacent blocks)
-        // in each chain. This avoids the pairwise over-counting where a valid
+        // Mirror the solver: group unpinned blocks by (group, course, day), then
+        // count the breaks (gaps or overlaps between adjacent blocks) in each
+        // chain via the same BlockScheduleMath.countChainBreaks the constraint
+        // itself uses. This avoids the pairwise over-counting where a valid
         // 7-8 / 8-9 / 9-10 sequence would flag the 7-8 <-> 9-10 pair.
         Map<java.util.List<Object>, java.util.List<CourseBlockAssignment>> blocksByCourseDay = new java.util.HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -263,19 +216,12 @@ public final class BlockScheduleAnalyzer {
             if (blocks.size() < 2) {
                 continue;
             }
-            blocks.sort(java.util.Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
-            for (int i = 1; i < blocks.size(); i++) {
-                int prevEnd = blocks.get(i - 1).getTimeslot().getStartHour()
-                        + blocks.get(i - 1).getTimeslot().getLengthHours();
-                if (prevEnd != blocks.get(i).getTimeslot().getStartHour()) {
-                    courseBlocksNonConsecutive++;
-                }
-            }
+            courseBlocksNonConsecutive += BlockScheduleMath.countChainBreaks(blocks);
         }
         result.put("Course blocks must be consecutive", courseBlocksNonConsecutive);
 
         // Teacher/group must have a break after consecutive hours (HARD) - Count
-        // Mirrors SchoolConstraintProvider's MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK
+        // Mirrors SchoolConstraintProvider's BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK
         // rule: group unpinned blocks by (subject, day), find the longest
         // back-to-back run, penalty is the excess over the threshold - matching
         // the solver's own penalty magnitude, not just a violation count.
@@ -300,7 +246,7 @@ public final class BlockScheduleAnalyzer {
         }
         int teacherBreakViolations = 0;
         for (List<CourseBlockAssignment> blocks : teacherDayBlocks.values()) {
-            int excess = longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
+            int excess = BlockScheduleMath.longestConsecutiveRunHours(blocks) - BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
             if (excess > 0) {
                 teacherBreakViolations += excess;
             }
@@ -309,7 +255,7 @@ public final class BlockScheduleAnalyzer {
         // result.put("Teacher must have a break after consecutive hours", teacherBreakViolations);
         int groupBreakViolations = 0;
         for (List<CourseBlockAssignment> blocks : groupDayBlocks.values()) {
-            int excess = longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
+            int excess = BlockScheduleMath.longestConsecutiveRunHours(blocks) - BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK;
             if (excess > 0) {
                 groupBreakViolations += excess;
             }
@@ -378,7 +324,7 @@ public final class BlockScheduleAnalyzer {
                 if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     teacherDouble.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
                 }
             }
@@ -396,7 +342,7 @@ public final class BlockScheduleAnalyzer {
                 if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     roomDouble.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
                 }
             }
@@ -433,7 +379,7 @@ public final class BlockScheduleAnalyzer {
         List<String> semesterOneFinishBy2pm = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (isSemesterOneBlock(a) && a.getTimeslot() != null
-                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR) {
+                    && a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours() > BlockScheduleMath.SEMESTER_ONE_LATEST_END_HOUR) {
                 semesterOneFinishBy2pm.add(blockAssignmentToString(a));
             }
         }
@@ -450,7 +396,7 @@ public final class BlockScheduleAnalyzer {
                 if ((!a1.isPinned() || !a2.isPinned())
                         && a1.getGroup().equals(a2.getGroup())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
                     groupConflict.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
                 }
             }
@@ -481,7 +427,7 @@ public final class BlockScheduleAnalyzer {
                     List<CourseBlockAssignment> assignments = dayEntry.getValue();
                     int count = assignments.size();
                     if (count > 0) {
-                        int limit = maxBlocksPerDay(assignments.get(0).getCourse());
+                        int limit = BlockScheduleMath.maxBlocksPerDay(assignments.get(0).getCourse());
                         if (count > limit) {
                             String courseName = assignments.get(0).getCourse().getName();
                             String groupName = assignments.get(0).getGroup().getName();
@@ -548,15 +494,15 @@ public final class BlockScheduleAnalyzer {
         List<String> teacherBreakDetails = new ArrayList<>();
         for (Map.Entry<Object, List<CourseBlockAssignment>> entry : teacherDayBlocksDetail.entrySet()) {
             List<CourseBlockAssignment> blocks = entry.getValue();
-            int run = longestConsecutiveRunHours(blocks);
-            if (run > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK) {
+            int run = BlockScheduleMath.longestConsecutiveRunHours(blocks);
+            if (run > BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK) {
                 @SuppressWarnings("unchecked")
                 List<Object> key = (List<Object>) (List<?>) entry.getKey();
                 Teacher teacher = (Teacher) key.get(0);
                 DayOfWeek day = (DayOfWeek) key.get(1);
                 teacherBreakDetails.add(String.format("%s %s on %s (%dh straight, limit=%dh)",
                         teacher.getName(), teacher.getLastName(), formatDay(day), run,
-                        MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
+                        BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
             }
         }
         // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
@@ -564,14 +510,14 @@ public final class BlockScheduleAnalyzer {
         List<String> groupBreakDetails = new ArrayList<>();
         for (Map.Entry<Object, List<CourseBlockAssignment>> entry : groupDayBlocksDetail.entrySet()) {
             List<CourseBlockAssignment> blocks = entry.getValue();
-            int run = longestConsecutiveRunHours(blocks);
-            if (run > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK) {
+            int run = BlockScheduleMath.longestConsecutiveRunHours(blocks);
+            if (run > BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK) {
                 @SuppressWarnings("unchecked")
                 List<Object> key = (List<Object>) (List<?>) entry.getKey();
                 com.example.domain.Group group = (com.example.domain.Group) key.get(0);
                 DayOfWeek day = (DayOfWeek) key.get(1);
                 groupBreakDetails.add(String.format("%s on %s (%dh straight, limit=%dh)",
-                        group.getName(), formatDay(day), run, MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
+                        group.getName(), formatDay(day), run, BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK));
             }
         }
         // TEMP DISABLED 2026-08-24 (mirrors SchoolConstraintProvider - re-enable both together)
@@ -734,12 +680,7 @@ public final class BlockScheduleAnalyzer {
         }
         for (Map<String, List<CourseBlockAssignment>> byCourse : coreBlocksByGroupAndCourse.values()) {
             for (List<CourseBlockAssignment> blocks : byCourse.values()) {
-                Map<Integer, Integer> hourCounts = new HashMap<>();
-                for (CourseBlockAssignment a : blocks) {
-                    hourCounts.merge(a.getTimeslot().getStartHour(), 1, Integer::sum);
-                }
-                int modeCount = Collections.max(hourCounts.values());
-                coreSameTimeViolations += blocks.size() - modeCount;
+                coreSameTimeViolations += BlockScheduleMath.blocksNotAtModeHour(blocks);
             }
         }
         // TEMP DISABLED 2026-08-26 (mirrors SchoolConstraintProvider - re-enable both together)
@@ -828,32 +769,14 @@ public final class BlockScheduleAnalyzer {
                 List<CourseBlockAssignment> assigns = dayEntry.getValue();
                 assigns.sort(Comparator.comparing(a -> a.getTimeslot().getStartHour()));
 
-                // Calculate gaps between blocks
+                // Calculate gaps between blocks - BlockScheduleMath.availableGapHours
+                // counts each available gap hour individually (partial credit for a
+                // gap the teacher is only partly free during), matching exactly what
+                // SchoolConstraintProvider.minimizeTeacherIdleGaps penalizes.
                 for (int i = 1; i < assigns.size(); i++) {
                     CourseBlockAssignment prev = assigns.get(i - 1);
                     CourseBlockAssignment curr = assigns.get(i);
-
-                    int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
-                    int currStart = curr.getTimeslot().getStartHour();
-                    int gap = currStart - prevEnd;
-
-                    if (gap > 0) {
-                        // Check if teacher is available during gap hours
-                        DayOfWeek day = dayEntry.getKey();
-                        boolean availableDuringGap = true;
-
-                        for (int gapHour = prevEnd; gapHour < currStart; gapHour++) {
-                            if (!prev.getTeacher().isAvailableAt(day, gapHour)) {
-                                availableDuringGap = false;
-                                break;
-                            }
-                        }
-
-                        // Only count as violation if teacher IS available during gap
-                        if (availableDuringGap) {
-                            idleGaps += gap;
-                        }
-                    }
+                    idleGaps += BlockScheduleMath.availableGapHours(prev, curr);
                 }
             }
         }
@@ -894,7 +817,7 @@ public final class BlockScheduleAnalyzer {
         // Prefer first-semester blocks to start early (SOFT, weight 4) - mirrors
         // SchoolConstraintProvider.preferSemesterOneBlocksStartEarly: group unpinned
         // semester-1 blocks by (group, day), penalize by how far the earliest one's
-        // start hour is from EARLIEST_START_HOUR (7).
+        // start hour is from BlockScheduleMath.EARLIEST_START_HOUR (7).
         int semesterOneStartEarlyViolations = 0;
         Map<String, Map<DayOfWeek, Integer>> semesterOneEarliestHourByGroupDay = new HashMap<>();
         for (CourseBlockAssignment a : list) {
@@ -910,8 +833,8 @@ public final class BlockScheduleAnalyzer {
         }
         for (Map<DayOfWeek, Integer> byDay : semesterOneEarliestHourByGroupDay.values()) {
             for (int earliestHour : byDay.values()) {
-                if (earliestHour > EARLIEST_START_HOUR) {
-                    semesterOneStartEarlyViolations += earliestHour - EARLIEST_START_HOUR;
+                if (earliestHour > BlockScheduleMath.EARLIEST_START_HOUR) {
+                    semesterOneStartEarlyViolations += earliestHour - BlockScheduleMath.EARLIEST_START_HOUR;
                 }
             }
         }
@@ -940,10 +863,8 @@ public final class BlockScheduleAnalyzer {
                 for (int i = 1; i < assigns.size(); i++) {
                     CourseBlockAssignment prev = assigns.get(i - 1);
                     CourseBlockAssignment curr = assigns.get(i);
-                    int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
-                    int gap = curr.getTimeslot().getStartHour() - prevEnd;
-                    if (gap > 0 && isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
-                        semesterOneIdleGaps += gap;
+                    if (isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
+                        semesterOneIdleGaps += BlockScheduleMath.gapHours(prev, curr);
                     }
                 }
             }
@@ -982,26 +903,6 @@ public final class BlockScheduleAnalyzer {
         result.put("Non-standard rooms should finish by 2pm", nonStandardAfter2pm);
 
         return result;
-    }
-
-    /**
-     * Helper method to check if two block timeslots overlap.
-     */
-    private static boolean blocksOverlap(BlockTimeslot block1, BlockTimeslot block2) {
-        if (block1 == null || block2 == null) {
-            return false;
-        }
-
-        if (!block1.getDayOfWeek().equals(block2.getDayOfWeek())) {
-            return false;
-        }
-
-        int start1 = block1.getStartHour();
-        int end1 = block1.getStartHour() + block1.getLengthHours();
-        int start2 = block2.getStartHour();
-        int end2 = block2.getStartHour() + block2.getLengthHours();
-
-        return start1 < end2 && start2 < end1;
     }
 
     /**

@@ -3,6 +3,7 @@ package com.example.web.controller;
 import com.example.web.dto.TeacherDTO;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.RoomEntity;
+import com.example.web.entity.TeacherAvailabilityGridEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.entity.TeacherQualificationEntity;
 import com.example.web.entity.TeacherWorkloadEntity;
@@ -10,6 +11,7 @@ import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.RoomRepository;
+import com.example.web.repository.TeacherAvailabilityGridRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.repository.TeacherWorkloadRepository;
 import com.example.common.RoomTypeCompatibility;
@@ -33,15 +35,18 @@ public class TeacherController {
     private final RoomRepository roomRepository;
     private final CourseRepository courseRepository;
     private final TeacherWorkloadRepository teacherWorkloadRepository;
+    private final TeacherAvailabilityGridRepository teacherAvailabilityGridRepository;
 
     public TeacherController(TeacherRepository teacherRepository,
             CourseBlockAssignmentRepository assignmentRepository, RoomRepository roomRepository,
-            CourseRepository courseRepository, TeacherWorkloadRepository teacherWorkloadRepository) {
+            CourseRepository courseRepository, TeacherWorkloadRepository teacherWorkloadRepository,
+            TeacherAvailabilityGridRepository teacherAvailabilityGridRepository) {
         this.teacherRepository = teacherRepository;
         this.assignmentRepository = assignmentRepository;
         this.roomRepository = roomRepository;
         this.courseRepository = courseRepository;
         this.teacherWorkloadRepository = teacherWorkloadRepository;
+        this.teacherAvailabilityGridRepository = teacherAvailabilityGridRepository;
     }
 
     @GetMapping
@@ -59,6 +64,18 @@ public class TeacherController {
     @GetMapping("/workload")
     public List<TeacherWorkloadEntity> getWorkload() {
         return teacherWorkloadRepository.findAll();
+    }
+
+    /**
+     * Backed by v_teacher_availability_grid (each weekday's available hours
+     * pre-aggregated server-side into a comma-separated string per teacher).
+     * Its own endpoint for the same reason getWorkload() is: shown to any
+     * role that can view the Teachers page, without requiring the
+     * ADMIN-only /api/assignments/** access.
+     */
+    @GetMapping("/availability-grid")
+    public List<TeacherAvailabilityGridEntity> getAvailabilityGrid() {
+        return teacherAvailabilityGridRepository.findAll();
     }
 
     @GetMapping("/{id}")

@@ -35,9 +35,10 @@ import java.util.List;
  * Stateless security: authenticate with a signed JWT (HMAC) carrying the user's
  * role. Reads are open to any authenticated role; writes require WRITER or
  * ADMIN; user management under /api/admin/** requires ADMIN. Course block
- * assignments (/api/assignments/**) are the one resource-specific exception
- * to the general read rule: ADMIN-only for every method, READER/WRITER
- * excluded entirely (not just from writing).
+ * assignments (/api/assignments/**) are the one resource-specific exception to
+ * the general write rule: reads are open the same as everywhere else
+ * (READER/WRITER/ADMIN), but writes are ADMIN-only - WRITER does not get its
+ * usual write access here, unlike every other domain-data resource.
  */
 @Configuration
 @EnableWebSecurity
@@ -69,10 +70,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/auth/preferred-language")
                         .hasAnyRole("READER", "WRITER", "ADMIN", "TEACHER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Course block assignments carry the live/solved schedule - admin-only
-                        // for every method (GET included), ahead of the general per-method
-                        // rules below so READER/WRITER no longer see or touch this resource.
-                        .requestMatchers("/api/assignments/**").hasRole("ADMIN")
+                        // Course block assignments carry the live/solved schedule - reads stay
+                        // open to READER/WRITER/ADMIN like everywhere else, but every write
+                        // (POST/PUT/DELETE, including the /export /import endpoints) is
+                        // ADMIN-only, ahead of the general per-method rules below which would
+                        // otherwise let WRITER write here too.
+                        .requestMatchers(HttpMethod.GET, "/api/assignments/**")
+                        .hasAnyRole("READER", "WRITER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/assignments/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/assignments/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/assignments/**").hasRole("ADMIN")
                         // TEACHER is deliberately NOT in the general GET rule below - it can only
                         // read its own schedule/identity/term, not the broader domain data every
                         // other role can. Without this exception, GET /api/auth/me (used on every

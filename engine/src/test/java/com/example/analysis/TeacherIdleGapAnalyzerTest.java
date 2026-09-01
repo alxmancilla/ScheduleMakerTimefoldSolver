@@ -27,9 +27,11 @@ import static org.junit.Assert.assertEquals;
  *  1. Adjacency: a chain of 3+ blocks on the same day counts idle hours once per
  *     gap (adjacent pairs only), never re-counting the non-adjacent pair, mirroring
  *     the solver's forEachUniquePair + ifNotExists formulation.
- *  2. Availability-awareness: a gap counts ONLY if the teacher is available for the
- *     WHOLE gap. If the teacher is unavailable for any hour in the gap, the entire
- *     gap contributes 0 (all-or-nothing, per BlockScheduleAnalyzer).
+ *  2. Availability-awareness: an idle hour is counted only if the teacher is
+ *     actually available during THAT hour - partial credit per available hour
+ *     (via {@code BlockScheduleMath.availableGapHours}, the same function
+ *     {@code SchoolConstraintProvider.minimizeTeacherIdleGaps} penalizes with),
+ *     not an all-or-nothing verdict on the whole gap.
  */
 public class TeacherIdleGapAnalyzerTest {
 
@@ -97,13 +99,27 @@ public class TeacherIdleGapAnalyzerTest {
     }
 
     @Test
-    public void gapWhereTeacherIsUnavailableIsNotCounted() {
+    public void gapPartiallyUnavailableCountsOnlyAvailableHours() {
         // Blocks 7-8 and 12-13; gap hours are 8,9,10,11. Teacher is NOT available
-        // at hour 10, so the WHOLE gap is excluded (all-or-nothing) -> 0.
+        // at hour 10, but IS available at 8, 9, and 11 - those 3 hours are still
+        // penalized (partial credit), unlike the all-or-nothing behavior this
+        // used to have before it shared BlockScheduleMath.availableGapHours with
+        // the constraint provider.
         Teacher t = teacherAvailable("T1", 7, 8, 9, 11, 12);
         SchoolSchedule schedule = scheduleWith(
                 block("A1", t, 7),
                 block("A2", t, 12));
+        assertEquals(3, teacherIdleGaps(schedule));
+    }
+
+    @Test
+    public void gapEntirelyUnavailableIsNotCounted() {
+        // Blocks 7-8 and 9-10; the sole gap hour is 8. Teacher is NOT available
+        // at 8, so this (single-hour) gap contributes 0.
+        Teacher t = teacherAvailable("T1", 7, 9);
+        SchoolSchedule schedule = scheduleWith(
+                block("A1", t, 7),
+                block("A2", t, 9));
         assertEquals(0, teacherIdleGaps(schedule));
     }
 

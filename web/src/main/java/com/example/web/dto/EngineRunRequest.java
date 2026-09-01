@@ -11,11 +11,11 @@ import jakarta.validation.constraints.Min;
 public class EngineRunRequest {
 
     @Min(1)
-    @Max(30)
+    @Max(120)
     private Integer minutesSpentLimit;
 
     @Min(1)
-    @Max(15)
+    @Max(60)
     private Integer unimprovedMinutesSpentLimit;
 
     public Integer getMinutesSpentLimit() {

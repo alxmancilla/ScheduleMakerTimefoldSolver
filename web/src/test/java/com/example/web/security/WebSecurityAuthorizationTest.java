@@ -68,6 +68,10 @@ public class WebSecurityAuthorizationTest {
     @MockBean
     private TeacherWorkloadRepository teacherWorkloadRepository;
 
+    // Required by TeacherController's constructor (GET /api/teachers/availability-grid).
+    @MockBean
+    private com.example.web.repository.TeacherAvailabilityGridRepository teacherAvailabilityGridRepository;
+
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean
     private AppUserDetailsService appUserDetailsService;

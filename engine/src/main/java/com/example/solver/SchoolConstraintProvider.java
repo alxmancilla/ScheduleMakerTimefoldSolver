@@ -12,7 +12,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 import com.example.domain.CourseBlockAssignment;
-import com.example.domain.BlockTimeslot;
+import com.example.domain.BlockScheduleMath;
 import com.example.domain.Room;
 import com.example.domain.Teacher;
 
@@ -129,34 +129,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
     }
 
     /**
-     * Helper method to check if two block timeslots overlap.
-     * Blocks overlap if they are on the same day and their time ranges intersect.
-     *
-     * @param block1 first block timeslot
-     * @param block2 second block timeslot
-     * @return true if blocks overlap, false otherwise
-     */
-    private boolean blocksOverlap(BlockTimeslot block1, BlockTimeslot block2) {
-        if (block1 == null || block2 == null) {
-            return false;
-        }
-
-        // Different days = no overlap
-        if (!block1.getDayOfWeek().equals(block2.getDayOfWeek())) {
-            return false;
-        }
-
-        // Same day: check if time ranges overlap
-        int start1 = block1.getStartHour();
-        int end1 = block1.getStartHour() + block1.getLengthHours();
-        int start2 = block2.getStartHour();
-        int end2 = block2.getStartHour() + block2.getLengthHours();
-
-        // Blocks overlap if one starts before the other ends
-        return start1 < end2 && start2 < end1;
-    }
-
-    /**
      * CRITICAL CONSTRAINT: Block length must match timeslot length.
      * A 1-hour block can only be assigned to a 1-hour timeslot.
      * A 2-hour block can only be assigned to a 2-hour timeslot, etc.
@@ -217,7 +189,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                                                    // blocks are not a double-booking (a2 is non-null via the join)
                         && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("No teacher double-booking");
     }
@@ -236,7 +208,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                                                 // blocks are not a double-booking (a2 is non-null via the join)
                         && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("No room double-booking");
     }
@@ -311,7 +283,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> a.isSemesterOne() && a.getTimeslot() != null
                         && a.getTimeslot().getStartHour()
-                                + a.getTimeslot().getLengthHours() > SEMESTER_ONE_LATEST_END_HOUR)
+                                + a.getTimeslot().getLengthHours() > BlockScheduleMath.SEMESTER_ONE_LATEST_END_HOUR)
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("First-semester blocks must finish by 2pm");
     }
@@ -328,7 +300,7 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .filter((a1, a2) -> (!a1.isPinned() || !a2.isPinned()) // Penalize if at least one is unpinned
                         && a1.getTimeslot() != null
                         && a2.getTimeslot() != null
-                        && blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
+                        && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot()))
                 .penalize(HardSoftScore.ONE_HARD)
                 .asConstraint("Group cannot have two courses at same time");
     }
@@ -392,16 +364,13 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Non-standard rooms should finish by 2pm");
     }
 
-    // A component with no row in component_block_rule falls back to this,
-    // matching the old default cap for non-Core courses.
-    private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
-
     private Constraint maxTwoBlocksPerCoursePerGroupPerDay(ConstraintFactory constraintFactory) {
         // HARD: No more than course.getMaxBlocksPerDay() blocks of the same
         // course/group may land on the same day. This prevents excessive
         // concentration of the same course on one day. The limit is configurable
         // per course component via component_block_rule (Settings > Block Rules);
-        // a component with no configured rule falls back to DEFAULT_MAX_BLOCKS_PER_DAY.
+        // a component with no configured rule falls back to
+        // BlockScheduleMath.DEFAULT_MAX_BLOCKS_PER_DAY.
         return constraintFactory
                 .forEachIncludingUnassigned(CourseBlockAssignment.class)
                 .filter(a -> !a.isPinned() && a.getTimeslot() != null)
@@ -410,19 +379,9 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         CourseBlockAssignment::getCourse,
                         a -> a.getTimeslot().getDayOfWeek(),
                         ConstraintCollectors.toList())
-                .filter((group, course, day, assignments) -> {
-                    int limit = course.getMaxBlocksPerDay() != null
-                            ? course.getMaxBlocksPerDay()
-                            : DEFAULT_MAX_BLOCKS_PER_DAY;
-                    return assignments.size() > limit;
-                })
+                .filter((group, course, day, assignments) -> assignments.size() > BlockScheduleMath.maxBlocksPerDay(course))
                 .penalize(HardSoftScore.ONE_HARD,
-                        (group, course, day, assignments) -> {
-                            int limit = course.getMaxBlocksPerDay() != null
-                                    ? course.getMaxBlocksPerDay()
-                                    : DEFAULT_MAX_BLOCKS_PER_DAY;
-                            return assignments.size() - limit;
-                        })
+                        (group, course, day, assignments) -> assignments.size() - BlockScheduleMath.maxBlocksPerDay(course))
                 .asConstraint("Maximum blocks per course per group per day");
     }
 
@@ -446,38 +405,15 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         ConstraintCollectors.toList())
                 .filter((group, course, day, blocks) -> blocks.size() > 1)
                 .penalize(HardSoftScore.ONE_HARD,
-                        (group, course, day, blocks) -> countChainBreaks(blocks))
+                        (group, course, day, blocks) -> BlockScheduleMath.countChainBreaks(blocks))
                 .asConstraint("Course blocks must be consecutive");
     }
 
-    /**
-     * Count the number of breaks (gaps or overlaps between adjacent blocks) in a
-     * set
-     * of blocks once sorted by start hour. Zero means the blocks form a single
-     * contiguous chain; each break contributes one hard penalty.
-     */
-    private static int countChainBreaks(java.util.List<CourseBlockAssignment> blocks) {
-        java.util.List<CourseBlockAssignment> sorted = new java.util.ArrayList<>(blocks);
-        sorted.sort(java.util.Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
-        int breaks = 0;
-        for (int i = 1; i < sorted.size(); i++) {
-            BlockTimeslot prev = sorted.get(i - 1).getTimeslot();
-            BlockTimeslot curr = sorted.get(i).getTimeslot();
-            int prevEnd = prev.getStartHour() + prev.getLengthHours();
-            if (prevEnd != curr.getStartHour()) {
-                breaks++;
-            }
-        }
-        return breaks;
-    }
-
-    // Half the 8h (7:00-15:00) school day - a teacher/group scheduled this many
-    // consecutive hours with zero idle time between blocks must get a break
-    // before continuing. Pinned blocks are excluded from the run (same
-    // convention as nonStandardRoomsShouldFinishBy2pm/groupPreferredRoomConstraint)
-    // so legacy pinned data can't block solver convergence; only movable blocks
-    // are enforced.
-    private static final int MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK = 4;
+    // Pinned blocks are excluded from the run (same convention as
+    // nonStandardRoomsShouldFinishBy2pm/groupPreferredRoomConstraint) so
+    // legacy pinned data can't block solver convergence; only movable blocks
+    // are enforced. See BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK
+    // for the threshold itself.
 
     private Constraint teacherMustHaveBreakAfterConsecutiveHours(ConstraintFactory constraintFactory) {
         // HARD: A teacher scheduled MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK straight
@@ -491,9 +427,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         CourseBlockAssignment::getTeacher,
                         a -> a.getTimeslot().getDayOfWeek(),
                         ConstraintCollectors.toList())
-                .filter((teacher, day, blocks) -> longestConsecutiveRunHours(blocks) > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                .filter((teacher, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
+                        > BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
                 .penalize(HardSoftScore.ONE_HARD,
-                        (teacher, day, blocks) -> longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                        (teacher, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
+                                - BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
                 .asConstraint("Teacher must have a break after consecutive hours");
     }
 
@@ -507,48 +445,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         CourseBlockAssignment::getGroup,
                         a -> a.getTimeslot().getDayOfWeek(),
                         ConstraintCollectors.toList())
-                .filter((group, day, blocks) -> longestConsecutiveRunHours(blocks) > MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                .filter((group, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
+                        > BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
                 .penalize(HardSoftScore.ONE_HARD,
-                        (group, day, blocks) -> longestConsecutiveRunHours(blocks) - MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
+                        (group, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
+                                - BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
                 .asConstraint("Group must have a break after consecutive hours");
-    }
-
-    /**
-     * The longest run of occupied hours (merging touching or overlapping
-     * blocks into one span) once sorted by start hour, tie-broken by id for a
-     * deterministic total order. A gap of any size - even one hour - starts a
-     * new run. Uses interval-merge (track [runStart, runEnd), extend on
-     * overlap/touch) rather than summing block lengths: mid-search the solver
-     * freely explores states where two blocks for the same teacher/group
-     * overlap (the double-booking constraint hasn't resolved it yet), and
-     * summing lengths would double-count that overlap - which also made the
-     * result depend on which of two equal-start-hour blocks the (otherwise
-     * unstable-for-ties) sort visited first, silently violating Timefold's
-     * requirement that a constraint be a pure, order-independent function of
-     * the group's contents. The explicit id tie-break plus interval-merge
-     * fixes both the correctness and the determinism.
-     */
-    static int longestConsecutiveRunHours(java.util.List<CourseBlockAssignment> blocks) {
-        java.util.List<CourseBlockAssignment> sorted = new java.util.ArrayList<>(blocks);
-        sorted.sort(java.util.Comparator
-                .comparingInt((CourseBlockAssignment a) -> a.getTimeslot().getStartHour())
-                .thenComparing(CourseBlockAssignment::getId));
-        int longest = 0;
-        int runStart = -1;
-        int runEnd = -1;
-        for (CourseBlockAssignment assignment : sorted) {
-            BlockTimeslot timeslot = assignment.getTimeslot();
-            int start = timeslot.getStartHour();
-            int end = start + timeslot.getLengthHours();
-            if (runEnd == -1 || start > runEnd) {
-                runStart = start;
-                runEnd = end;
-            } else {
-                runEnd = Math.max(runEnd, end);
-            }
-            longest = Math.max(longest, runEnd - runStart);
-        }
-        return longest;
     }
 
     // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================
@@ -632,25 +534,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && "Core".equals(a.getCourse().getDesignation()))
                 .groupBy(CourseBlockAssignment::getGroup, CourseBlockAssignment::getCourse,
                         ConstraintCollectors.toList())
-                .filter((group, course, blocks) -> blocksNotAtModeHour(blocks) > 0)
-                .penalize(HardSoftScore.ofSoft(2), (group, course, blocks) -> blocksNotAtModeHour(blocks))
+                .filter((group, course, blocks) -> BlockScheduleMath.blocksNotAtModeHour(blocks) > 0)
+                .penalize(HardSoftScore.ofSoft(2),
+                        (group, course, blocks) -> BlockScheduleMath.blocksNotAtModeHour(blocks))
                 .asConstraint("Prefer Core 1h blocks at the same time across days");
-    }
-
-    /**
-     * How many of these blocks' start hours differ from the most common
-     * ("mode") start hour in the set - 0 when they all agree, or already a
-     * singleton. Counting the deviation from the mode (not a flat 1-point
-     * penalty for "not perfectly consistent") gives local search a smooth
-     * gradient: moving one outlying block back toward the group's dominant
-     * hour measurably improves the score, rather than being all-or-nothing.
-     */
-    private static int blocksNotAtModeHour(java.util.List<CourseBlockAssignment> blocks) {
-        java.util.Map<Integer, Integer> hourCounts = new java.util.HashMap<>();
-        for (CourseBlockAssignment a : blocks) {
-            hourCounts.merge(a.getTimeslot().getStartHour(), 1, Integer::sum);
-        }
-        return blocks.size() - java.util.Collections.max(hourCounts.values());
     }
 
     private Constraint roomCapacityShouldFitGroupSize(ConstraintFactory constraintFactory) {
@@ -757,26 +644,16 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
                         && a1.getTeacher() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && availableGapHours(a1, a2) > 0)
+                        && BlockScheduleMath.availableGapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same teacher lies in
                 // the [earlierEnd, laterStart] span between a1 and a2.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getTeacher(), CourseBlockAssignment::getTeacher),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
-                                && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(2), (a1, a2) -> availableGapHours(a1, a2))
+                                && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
+                .penalize(HardSoftScore.ofSoft(2), (a1, a2) -> BlockScheduleMath.availableGapHours(a1, a2))
                 .asConstraint("Minimize teacher idle gaps (availability-aware)");
     }
-
-    // The school day's earliest possible start hour (matches the earliest
-    // BlockTimeslot start hour, 7:00) - the target preferSemesterOneBlocksStartEarly
-    // penalizes deviation from.
-    private static final int EARLIEST_START_HOUR = 7;
-
-    // Mirrors CourseBlockAssignment.SEMESTER_ONE_LATEST_END_HOUR - see
-    // semesterOneBlocksMustFinishBy2pm below for why this is a HARD guarantee
-    // rather than a soft preference like EARLIEST_START_HOUR above.
-    private static final int SEMESTER_ONE_LATEST_END_HOUR = 14;
 
     /** True when this block belongs to a first-semester (semester == 1) course. */
     private static boolean isSemesterOne(CourseBlockAssignment a) {
@@ -787,10 +664,10 @@ public class SchoolConstraintProvider implements ConstraintProvider {
      * SOFT: First-semester groups should start their school day as early as
      * possible (7:00). Groups the group's unpinned semester-1 blocks per day,
      * penalizing by how far the EARLIEST one's start hour is from
-     * EARLIEST_START_HOUR - a deviation-from-ideal gradient (like
-     * preferCoreOneHourBlocksAtSameTimeAcrossDays' mode-deviation), not a flat
-     * all-or-nothing penalty, so local search can improve incrementally by
-     * moving the earliest block closer to 7:00.
+     * BlockScheduleMath.EARLIEST_START_HOUR - a deviation-from-ideal gradient
+     * (like preferCoreOneHourBlocksAtSameTimeAcrossDays' mode-deviation), not
+     * a flat all-or-nothing penalty, so local search can improve
+     * incrementally by moving the earliest block closer to 7:00.
      * WEIGHT: 4 (middle priority, slightly above the general-purpose 3 tier).
      */
     private Constraint preferSemesterOneBlocksStartEarly(ConstraintFactory constraintFactory) {
@@ -799,19 +676,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .filter(a -> !a.isPinned() && a.getGroup() != null && a.getTimeslot() != null && isSemesterOne(a))
                 .groupBy(CourseBlockAssignment::getGroup, a -> a.getTimeslot().getDayOfWeek(),
                         ConstraintCollectors.toList())
-                .filter((group, day, blocks) -> earliestStartHour(blocks) > EARLIEST_START_HOUR)
+                .filter((group, day, blocks) -> BlockScheduleMath.earliestStartHour(blocks)
+                        > BlockScheduleMath.EARLIEST_START_HOUR)
                 .penalize(HardSoftScore.ofSoft(6),
-                        (group, day, blocks) -> earliestStartHour(blocks) - EARLIEST_START_HOUR)
+                        (group, day, blocks) -> BlockScheduleMath.earliestStartHour(blocks)
+                                - BlockScheduleMath.EARLIEST_START_HOUR)
                 .asConstraint("Prefer first-semester blocks to start early");
-    }
-
-    /** The earliest start hour among these blocks. */
-    private static int earliestStartHour(java.util.List<CourseBlockAssignment> blocks) {
-        int earliest = Integer.MAX_VALUE;
-        for (CourseBlockAssignment a : blocks) {
-            earliest = Math.min(earliest, a.getTimeslot().getStartHour());
-        }
-        return earliest;
     }
 
     /**
@@ -841,14 +711,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
                         && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && gapHours(a1, a2) > 0)
+                        && BlockScheduleMath.gapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same group (any
                 // semester) lies in the [earlierEnd, laterStart] span between a1/a2.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
-                                && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(6), (a1, a2) -> gapHours(a1, a2))
+                                && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
+                .penalize(HardSoftScore.ofSoft(6), (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
                 .asConstraint("Minimize first-semester group idle gaps");
     }
 
@@ -869,91 +739,15 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         Joiners.equal(SchoolConstraintProvider::dayOfWeekOrNull))
                 .filter((a1, a2) -> !a1.isPinned() && !a2.isPinned()
                         && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
-                        && gapHours(a1, a2) > 0)
+                        && BlockScheduleMath.gapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same group lies in
                 // the [earlierEnd, laterStart] span between a1 and a2.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
                         Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
-                                && mid != a1 && mid != a2 && liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(3), (a1, a2) -> gapHours(a1, a2))
+                                && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
+                .penalize(HardSoftScore.ofSoft(3), (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
                 .asConstraint("Minimize group idle gaps");
-    }
-
-    /**
-     * The idle-hour count in the gap between two same-day blocks (0 if they overlap
-     * or are consecutive).
-     */
-    private static int gapHours(CourseBlockAssignment a1, CourseBlockAssignment a2) {
-        int start1 = a1.getTimeslot().getStartHour();
-        int end1 = start1 + a1.getTimeslot().getLengthHours();
-        int start2 = a2.getTimeslot().getStartHour();
-        int end2 = start2 + a2.getTimeslot().getLengthHours();
-        if (end1 <= start2) {
-            return start2 - end1;
-        } else if (end2 <= start1) {
-            return start1 - end2;
-        }
-        return 0;
-    }
-
-    /**
-     * The idle-hour count in the gap between two same-day teacher blocks, counting
-     * only hours during which the teacher is actually available (unavailable gap
-     * hours are unavoidable and therefore not penalized).
-     */
-    private static int availableGapHours(CourseBlockAssignment a1, CourseBlockAssignment a2) {
-        int start1 = a1.getTimeslot().getStartHour();
-        int end1 = start1 + a1.getTimeslot().getLengthHours();
-        int start2 = a2.getTimeslot().getStartHour();
-        int end2 = start2 + a2.getTimeslot().getLengthHours();
-        int gapStart, gapEnd;
-        if (end1 <= start2) {
-            gapStart = end1;
-            gapEnd = start2;
-        } else if (end2 <= start1) {
-            gapStart = end2;
-            gapEnd = start1;
-        } else {
-            return 0;
-        }
-        DayOfWeek day = a1.getTimeslot().getDayOfWeek();
-        Teacher teacher = a1.getTeacher();
-        int available = 0;
-        for (int gapHour = gapStart; gapHour < gapEnd; gapHour++) {
-            if (teacher.isAvailableAt(day, gapHour)) {
-                available++;
-            }
-        }
-        return available;
-    }
-
-    /**
-     * True if {@code mid} starts within the open span between the earlier block's
-     * end
-     * and the later block's start of the {@code (a1, a2)} pair. Used to detect that
-     * the pair is NOT adjacent (a third block lies between them), so its gap must
-     * not
-     * be penalized directly.
-     */
-    private static boolean liesBetween(CourseBlockAssignment a1, CourseBlockAssignment a2,
-            CourseBlockAssignment mid) {
-        int start1 = a1.getTimeslot().getStartHour();
-        int end1 = start1 + a1.getTimeslot().getLengthHours();
-        int start2 = a2.getTimeslot().getStartHour();
-        int end2 = start2 + a2.getTimeslot().getLengthHours();
-        int spanStart, spanEnd;
-        if (end1 <= start2) {
-            spanStart = end1;
-            spanEnd = start2;
-        } else if (end2 <= start1) {
-            spanStart = end2;
-            spanEnd = start1;
-        } else {
-            return false;
-        }
-        int midStart = mid.getTimeslot().getStartHour();
-        return midStart >= spanStart && midStart < spanEnd;
     }
 
     private Constraint preferBlockSpecifiedRoom(ConstraintFactory constraintFactory) {

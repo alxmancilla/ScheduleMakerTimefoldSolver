@@ -43,6 +43,7 @@
     "tools": "Tools",
     "reports": "Reports",
     "courseCoverage": "Course Coverage",
+    "teacherAvailability": "Teacher Availability",
     "import": "Import / Export",
     "admin": "Admin",
     "settings": "Settings",
@@ -233,7 +234,8 @@
       "name": "Name",
       "building": "Building",
       "type": "Type",
-      "capacity": "Capacity"
+      "capacity": "Capacity",
+      "utilization": "Utilization"
     },
     "savedMessage": "Room saved",
     "deletedMessage": "Room deleted",
@@ -402,6 +404,26 @@
       "rooms": "Rooms"
     }
   },
+  "teacherAvailability": {
+    "title": "Teacher Availability",
+    "description": "Each teacher's declared weekly availability, condensed into one row - hour ranges per day, at a glance.",
+    "loading": "Loading teacher availability...",
+    "loadFailedPrefix": "Failed to load teacher availability: ",
+    "searchPlaceholder": "Search by teacher name...",
+    "none": "No matching teachers",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "table": {
+      "teacher": "Teacher"
+    }
+  },
   "reports": {
     "title": "Reports",
     "refresh": "Refresh",
@@ -458,7 +480,7 @@
       "startFailedPrefix": "Failed to start engine: ",
       "minutesSpentLimit": "Total time limit (minutes)",
       "unimprovedMinutesSpentLimit": "Give up if stuck for (minutes)",
-      "limitsDescription": "Applies to this run only — solverConfig.xml itself isn't changed. Leave the defaults (5 / 2) unless you have a reason to run longer or shorter.",
+      "limitsDescription": "Applies to this run only — solverConfig.xml itself isn't changed. Leave the defaults (5 / 2) unless you have a reason to run longer or shorter. Total time can go up to 120 minutes, give-up-if-stuck up to 60.",
       "state": "State:",
       "started": "Started:",
       "finished": "Finished:",

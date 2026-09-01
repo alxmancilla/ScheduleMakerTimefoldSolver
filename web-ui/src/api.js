@@ -63,6 +63,7 @@ export const searchTeachers = (query) => api.get(`/teachers/search?query=${query
 // readable by any role that can view the Teachers page (/api/assignments/** is
 // ADMIN-only, this endpoint deliberately isn't).
 export const getTeacherWorkload = () => api.get('/teachers/workload');
+export const getTeacherAvailabilityGrid = () => api.get('/teachers/availability-grid');
 
 // Courses
 export const getCourses = () => api.get('/courses');
@@ -115,6 +116,7 @@ export const updateRoom = (name, room) => api.put(`/rooms/${name}`, room);
 export const deleteRoom = (name) => api.delete(`/rooms/${name}`);
 export const getRoomsByType = (type) => api.get(`/rooms/type/${type}`);
 export const getRoomsByBuilding = (building) => api.get(`/rooms/building/${building}`);
+export const getRoomUtilization = () => api.get('/rooms/utilization');
 
 // Student Groups
 export const getGroups = () => api.get('/groups');

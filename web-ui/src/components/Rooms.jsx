@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getRooms, createRoom, updateRoom, deleteRoom } from '../api';
+import { getRooms, createRoom, updateRoom, deleteRoom, getRoomUtilization } from '../api';
 import WriteOnly from '../auth/WriteOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { ROOM_TYPES } from '../constants';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
+
+// The school week's total available hours (5 days x 8 slots, 7:00-15:00) -
+// the denominator for the utilization bar below. A room can exceed this
+// (bar clamped visually, but the raw number still shown) when the data has
+// unresolved room double-booking violations - see RoomUtilizationEntity.
+const WEEKLY_AVAILABLE_HOURS = 40;
 
 function Rooms() {
   const { t } = useTranslation();
@@ -17,9 +23,11 @@ function Rooms() {
   const [editingRoom, setEditingRoom] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [utilizationByRoom, setUtilizationByRoom] = useState({});
 
   useEffect(() => {
     loadRooms();
+    loadUtilization();
   }, []);
 
   const loadRooms = async () => {
@@ -32,6 +40,22 @@ function Rooms() {
       setError(t('rooms.loadFailedPrefix') + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Current room utilization: assignment count and total hours booked per
+  // week, computed server-side by v_room_utilization via GET
+  // /api/rooms/utilization.
+  const loadUtilization = async () => {
+    try {
+      const response = await getRoomUtilization();
+      const byRoom = {};
+      response.data.forEach((u) => {
+        byRoom[u.name] = u;
+      });
+      setUtilizationByRoom(byRoom);
+    } catch (err) {
+      // Non-critical: the utilization column just won't have data.
     }
   };
 
@@ -157,6 +181,7 @@ function Rooms() {
               <th>{t('rooms.table.building')}</th>
               <th>{t('rooms.table.type')}</th>
               <th>{t('rooms.table.capacity')}</th>
+              <th>{t('rooms.table.utilization')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
@@ -167,6 +192,25 @@ function Rooms() {
                 <td>{room.building}</td>
                 <td>{room.type}</td>
                 <td>{room.capacity ?? '-'}</td>
+                <td>
+                  {(() => {
+                    const utilization = utilizationByRoom[room.name];
+                    if (!utilization) return '-';
+                    const hoursUsed = utilization.totalHoursUsed || 0;
+                    const pct = Math.round((hoursUsed / WEEKLY_AVAILABLE_HOURS) * 100);
+                    const barColor = pct > 100 ? 'var(--color-danger)' : pct >= 80 ? 'var(--color-warning)' : 'var(--color-success)';
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '140px' }}>
+                        <div style={{ flex: 1, background: 'var(--color-border-soft)', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                          <div style={{ width: `${Math.min(pct, 100)}%`, background: barColor, height: '100%' }} />
+                        </div>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+                          {hoursUsed}/{WEEKLY_AVAILABLE_HOURS}h ({utilization.assignmentsCount || 0})
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </td>
                 <td>
                   <WriteOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(room)} style={{ marginRight: '5px' }}>

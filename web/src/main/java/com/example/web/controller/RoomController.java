@@ -2,8 +2,10 @@ package com.example.web.controller;
 
 import com.example.web.dto.RoomDTO;
 import com.example.web.entity.RoomEntity;
+import com.example.web.entity.RoomUtilizationEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.RoomRepository;
+import com.example.web.repository.RoomUtilizationRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,9 +22,24 @@ public class RoomController {
     @Autowired
     private RoomRepository roomRepository;
 
+    @Autowired
+    private RoomUtilizationRepository roomUtilizationRepository;
+
     @GetMapping
     public List<RoomEntity> getAllRooms() {
         return roomRepository.findAll();
+    }
+
+    /**
+     * Backed by v_room_utilization (assignments count, distinct timeslots
+     * used, and total hours booked per week, computed server-side). Its own
+     * endpoint rather than requiring /api/assignments/** access - that path
+     * is ADMIN-only, but this utilization summary is shown to any role that
+     * can view the Rooms page.
+     */
+    @GetMapping("/utilization")
+    public List<RoomUtilizationEntity> getUtilization() {
+        return roomUtilizationRepository.findAll();
     }
 
     @GetMapping("/{name}")

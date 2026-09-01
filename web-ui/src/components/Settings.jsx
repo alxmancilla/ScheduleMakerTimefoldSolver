@@ -649,7 +649,7 @@ function Settings() {
               id="minutesSpentLimit"
               type="number"
               min="1"
-              max="30"
+              max="120"
               value={minutesSpentLimit}
               onChange={(e) => setMinutesSpentLimit(e.target.value === '' ? '' : Number(e.target.value))}
               disabled={engineStatus?.state === 'RUNNING'}
@@ -662,7 +662,7 @@ function Settings() {
               id="unimprovedMinutesSpentLimit"
               type="number"
               min="1"
-              max="15"
+              max="60"
               value={unimprovedMinutesSpentLimit}
               onChange={(e) => setUnimprovedMinutesSpentLimit(e.target.value === '' ? '' : Number(e.target.value))}
               disabled={engineStatus?.state === 'RUNNING'}
