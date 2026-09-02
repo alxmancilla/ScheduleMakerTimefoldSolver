@@ -49,7 +49,13 @@ public class PreSolveValidatorTest {
 
     private static CourseBlockAssignment pinnedBlock(String id, int blockLength, BlockTimeslot slot, Room room,
             Teacher teacher, String satisfiesRoomType) {
-        Group group = new Group("G1", "Group 1", new HashSet<>());
+        return pinnedBlock(id, blockLength, slot, room, teacher, satisfiesRoomType,
+                new Group("G1", "Group 1", new HashSet<>()));
+    }
+
+    /** Same as above, but with an explicit group - needed to isolate the group-clash check from the others. */
+    private static CourseBlockAssignment pinnedBlock(String id, int blockLength, BlockTimeslot slot, Room room,
+            Teacher teacher, String satisfiesRoomType, Group group) {
         CourseBlockAssignment a = new CourseBlockAssignment(id, group, MATH, blockLength);
         a.setTimeslot(slot);
         a.setRoom(room);
@@ -57,6 +63,14 @@ public class PreSolveValidatorTest {
         a.setSatisfiesRoomType(satisfiesRoomType);
         a.setPinned(true);
         return a;
+    }
+
+    /** A second teacher, qualified and available like {@link #qualifiedAvailableTeacher()}, for two-teacher tests. */
+    private static Teacher secondQualifiedAvailableTeacher() {
+        Set<String> quals = new HashSet<>(Arrays.asList("Matemáticas"));
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8, 9, 10)));
+        return new Teacher("T2", "Bob", "Smith", quals, avail, 40);
     }
 
     @Test
@@ -137,6 +151,46 @@ public class PreSolveValidatorTest {
     }
 
     @Test
+    public void pinnedGroupClashIsReported() {
+        // Same group, different teachers and rooms, so only the group-clash branch fires.
+        Teacher t1 = qualifiedAvailableTeacher();
+        Teacher t2 = secondQualifiedAvailableTeacher();
+        Room r1 = new Room("AULA 1", "A", "estándar");
+        Room r2 = new Room("AULA 2", "A", "estándar");
+        BlockTimeslot s1 = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        BlockTimeslot s2 = new BlockTimeslot("s2", DayOfWeek.MONDAY, 8, 2); // overlaps 8-9
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+        CourseBlockAssignment a1 = pinnedBlock("A1", 2, s1, r1, t1, "estándar", group);
+        CourseBlockAssignment a2 = pinnedBlock("A2", 2, s2, r2, t2, "estándar", group);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("Pinned group clash")));
+        assertFalse(r.getProblems().stream().anyMatch(p -> p.contains("teacher double-booking")));
+        assertFalse(r.getProblems().stream().anyMatch(p -> p.contains("room double-booking")));
+    }
+
+    @Test
+    public void pinnedRoomDoubleBookingIsReported() {
+        // Same room, different teachers and groups, so only the room-double-booking branch fires.
+        Teacher t1 = qualifiedAvailableTeacher();
+        Teacher t2 = secondQualifiedAvailableTeacher();
+        Room sharedRoom = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot s1 = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        BlockTimeslot s2 = new BlockTimeslot("s2", DayOfWeek.MONDAY, 8, 2); // overlaps 8-9
+        Group g1 = new Group("G1", "Group 1", new HashSet<>());
+        Group g2 = new Group("G2", "Group 2", new HashSet<>());
+        CourseBlockAssignment a1 = pinnedBlock("A1", 2, s1, sharedRoom, t1, "estándar", g1);
+        CourseBlockAssignment a2 = pinnedBlock("A2", 2, s2, sharedRoom, t2, "estándar", g2);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("Pinned room double-booking")));
+        assertFalse(r.getProblems().stream().anyMatch(p -> p.contains("teacher double-booking")));
+        assertFalse(r.getProblems().stream().anyMatch(p -> p.contains("group clash")));
+    }
+
+    @Test
     public void missingTimeslotIsReported() {
         Room room = new Room("AULA 1", "A", "estándar");
         CourseBlockAssignment a = pinnedBlock("A1", 2, null, room, qualifiedAvailableTeacher(), "estándar");
@@ -152,5 +206,57 @@ public class PreSolveValidatorTest {
         ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
         assertFalse(r.isValid());
         assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("no room")));
+    }
+
+    // ---- Capacity warning: assigned hours vs total availability, pinned or not ----
+
+    @Test
+    public void teacherOverCapacity_returnsWarningButStaysValid() {
+        // qualifiedAvailableTeacher() has 7h of availability (Mon 7-14).
+        Teacher teacher = qualifiedAvailableTeacher();
+        Room room = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot s1 = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4);
+        BlockTimeslot s2 = new BlockTimeslot("s2", DayOfWeek.MONDAY, 11, 4); // 4h+4h=8h > 7h available
+        CourseBlockAssignment a1 = pinnedBlock("A1", 4, s1, room, teacher, "estándar");
+        CourseBlockAssignment a2 = pinnedBlock("A2", 4, s2, room, teacher, "estándar");
+        a2.setPinned(false); // capacity check must count movable assignments too
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
+        // The pinned block alone (4h) doesn't overlap/violate anything pinned-specific,
+        // and the movable block is skipped by the pinned-only checks above - so this
+        // is purely a capacity warning, not a blocking problem.
+        assertTrue(r.isValid());
+        assertEquals(1, r.getWarnings().size());
+        String warning = r.getWarnings().get(0);
+        assertTrue(warning.contains("T1"));
+        assertTrue(warning.contains("8h/week"));
+        assertTrue(warning.contains("7h/week"));
+        assertTrue(warning.contains("short by 1h"));
+    }
+
+    @Test
+    public void teacherWithinCapacity_noWarning() {
+        Teacher teacher = qualifiedAvailableTeacher(); // 7h available
+        Room room = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4);
+        CourseBlockAssignment a = pinnedBlock("A1", 4, slot, room, teacher, "estándar");
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
+        assertTrue(r.getWarnings().isEmpty());
+    }
+
+    @Test
+    public void describeIncludesCapacityWarningSection() {
+        Teacher teacher = qualifiedAvailableTeacher(); // 7h available
+        Room room = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot s1 = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4);
+        BlockTimeslot s2 = new BlockTimeslot("s2", DayOfWeek.MONDAY, 11, 4);
+        CourseBlockAssignment a1 = pinnedBlock("A1", 4, s1, room, teacher, "estándar");
+        CourseBlockAssignment a2 = pinnedBlock("A2", 4, s2, room, teacher, "estándar");
+        a2.setPinned(false);
+
+        String description = PreSolveValidator.validate(scheduleWith(a1, a2)).describe();
+        assertTrue(description.contains("Pre-solve capacity warning"));
+        assertTrue(description.contains("short by 1h"));
     }
 }
