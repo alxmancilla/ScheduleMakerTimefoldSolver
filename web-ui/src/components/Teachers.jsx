@@ -43,6 +43,10 @@ function Teachers() {
   const [availability, setAvailability] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [assignedHoursByTeacher, setAssignedHoursByTeacher] = useState({});
+  // Non-blocking capacity guardrail from the last successful save (assigned
+  // hours vs the availability just saved) - survives the form closing, same
+  // pattern as Settings.jsx's semesterHourLimitWarnings.
+  const [capacityWarnings, setCapacityWarnings] = useState([]);
 
   useEffect(() => {
     loadTeachers();
@@ -189,13 +193,13 @@ function Teachers() {
     };
 
     try {
-      if (editingTeacher) {
-        await updateTeacher(editingTeacher.id, teacher);
-      } else {
-        await createTeacher(teacher);
-      }
+      const response = editingTeacher
+        ? await updateTeacher(editingTeacher.id, teacher)
+        : await createTeacher(teacher);
       handleCancel();
       loadTeachers();
+      loadWorkload();
+      setCapacityWarnings(response.data.warnings || []);
       showToast(t('teachers.savedMessage'));
     } catch (err) {
       const data = err.response?.data;
@@ -210,11 +214,13 @@ function Teachers() {
     setEditingTeacher(null);
     resetForm();
     setError(null);
+    setCapacityWarnings([]);
     setShowForm(true);
   };
 
   const handleEdit = (teacher) => {
     setEditingTeacher(teacher);
+    setCapacityWarnings([]);
     setForm({
       id: teacher.id,
       name: teacher.name || '',
@@ -276,6 +282,23 @@ function Teachers() {
       </div>
 
       {error && <div className="error" role="alert">{error}</div>}
+      {capacityWarnings.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            marginTop: '10px', padding: '10px 14px', borderRadius: '8px',
+            background: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+            border: '1px solid var(--color-warning)', color: 'var(--color-text)', fontSize: '13px',
+          }}
+        >
+          <strong>{t('teachers.capacityWarningsTitle')}</strong>
+          <ul style={{ margin: '6px 0 0', paddingLeft: '20px' }}>
+            {capacityWarnings.map((warning, idx) => (
+              <li key={idx}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {showForm && (
         <div className="card">

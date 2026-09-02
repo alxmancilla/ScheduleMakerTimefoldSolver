@@ -72,6 +72,7 @@
     "saveFailedPrefix": "Error al guardar maestro: ",
     "deleteFailedPrefix": "Error al eliminar maestro: ",
     "confirmDelete": "¿Está seguro de que desea eliminar este maestro?",
+    "capacityWarningsTitle": "Guardado, pero vale la pena revisar:",
     "fields": {
       "id": "ID:",
       "name": "Nombre:",

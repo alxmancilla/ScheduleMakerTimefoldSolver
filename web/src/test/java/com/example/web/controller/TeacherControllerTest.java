@@ -172,8 +172,9 @@ public class TeacherControllerTest {
         when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(json(validPayload())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("T1"))
-                .andExpect(jsonPath("$.name").value("Ada"));
+                .andExpect(jsonPath("$.teacher.id").value("T1"))
+                .andExpect(jsonPath("$.teacher.name").value("Ada"))
+                .andExpect(jsonPath("$.warnings").isEmpty());
         verify(teacherRepository).save(any(TeacherEntity.class));
     }
 
@@ -267,9 +268,60 @@ public class TeacherControllerTest {
         body.put("name", "Grace");
         mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("T1"))
-                .andExpect(jsonPath("$.name").value("Grace"));
+                .andExpect(jsonPath("$.teacher.id").value("T1"))
+                .andExpect(jsonPath("$.teacher.name").value("Grace"))
+                .andExpect(jsonPath("$.warnings").isEmpty());
         verify(teacherRepository).save(any(TeacherEntity.class));
+    }
+
+    // ---- Capacity guardrail: assigned hours vs saved availability ----
+
+    @Test
+    public void createTeacher_assignedHoursExceedAvailability_returnsWarning() throws Exception {
+        when(teacherRepository.existsById("T1")).thenReturn(false);
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        // 2h assigned (one existing block) vs 1h of availability being saved.
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(block("A1", "estándar", "ROOM1", false)));
+
+        Map<String, Object> body = validPayload();
+        body.put("availability", List.of(Map.of("dayOfWeek", 1, "hour", 8)));
+        mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings", hasSize(1)))
+                .andExpect(jsonPath("$.warnings[0]", containsString("2h/week")))
+                .andExpect(jsonPath("$.warnings[0]", containsString("1h/week")))
+                .andExpect(jsonPath("$.warnings[0]", containsString("short by 1h")));
+    }
+
+    @Test
+    public void updateTeacher_assignedHoursExceedAvailability_returnsWarning() throws Exception {
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(block("A1", "estándar", "ROOM1", false)));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("availability", List.of(Map.of("dayOfWeek", 1, "hour", 8)));
+        mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings", hasSize(1)));
+    }
+
+    @Test
+    public void updateTeacher_assignedHoursWithinAvailability_noWarning() throws Exception {
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(teacherRepository.save(any(TeacherEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        // 2h assigned, exactly 2h of availability being saved - no shortfall.
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(block("A1", "estándar", "ROOM1", false)));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("availability", List.of(
+                Map.of("dayOfWeek", 1, "hour", 8),
+                Map.of("dayOfWeek", 1, "hour", 9)));
+        mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings").isEmpty());
     }
 
     private CourseBlockAssignmentEntity block(String id, String satisfiesRoomType, String roomName, boolean pinned) {
@@ -298,7 +350,7 @@ public class TeacherControllerTest {
         body.put("requiredRoomName", "ROOM1");
         mockMvc.perform(put("/api/teachers/T1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.requiredRoomName").value("ROOM1"));
+                .andExpect(jsonPath("$.teacher.requiredRoomName").value("ROOM1"));
 
         verify(assignmentRepository).save(existing);
         org.junit.Assert.assertEquals("ROOM1", existing.getRoomName());

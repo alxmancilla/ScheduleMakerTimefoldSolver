@@ -72,6 +72,7 @@
     "saveFailedPrefix": "Failed to save teacher: ",
     "deleteFailedPrefix": "Failed to delete teacher: ",
     "confirmDelete": "Are you sure you want to delete this teacher?",
+    "capacityWarningsTitle": "Saved, but worth checking:",
     "fields": {
       "id": "ID:",
       "name": "Name:",

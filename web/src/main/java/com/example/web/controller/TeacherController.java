@@ -1,6 +1,7 @@
 package com.example.web.controller;
 
 import com.example.web.dto.TeacherDTO;
+import com.example.web.dto.TeacherUpsertResponse;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.TeacherAvailabilityGridEntity;
@@ -91,7 +92,7 @@ public class TeacherController {
 
     @PostMapping
     @Transactional
-    public TeacherEntity createTeacher(
+    public TeacherUpsertResponse createTeacher(
             @Validated({ Default.class, TeacherDTO.Create.class }) @RequestBody TeacherDTO request) {
         if (teacherRepository.existsById(request.getId())) {
             throw new IllegalArgumentException("Teacher with ID '" + request.getId() + "' already exists");
@@ -101,12 +102,13 @@ public class TeacherController {
         teacher.setRequiredRoomName(request.getRequiredRoomName());
         applyQualifications(teacher, request.getQualifications());
         applyAvailability(teacher, request.getAvailability());
-        return teacherRepository.save(teacher);
+        TeacherEntity saved = teacherRepository.save(teacher);
+        return new TeacherUpsertResponse(saved, buildCapacityWarning(saved));
     }
 
     @PutMapping("/{id}")
     @Transactional
-    public TeacherEntity updateTeacher(@PathVariable String id, @Valid @RequestBody TeacherDTO request) {
+    public TeacherUpsertResponse updateTeacher(@PathVariable String id, @Valid @RequestBody TeacherDTO request) {
         TeacherEntity teacher = teacherRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Teacher", id));
         teacher.setName(request.getName());
@@ -117,7 +119,43 @@ public class TeacherController {
         applyAvailability(teacher, request.getAvailability());
         TeacherEntity saved = teacherRepository.save(teacher);
         backfillRequiredRoom(saved);
-        return saved;
+        return new TeacherUpsertResponse(saved, buildCapacityWarning(saved));
+    }
+
+    /**
+     * Non-blocking capacity guardrail, same shape as
+     * SemesterHourLimitController's guardrail #3: warns (never blocks) when
+     * a teacher's total assigned course hours - summed from
+     * course_block_assignment.block_length across every assignment for this
+     * teacher, regardless of solved/pinned status, the same basis
+     * v_teacher_workload uses - exceed their total weekly availability -
+     * just-saved teacher_availability rows, one hour each. Exceeding this is
+     * a mathematical fact (there are more required hours than there are
+     * hours in the week they can teach), not a judgment call, but it's
+     * advisory only: an admin might be mid-fix (about to widen availability
+     * further, or about to move a course to another teacher), so the save
+     * still succeeds either way.
+     *
+     * <p>
+     * Before this existed, nothing in the system ever compared a teacher's
+     * workload against their availability - the solver was the only thing
+     * that "noticed", and only indirectly, by producing double-booking hard
+     * violations once an over-capacity teacher's blocks collided in the
+     * output.
+     */
+    private List<String> buildCapacityWarning(TeacherEntity teacher) {
+        int assignedHours = assignmentRepository.findByTeacherId(teacher.getId()).stream()
+                .mapToInt(CourseBlockAssignmentEntity::getBlockLength)
+                .sum();
+        int availableHours = teacher.getAvailability().size();
+        if (assignedHours <= availableHours) {
+            return List.of();
+        }
+        return List.of(String.format(
+                "%s %s is assigned %dh/week of courses but only has %dh/week of availability - "
+                        + "short by %dh. This will force double-bookings once solved.",
+                teacher.getName(), teacher.getLastName(), assignedHours, availableHours,
+                assignedHours - availableHours));
     }
 
     /**
