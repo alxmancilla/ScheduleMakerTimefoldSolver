@@ -114,6 +114,81 @@ public class PreSolveValidatorTest {
     }
 
     @Test
+    public void pinnedHardSemesterHourLimitViolationIsReported() {
+        // Mirrors SchoolConstraintProvider.semesterHourLimitsMustBeRespected():
+        // a non-pinned block of a HARD-limited course can never reach a
+        // violating timeslot (excluded from its own value range), so this can
+        // only ever fire for a pinned row whose timeslot predates the limit.
+        Course limitedCourse = new Course("2", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
+        limitedCourse.setLatestEndHour(13);
+        limitedCourse.setLatestEndHourSeverity("HARD");
+        Teacher teacher = qualifiedAvailableTeacher(); // available Mon 7-14
+        Room room = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 12, 2); // ends 14:00, past the 13:00 limit
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+        CourseBlockAssignment a = new CourseBlockAssignment("A1", group, limitedCourse, 2);
+        a.setTimeslot(slot);
+        a.setRoom(room);
+        a.setTeacher(teacher);
+        a.setSatisfiesRoomType("estándar");
+        a.setPinned(true);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("HARD limit")));
+    }
+
+    @Test
+    public void pinnedHardSemesterHourLimitWithinBoundsPasses() {
+        Course limitedCourse = new Course("2", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
+        limitedCourse.setLatestEndHour(13);
+        limitedCourse.setLatestEndHourSeverity("HARD");
+        Teacher teacher = qualifiedAvailableTeacher();
+        Room room = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2); // ends 9:00, within the limit
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+        CourseBlockAssignment a = new CourseBlockAssignment("A1", group, limitedCourse, 2);
+        a.setTimeslot(slot);
+        a.setRoom(room);
+        a.setTeacher(teacher);
+        a.setSatisfiesRoomType("estándar");
+        a.setPinned(true);
+
+        assertTrue(PreSolveValidator.validate(scheduleWith(a)).isValid());
+    }
+
+    @Test
+    public void pinnedTeacherRequiredRoomMismatchIsReported() {
+        // Mirrors SchoolConstraintProvider.teacherRequiredRoomMustBeUsed():
+        // a non-pinned block's room is already structurally guaranteed
+        // correct, so this can only ever fire for a pinned row whose room
+        // drifted out of sync with its teacher's current requirement.
+        Teacher teacher = qualifiedAvailableTeacher();
+        teacher.setRequiredRoomName("AULA 1");
+        Room requiredRoom = new Room("AULA 1", "A", "estándar");
+        Room actualRoom = new Room("AULA 2", "A", "estándar"); // mismatch
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, actualRoom, teacher, "estándar");
+        a.setAllRooms(Arrays.asList(requiredRoom, actualRoom));
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("required room")));
+    }
+
+    @Test
+    public void pinnedTeacherRequiredRoomMatchPasses() {
+        Teacher teacher = qualifiedAvailableTeacher();
+        teacher.setRequiredRoomName("AULA 1");
+        Room requiredRoom = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, requiredRoom, teacher, "estándar");
+        a.setAllRooms(Arrays.asList(requiredRoom));
+
+        assertTrue(PreSolveValidator.validate(scheduleWith(a)).isValid());
+    }
+
+    @Test
     public void unqualifiedTeacherIsReported() {
         BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
         Room room = new Room("AULA 1", "A", "estándar");
@@ -122,6 +197,24 @@ public class PreSolveValidatorTest {
         Teacher unqualified = new Teacher("T2", "Bob", "Smith", new HashSet<>(), avail, 40);
         ValidationResult r = PreSolveValidator.validate(
                 scheduleWith(pinnedBlock("A1", 2, slot, room, unqualified, "estándar")));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("not qualified")));
+    }
+
+    @Test
+    public void movableUnqualifiedTeacherIsReported() {
+        // Teacher qualification doesn't depend on where the solver places
+        // anything, so - unlike availability or room type - it's checked for
+        // every assignment, not just pinned ones.
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        Room room = new Room("AULA 1", "A", "estándar");
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8, 9)));
+        Teacher unqualified = new Teacher("T2", "Bob", "Smith", new HashSet<>(), avail, 40);
+        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, room, unqualified, "estándar");
+        a.setPinned(false);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
         assertFalse(r.isValid());
         assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("not qualified")));
     }
@@ -260,5 +353,162 @@ public class PreSolveValidatorTest {
         String description = PreSolveValidator.validate(scheduleWith(a1, a2)).describe();
         assertTrue(description.contains("Pre-solve validation found 1 problem:"));
         assertTrue(description.contains("short by 1h"));
+    }
+
+    // ---- Inactive courses: nothing else in the solve path checks this ----
+
+    @Test
+    public void inactiveCourseAssignmentIsReported() {
+        // Same name as MATH so the teacher's qualification stays satisfied -
+        // isolates the inactive-course check from the qualification one.
+        Course inactiveCourse = new Course("9", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 2, false);
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        Room room = new Room("AULA 1", "A", "estándar");
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+        CourseBlockAssignment a = new CourseBlockAssignment("A1", group, inactiveCourse, 2);
+        a.setTimeslot(slot);
+        a.setRoom(room);
+        a.setTeacher(qualifiedAvailableTeacher());
+        a.setSatisfiesRoomType("estándar");
+        a.setPinned(false); // movable - confirms this isn't pinned-only, unlike validateSingle's checks
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("inactive")));
+    }
+
+    @Test
+    public void inactiveCourseAggregatesAcrossMultipleBlocksAndGroups() {
+        // Grouped per course (one problem, not one per block) to avoid
+        // flooding the report when a course has many leftover blocks.
+        Course inactiveCourse = new Course("9", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 2, false);
+        Teacher teacher = qualifiedAvailableTeacher();
+        Group g1 = new Group("G1", "Group 1", new HashSet<>());
+        Group g2 = new Group("G2", "Group 2", new HashSet<>());
+        CourseBlockAssignment a1 = new CourseBlockAssignment("A1", g1, inactiveCourse, 2);
+        a1.setTeacher(teacher);
+        a1.setSatisfiesRoomType("estándar");
+        a1.setPinned(false);
+        CourseBlockAssignment a2 = new CourseBlockAssignment("A2", g2, inactiveCourse, 2);
+        a2.setTeacher(teacher);
+        a2.setSatisfiesRoomType("estándar");
+        a2.setPinned(false);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
+        long inactiveProblemCount = r.getProblems().stream().filter(p -> p.contains("inactive")).count();
+        assertEquals(1, inactiveProblemCount);
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("G1") && p.contains("G2") && p.contains("2 block")));
+    }
+
+    // ---- Room-fixed capacity: two teachers sharing one required room ----
+
+    private static Teacher fullWeekTeacher(String id, String lastName) {
+        Set<String> quals = new HashSet<>(Arrays.asList("Matemáticas"));
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        Set<Integer> hours = new HashSet<>();
+        for (int h = 7; h < 15; h++) {
+            hours.add(h);
+        }
+        for (DayOfWeek day : Arrays.asList(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY)) {
+            avail.put(day, new HashSet<>(hours));
+        }
+        return new Teacher(id, "Teacher", lastName, quals, avail, 999);
+    }
+
+    @Test
+    public void roomFixedCapacityExceededIsReported() {
+        // Two different teachers, each fully available (40h/week - the whole
+        // school week), both required into the same room. Neither exceeds
+        // their own capacity individually (25h each), but the room they
+        // share can only ever host 40h/week total.
+        Room requiredRoom = new Room("AULA 1", "A", "estándar");
+        Teacher t1 = fullWeekTeacher("T1", "One");
+        Teacher t2 = fullWeekTeacher("T2", "Two");
+        t1.setRequiredRoomName("AULA 1");
+        t2.setRequiredRoomName("AULA 1");
+
+        Group g1 = new Group("G1", "Group 1", new HashSet<>());
+        Group g2 = new Group("G2", "Group 2", new HashSet<>());
+        CourseBlockAssignment a1 = new CourseBlockAssignment("A1", g1, MATH, 25);
+        a1.setTeacher(t1);
+        a1.setSatisfiesRoomType("estándar");
+        a1.setAllRooms(Arrays.asList(requiredRoom));
+        a1.setPinned(false);
+        CourseBlockAssignment a2 = new CourseBlockAssignment("A2", g2, MATH, 25);
+        a2.setTeacher(t2);
+        a2.setSatisfiesRoomType("estándar");
+        a2.setAllRooms(Arrays.asList(requiredRoom));
+        a2.setPinned(false);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("AULA 1") && p.contains("fixed")));
+    }
+
+    @Test
+    public void roomFixedCapacityWithinBoundsPasses() {
+        Room requiredRoom = new Room("AULA 1", "A", "estándar");
+        Teacher t1 = fullWeekTeacher("T1", "One");
+        t1.setRequiredRoomName("AULA 1");
+        Group g1 = new Group("G1", "Group 1", new HashSet<>());
+        CourseBlockAssignment a1 = new CourseBlockAssignment("A1", g1, MATH, 4);
+        a1.setTeacher(t1);
+        a1.setSatisfiesRoomType("estándar");
+        a1.setAllRooms(Arrays.asList(requiredRoom));
+        a1.setPinned(false);
+
+        assertTrue(PreSolveValidator.validate(scheduleWith(a1)).isValid());
+    }
+
+    // ---- Block-spread capacity: enough hours, not enough distinct days ----
+
+    @Test
+    public void blockSpreadExceedsAvailableDaysIsReported() {
+        // 5 required 1-hour blocks at the default max-2/day cap need 3
+        // distinct days; this teacher only has 2 (Mon+Tue) - not a raw-hours
+        // shortfall (5h assigned vs 10h available), a days shortfall.
+        Set<String> quals = new HashSet<>(Arrays.asList("Matemáticas"));
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8, 9, 10, 11)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7, 8, 9, 10, 11)));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+
+        List<CourseBlockAssignment> blocks = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            CourseBlockAssignment a = new CourseBlockAssignment("A" + i, group, MATH, 1);
+            a.setTeacher(teacher);
+            a.setSatisfiesRoomType("estándar");
+            a.setPinned(false);
+            blocks.add(a);
+        }
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0])));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("distinct day")));
+    }
+
+    @Test
+    public void blockSpreadWithinAvailableDaysPasses() {
+        // 4 blocks at max-2/day need 2 distinct days - exactly what this
+        // teacher has.
+        Set<String> quals = new HashSet<>(Arrays.asList("Matemáticas"));
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8, 9, 10, 11)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7, 8, 9, 10, 11)));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+
+        List<CourseBlockAssignment> blocks = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            CourseBlockAssignment a = new CourseBlockAssignment("A" + i, group, MATH, 1);
+            a.setTeacher(teacher);
+            a.setSatisfiesRoomType("estándar");
+            a.setPinned(false);
+            blocks.add(a);
+        }
+
+        assertTrue(PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0]))).isValid());
     }
 }
