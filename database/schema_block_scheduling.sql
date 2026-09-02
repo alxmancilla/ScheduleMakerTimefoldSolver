@@ -992,10 +992,13 @@ CREATE TABLE IF NOT EXISTS schedule_run_constraint (
 CREATE INDEX IF NOT EXISTS idx_schedule_run_constraint_name ON schedule_run_constraint(constraint_name);
 
 -- Resolves "the current effective schedule" in one place: pinned rows use
--- their own (input) block_timeslot_id; every other row uses the most recent
--- schedule_run's result for that assignment. Everything that displays or
+-- their own (input) block_timeslot_id/room_name; every other row uses the
+-- most recent schedule_run's result for both. Everything that displays or
 -- loads "the schedule" reads through this view instead of re-deriving the
--- pinned/latest-run rule itself.
+-- pinned/latest-run rule itself. satisfies_room_type/preferred_room_hint are
+-- NOT resolved from the latest run - they aren't planning variables, so the
+-- raw column (the current input) is always the right value, not a solve
+-- snapshot that could go stale relative to a later edit.
 CREATE OR REPLACE VIEW course_block_assignment_current AS
 SELECT
     cba.id,
@@ -1005,12 +1008,12 @@ SELECT
     cba.pinned,
     cba.teacher_id,
     CASE WHEN cba.pinned THEN cba.block_timeslot_id ELSE latest.block_timeslot_id END AS block_timeslot_id,
-    cba.room_name,
+    CASE WHEN cba.pinned THEN cba.room_name ELSE latest.room_name END AS room_name,
     cba.satisfies_room_type,
     cba.preferred_room_hint
 FROM course_block_assignment cba
 LEFT JOIN (
-    SELECT srr.assignment_id, srr.block_timeslot_id
+    SELECT srr.assignment_id, srr.block_timeslot_id, srr.room_name
     FROM schedule_run_result srr
     WHERE srr.schedule_run_id = (SELECT MAX(id) FROM schedule_run)
 ) latest ON latest.assignment_id = cba.id;
@@ -1018,7 +1021,7 @@ LEFT JOIN (
 COMMENT ON TABLE schedule_run IS 'One row per solver run. DataSaver prunes to the most recent 10 after every insert.';
 COMMENT ON TABLE schedule_run_result IS 'One row per assignment per run: the solved (or still-unassigned) timeslot for that run.';
 COMMENT ON TABLE schedule_run_constraint IS 'Which constraints (by name) were active for a given schedule_run - lets score-history analysis separate normal solver variance from a genuine constraint-set change between runs.';
-COMMENT ON VIEW course_block_assignment_current IS 'Resolved "current schedule": pinned rows use their own input timeslot, everything else uses the most recent schedule_run.';
+COMMENT ON VIEW course_block_assignment_current IS 'Resolved "current schedule": pinned rows use their own input timeslot/room, everything else uses the most recent schedule_run''s result for both.';
 
 -- ============================================================================
 -- END OF SCHEMA
