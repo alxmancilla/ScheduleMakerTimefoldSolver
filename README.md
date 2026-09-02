@@ -151,7 +151,8 @@ database," used specifically to avoid hand-syncing the same rule twice.
 │       ├── solver/                      # SchoolConstraintProvider, SchoolSolverConfig,
 │       │                                 # custom moves/filters/comparators
 │       ├── analysis/                    # BlockScheduleAnalyzer (mirrors the constraints)
-│       ├── validation/                  # PreSolveValidator (fail-fast data sanity checks)
+│       ├── validation/                  # PreSolveValidator (blocking checks before every solve:
+│       │                                 # invalid pinned data + whole-schedule capacity facts)
 │       ├── data/                        # DataLoader, DataSaver, DemoDataGenerator
 │       └── util/                        # Excel import/export helpers
 ├── reporter/                            # scheduler-reporter: depends on engine as a library
@@ -215,7 +216,7 @@ mvn test
 ```
 
 `mvn test` (Surefire) is unit tests only, no external dependencies, and should always be green
-(`web`: 278 tests, 0 failures, 0 errors). If you see `web` tests failing in bulk with "Mockito
+(`web`: 382 tests, 0 failures, 0 errors). If you see `web` tests failing in bulk with "Mockito
 cannot mock this class" / "Could not modify all classes" cascading into dozens of unrelated
 "ApplicationContext failure threshold exceeded" errors, that's `spring-boot-dependencies`
 3.2.1's pinned Mockito 5.7.0/byte-buddy 1.14.10 being too old to instrument classes on your JDK —
@@ -245,9 +246,15 @@ Desktop connection flaky.
 ```bash
 mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
 ```
-Loads data → solves → saves the assignments back to PostgreSQL → prints a constraint
-violation summary. PDF reports are generated separately by the **reporter** module, which
-reads the persisted schedule from the database:
+Loads data → validates → solves → saves the assignments back to PostgreSQL → prints a
+constraint violation summary. `PreSolveValidator` runs right after loading and, if it finds
+any blocking problem (invalid pinned data, or a whole-schedule capacity fact like a teacher
+assigned more hours than they have availability for), aborts before solving starts —
+`SKIP_PRESOLVE_VALIDATION=true` proceeds anyway (validation still prints its findings either
+way; the flag only changes whether they abort the run). `SOLVER_MINUTES_LIMIT` /
+`SOLVER_UNIMPROVED_MINUTES_LIMIT` override the local search time budget for one run without
+touching `solverConfig.xml`. PDF reports are generated separately by the **reporter** module,
+which reads the persisted schedule from the database:
 ```bash
 mvn -pl reporter exec:java -Dexec.mainClass="com.example.reporter.PdfReportApp"
 ```
