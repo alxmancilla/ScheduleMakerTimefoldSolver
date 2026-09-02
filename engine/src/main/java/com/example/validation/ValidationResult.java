@@ -11,17 +11,20 @@ import java.util.List;
  * advisory guardrail" split (see SemesterHourLimitController for the same
  * pattern on the web side):
  * <ul>
- * <li>{@code problems} - invalid pinned data (a pinned block the solver's
- * hard constraints can never fix, since they exclude pinned rows). An empty
- * list here means the pinned data is valid; {@link #isValid()} reflects only
- * this list, and {@code MainBlockSchedulingApp} aborts the solve when it's
- * non-empty.</li>
- * <li>{@code warnings} - structural facts about the *whole* schedule
- * (pinned and movable alike) that no amount of solving can fix, but that
- * don't represent invalid data - currently just a teacher whose total
- * assigned hours exceed their total availability. Printed, never blocking:
- * the solve still runs and does its best, producing double-bookings for
- * exactly the teachers named here.</li>
+ * <li>{@code problems} - anything {@code PreSolveValidator} can *prove*
+ * will keep the solve from succeeding: invalid pinned data (a pinned block
+ * the solver's hard constraints can never fix, since they exclude pinned
+ * rows) and whole-schedule capacity facts (a teacher assigned more hours
+ * than they have availability for - see {@code validateCapacity}, an exact
+ * mathematical guarantee, not a heuristic). An empty list means nothing
+ * proven-fatal was found; {@link #isValid()} reflects only this list, and
+ * {@code MainBlockSchedulingApp} aborts the solve when it's non-empty.</li>
+ * <li>{@code warnings} - reserved for a future check that's advisory rather
+ * than provably fatal (e.g. a room-capacity heuristic with enough moving
+ * parts - multiple types, multiple rooms, no single "the room's
+ * availability" - that it wouldn't be as airtight as the teacher-capacity
+ * check above). {@code PreSolveValidator} doesn't currently populate this;
+ * printed, never blocking, when something eventually does.</li>
  * </ul>
  */
 public final class ValidationResult {
@@ -57,10 +60,10 @@ public final class ValidationResult {
     public String describe() {
         StringBuilder sb = new StringBuilder();
         if (isValid()) {
-            sb.append("Pre-solve validation passed: pinned assignments are valid.");
+            sb.append("Pre-solve validation passed: no blocking problems found.");
         } else {
             sb.append("Pre-solve validation found ").append(problems.size())
-                    .append(problems.size() == 1 ? " problem in pinned assignments:" : " problems in pinned assignments:");
+                    .append(problems.size() == 1 ? " problem:" : " problems:");
             for (String p : problems) {
                 sb.append(System.lineSeparator()).append("  - ").append(p);
             }

@@ -55,14 +55,18 @@ public class MainBlockSchedulingApp {
         System.out.println("  Course Block Assignments: " + initialSchedule.getCourseBlockAssignments().size());
         System.out.println();
 
-        // Validate pinned assignments before solving. Pinned blocks are excluded
-        // from the solver's hard constraints, so invalid pinned data would be
-        // silently accepted; fail fast with a clear report instead.
+        // Validate before solving: invalid pinned data (excluded from the
+        // solver's hard constraints, so it would otherwise be silently
+        // accepted) and whole-schedule capacity facts (e.g. a teacher
+        // assigned more hours than they have availability for) that make at
+        // least one hard violation mathematically certain regardless of how
+        // well the solve goes. Fail fast with a clear report instead of
+        // burning the full solve budget to confirm what's already provable.
         ValidationResult validation = PreSolveValidator.validate(initialSchedule);
         System.out.println(validation.describe());
         System.out.println();
         if (!validation.isValid()) {
-            System.err.println("Aborting solve: fix the pinned assignments above and retry.");
+            System.err.println("Aborting solve: fix the problems above and retry.");
             System.exit(1);
         }
 

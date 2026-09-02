@@ -211,7 +211,7 @@ public class PreSolveValidatorTest {
     // ---- Capacity warning: assigned hours vs total availability, pinned or not ----
 
     @Test
-    public void teacherOverCapacity_returnsWarningButStaysValid() {
+    public void teacherOverCapacity_isBlockingProblem() {
         // qualifiedAvailableTeacher() has 7h of availability (Mon 7-14).
         Teacher teacher = qualifiedAvailableTeacher();
         Room room = new Room("AULA 1", "A", "estándar");
@@ -222,31 +222,33 @@ public class PreSolveValidatorTest {
         a2.setPinned(false); // capacity check must count movable assignments too
 
         ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
-        // The pinned block alone (4h) doesn't overlap/violate anything pinned-specific,
-        // and the movable block is skipped by the pinned-only checks above - so this
-        // is purely a capacity warning, not a blocking problem.
-        assertTrue(r.isValid());
-        assertEquals(1, r.getWarnings().size());
-        String warning = r.getWarnings().get(0);
-        assertTrue(warning.contains("T1"));
-        assertTrue(warning.contains("8h/week"));
-        assertTrue(warning.contains("7h/week"));
-        assertTrue(warning.contains("short by 1h"));
+        // Exceeding total availability is a proven mathematical fact (at least
+        // one double-booking is unavoidable), so it blocks like the pinned
+        // checks above - it doesn't just warn and let the solve run anyway.
+        assertFalse(r.isValid());
+        assertEquals(1, r.getProblems().size());
+        String problem = r.getProblems().get(0);
+        assertTrue(problem.contains("T1"));
+        assertTrue(problem.contains("8h/week"));
+        assertTrue(problem.contains("7h/week"));
+        assertTrue(problem.contains("short by 1h"));
+        assertTrue(r.getWarnings().isEmpty());
     }
 
     @Test
-    public void teacherWithinCapacity_noWarning() {
+    public void teacherWithinCapacity_noProblem() {
         Teacher teacher = qualifiedAvailableTeacher(); // 7h available
         Room room = new Room("AULA 1", "A", "estándar");
         BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4);
         CourseBlockAssignment a = pinnedBlock("A1", 4, slot, room, teacher, "estándar");
 
         ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
-        assertTrue(r.getWarnings().isEmpty());
+        assertTrue(r.isValid());
+        assertTrue(r.getProblems().isEmpty());
     }
 
     @Test
-    public void describeIncludesCapacityWarningSection() {
+    public void describeIncludesCapacityProblem() {
         Teacher teacher = qualifiedAvailableTeacher(); // 7h available
         Room room = new Room("AULA 1", "A", "estándar");
         BlockTimeslot s1 = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4);
@@ -256,7 +258,7 @@ public class PreSolveValidatorTest {
         a2.setPinned(false);
 
         String description = PreSolveValidator.validate(scheduleWith(a1, a2)).describe();
-        assertTrue(description.contains("Pre-solve capacity warning"));
+        assertTrue(description.contains("Pre-solve validation found 1 problem:"));
         assertTrue(description.contains("short by 1h"));
     }
 }

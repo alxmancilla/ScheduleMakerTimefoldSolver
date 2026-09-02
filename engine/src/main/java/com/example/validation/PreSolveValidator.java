@@ -24,12 +24,16 @@ import java.util.Map;
  * clear report.
  * </p>
  * <p>
- * It also warns (never blocks) about a teacher whose total assigned hours
- * exceed their total availability - see {@link #validateCapacity}. Unlike the
- * pinned checks above, this isn't about invalid data; it's a structural fact
- * about the whole schedule (pinned and movable assignments together) that no
- * amount of solving can fix, so it's surfaced up front instead of only
- * showing up indirectly as double-booking violations in the solved result.
+ * It also blocks on a teacher whose total assigned hours exceed their total
+ * availability - see {@link #validateCapacity}. This isn't invalid data the
+ * way the pinned checks above are, but it's just as fatal to the solve: it's
+ * a proven mathematical fact (pigeonhole - every teaching hour occupies
+ * exactly one of the teacher's available hour-slots, and two blocks can never
+ * share one) that at least one double-booking is unavoidable, so a solve
+ * attempt can only ever end in a hard violation. Blocking here - rather than
+ * warning and burning the full solve budget to confirm what's already known
+ * - mirrors this project's other "exact, not a heuristic" guardrail
+ * (SemesterHourLimitController's guardrail #2).
  * </p>
  */
 public final class PreSolveValidator {
@@ -39,16 +43,15 @@ public final class PreSolveValidator {
 
     /**
      * Validate all pinned assignments in the schedule, plus whole-schedule
-     * capacity warnings.
+     * capacity facts.
      *
      * @param schedule the problem to validate (before solving)
-     * @return a {@link ValidationResult} listing every problem and warning found
+     * @return a {@link ValidationResult} listing every problem found
      */
     public static ValidationResult validate(SchoolSchedule schedule) {
         List<String> problems = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
         if (schedule == null || schedule.getCourseBlockAssignments() == null) {
-            return new ValidationResult(problems, warnings);
+            return new ValidationResult(problems);
         }
 
         List<CourseBlockAssignment> pinned = new ArrayList<>();
@@ -62,26 +65,26 @@ public final class PreSolveValidator {
             validateSingle(a, problems);
         }
         validateConflicts(pinned, problems);
-        validateCapacity(schedule.getCourseBlockAssignments(), warnings);
+        validateCapacity(schedule.getCourseBlockAssignments(), problems);
 
-        return new ValidationResult(problems, warnings);
+        return new ValidationResult(problems);
     }
 
     /**
-     * Warns (never blocks) when a teacher's total assigned hours - summed
-     * across every assignment for them, pinned or not, the same basis
+     * Blocks when a teacher's total assigned hours - summed across every
+     * assignment for them, pinned or not, the same basis
      * TeacherController.buildCapacityWarning() uses - exceed their total
      * weekly availability ({@link Teacher#getTotalAvailableHours()}). Unlike
-     * that web-layer check, this runs for every solve regardless of how the
-     * data got there (hand-edited via the API, bulk Excel import, or a
-     * direct SQL fix) and regardless of how the solve was triggered (CLI or
-     * the web "Run Solver" button, since both funnel through
-     * MainBlockSchedulingApp). Exceeding this is a mathematical fact - there
-     * are more required hours than there are hours in the week the teacher
-     * can teach - so at least one double-booking is unavoidable no matter
-     * how good the solve is.
+     * that web-layer check (which only warns, since an admin might be mid-fix
+     * when saving), this runs right before every solve regardless of how the
+     * data got there (hand-edited via the API, bulk Excel import, or a direct
+     * SQL fix) and regardless of how the solve was triggered (CLI or the web
+     * "Run Solver" button, since both funnel through
+     * MainBlockSchedulingApp) - so there's no good reason left to let the
+     * solve run anyway: the outcome (at least one double-booking) is already
+     * certain.
      */
-    private static void validateCapacity(List<CourseBlockAssignment> assignments, List<String> warnings) {
+    private static void validateCapacity(List<CourseBlockAssignment> assignments, List<String> problems) {
         Map<Teacher, Integer> assignedHoursByTeacher = new LinkedHashMap<>();
         for (CourseBlockAssignment a : assignments) {
             Teacher teacher = a.getTeacher();
@@ -95,7 +98,7 @@ public final class PreSolveValidator {
             int assignedHours = entry.getValue();
             int availableHours = teacher.getTotalAvailableHours();
             if (assignedHours > availableHours) {
-                warnings.add(String.format(
+                problems.add(String.format(
                         "Teacher '%s' is assigned %dh/week of courses but only has %dh/week of availability - "
                                 + "short by %dh. At least one double-booking is unavoidable.",
                         teacher.getId(), assignedHours, availableHours, assignedHours - availableHours));
