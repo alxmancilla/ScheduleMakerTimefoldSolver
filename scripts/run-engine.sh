@@ -19,6 +19,9 @@
 #   SKIP_PRESOLVE_VALIDATION            Proceed to solve even if PreSolveValidator finds blocking
 #                                        problems (default: false - aborts on any problem). Validation
 #                                        still runs and prints everything it finds either way.
+#   VALIDATE_ONLY                       Run PreSolveValidator and exit - never solves, regardless of
+#                                        SKIP_PRESOLVE_VALIDATION (default: false). Exit code is 0 if
+#                                        no blocking problems were found, 1 otherwise.
 #
 # Exit code is that of the JVM: non-zero on failure, so cron/orchestrators can
 # detect a failed run.
@@ -53,11 +56,17 @@ export DB_PASSWORD="${DB_PASSWORD:-}"
 OUTPUT_DIR="${ENGINE_OUTPUT_DIR:-$(pwd)}"
 mkdir -p "${OUTPUT_DIR}"
 
-echo "=== Schedule engine worker ==="
-echo "  jar        : ${ENGINE_JAR}"
-echo "  db url     : ${DB_URL}"
-echo "  output dir : ${OUTPUT_DIR}"
-echo
+# Skipped for VALIDATE_ONLY runs: PreSolveValidationRunnerService captures this
+# script's full stdout as the report shown in the web UI's "Run Validation"
+# panel, and this banner is just noise there - a real solve run still wants it
+# (which jar/db it hit is useful context for a multi-minute background job).
+if [[ "${VALIDATE_ONLY:-}" != "true" ]]; then
+  echo "=== Schedule engine worker ==="
+  echo "  jar        : ${ENGINE_JAR}"
+  echo "  db url     : ${DB_URL}"
+  echo "  output dir : ${OUTPUT_DIR}"
+  echo
+fi
 
 cd "${OUTPUT_DIR}"
 # shellcheck disable=SC2086

@@ -74,6 +74,17 @@ public class MainBlockSchedulingApp {
         ValidationResult validation = PreSolveValidator.validate(initialSchedule);
         System.out.println(validation.describe());
         System.out.println();
+
+        // VALIDATE_ONLY=true stops here regardless of the outcome - this is
+        // for running the check by itself (e.g. the web UI's "Run Validation"
+        // button), not as a prelude to solving. Exit code mirrors the normal
+        // abort path (0 = no blocking problems, 1 = found some) so callers
+        // (cron, the web subprocess runner) can tell the two apart without
+        // parsing the printed report.
+        if (parseBooleanEnv("VALIDATE_ONLY")) {
+            System.exit(validation.isValid() ? 0 : 1);
+        }
+
         boolean skipValidation = parseBooleanEnv("SKIP_PRESOLVE_VALIDATION");
         if (!validation.isValid()) {
             if (skipValidation) {

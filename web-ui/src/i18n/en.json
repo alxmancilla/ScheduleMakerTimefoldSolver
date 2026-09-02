@@ -45,6 +45,7 @@
     "courseCoverage": "Course Coverage",
     "teacherAvailability": "Teacher Availability",
     "import": "Import / Export",
+    "validation": "Validation",
     "admin": "Admin",
     "settings": "Settings",
     "users": "Users",
@@ -468,6 +469,19 @@
     "exportCourses": "Courses",
     "exportRooms": "Rooms",
     "exportGroups": "Groups"
+  },
+  "preSolveValidation": {
+    "title": "Pre-Solve Validation",
+    "runValidation": "Run Validation",
+    "running": "Running…",
+    "description": "Runs PreSolveValidator by itself, without solving — the same blocking checks that run before every solve (invalid pinned data, plus whole-schedule facts like a teacher assigned more hours than they have availability for). Takes seconds, not minutes, and never writes anything to the database.",
+    "startFailedPrefix": "Failed to start validation: ",
+    "state": "State:",
+    "started": "Started:",
+    "finished": "Finished:",
+    "resultPassed": "✓ No blocking problems found",
+    "resultProblems": "⚠ Blocking problems found — see the report below",
+    "resultFailed": "✗ Validation run failed to complete — see the log below"
   },
   "settings": {
     "title": "Settings",

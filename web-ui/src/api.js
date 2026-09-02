@@ -167,6 +167,8 @@ export const listTimeslots = () => api.get('/timeslots');
 // Admin: Engine (solver)
 export const runEngine = (overrides) => api.post('/admin/engine/run', overrides || {});
 export const getEngineStatus = () => api.get('/admin/engine/status');
+export const runPreSolveValidation = () => api.post('/validation/run');
+export const getPreSolveValidationStatus = () => api.get('/validation/status');
 
 // Admin: Generate Blocks
 export const generateBlocks = () => api.post('/admin/blocks/generate');

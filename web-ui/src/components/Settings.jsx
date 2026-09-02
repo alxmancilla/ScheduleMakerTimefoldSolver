@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   getTimeslots, createTimeslot, updateTimeslot, deleteTimeslot,
-  runEngine, getEngineStatus, generateBlocks, clearUnpinnedTimeslots,
+  runEngine, getEngineStatus,
+  generateBlocks, clearUnpinnedTimeslots,
   listAdminReports, downloadAdminReport,
   getTerm, updateTerm, getAuditLog,
   getComponentBlockRules, setComponentBlockRule, deleteComponentBlockRule, getCourseDesignations,

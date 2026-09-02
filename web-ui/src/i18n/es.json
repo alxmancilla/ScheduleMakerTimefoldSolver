@@ -45,6 +45,7 @@
     "courseCoverage": "Cobertura de Cursos",
     "teacherAvailability": "Disponibilidad de Maestros",
     "import": "Importar / Exportar",
+    "validation": "Validación",
     "admin": "Administración",
     "settings": "Configuración",
     "users": "Usuarios",
@@ -468,6 +469,19 @@
     "exportCourses": "Cursos",
     "exportRooms": "Aulas",
     "exportGroups": "Grupos"
+  },
+  "preSolveValidation": {
+    "title": "Validación Previa al Solver",
+    "runValidation": "Ejecutar Validación",
+    "running": "Ejecutando…",
+    "description": "Ejecuta PreSolveValidator por sí solo, sin resolver — las mismas verificaciones bloqueantes que corren antes de cada solve (datos fijados inválidos, más hechos de todo el horario como un maestro con más horas asignadas que disponibilidad). Tarda segundos, no minutos, y nunca escribe nada en la base de datos.",
+    "startFailedPrefix": "Error al iniciar la validación: ",
+    "state": "Estado:",
+    "started": "Iniciado:",
+    "finished": "Finalizado:",
+    "resultPassed": "✓ No se encontraron problemas bloqueantes",
+    "resultProblems": "⚠ Se encontraron problemas bloqueantes — vea el reporte abajo",
+    "resultFailed": "✗ La ejecución de validación no se completó — vea el registro abajo"
   },
   "settings": {
     "title": "Configuración",

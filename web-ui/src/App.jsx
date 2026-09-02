@@ -12,6 +12,7 @@ import CourseCoverage from './components/CourseCoverage';
 import TeacherAvailability from './components/TeacherAvailability';
 import Reports from './components/Reports';
 import ImportExcel from './components/Import';
+import PreSolveValidation from './components/PreSolveValidation';
 import Settings from './components/Settings';
 import Users from './components/Users';
 import Login from './components/Login';
@@ -41,6 +42,7 @@ const TOOLS_ITEMS = [
   { path: '/course-coverage', labelKey: 'nav.courseCoverage' },
   { path: '/teacher-availability', labelKey: 'nav.teacherAvailability' },
   { path: '/import', labelKey: 'nav.import', writeOnly: true },
+  { path: '/validation', labelKey: 'nav.validation', writeOnly: true },
 ];
 
 /**
@@ -325,6 +327,7 @@ function App() {
             <Route path="/teacher-availability" element={<TeacherAvailability />} />
             <Route element={<WriteRoute />}>
               <Route path="/import" element={<ImportExcel />} />
+              <Route path="/validation" element={<PreSolveValidation />} />
             </Route>
             <Route element={<AdminRoute />}>
               <Route path="/settings" element={<Settings />} />
