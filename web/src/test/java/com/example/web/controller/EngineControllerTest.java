@@ -65,21 +65,21 @@ public class EngineControllerTest {
     @WithMockUser(username = "alice", roles = "ADMIN")
     public void runEngine_noBody_startsWithNoOverrides() throws Exception {
         when(appUserRepository.findById("alice")).thenReturn(Optional.empty());
-        when(engineRunnerService.tryStart(null, null, null)).thenReturn(true);
+        when(engineRunnerService.tryStart(null, null, null, null)).thenReturn(true);
         when(engineRunnerService.getSnapshot()).thenReturn(snapshot(EngineRunnerService.State.RUNNING, null));
 
         mockMvc.perform(post("/api/admin/engine/run"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("RUNNING"));
 
-        verify(engineRunnerService).tryStart(null, null, null);
+        verify(engineRunnerService).tryStart(null, null, null, null);
     }
 
     @Test
     @WithMockUser(username = "alice", roles = "ADMIN")
     public void runEngine_withOverrides_passesThemThrough() throws Exception {
         when(appUserRepository.findById("alice")).thenReturn(Optional.empty());
-        when(engineRunnerService.tryStart(10, 4, null)).thenReturn(true);
+        when(engineRunnerService.tryStart(10, 4, null, null)).thenReturn(true);
         when(engineRunnerService.getSnapshot()).thenReturn(snapshot(EngineRunnerService.State.RUNNING, null));
 
         mockMvc.perform(post("/api/admin/engine/run")
@@ -88,7 +88,23 @@ public class EngineControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("RUNNING"));
 
-        verify(engineRunnerService).tryStart(10, 4, null);
+        verify(engineRunnerService).tryStart(10, 4, null, null);
+    }
+
+    @Test
+    @WithMockUser(username = "alice", roles = "ADMIN")
+    public void runEngine_skipValidation_passesItThrough() throws Exception {
+        when(appUserRepository.findById("alice")).thenReturn(Optional.empty());
+        when(engineRunnerService.tryStart(null, null, null, true)).thenReturn(true);
+        when(engineRunnerService.getSnapshot()).thenReturn(snapshot(EngineRunnerService.State.RUNNING, null));
+
+        mockMvc.perform(post("/api/admin/engine/run")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"skipValidation\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("RUNNING"));
+
+        verify(engineRunnerService).tryStart(null, null, null, true);
     }
 
     @Test
@@ -97,14 +113,14 @@ public class EngineControllerTest {
         AppUserEntity user = new AppUserEntity();
         user.setPreferredLanguage("es");
         when(appUserRepository.findById("alice")).thenReturn(Optional.of(user));
-        when(engineRunnerService.tryStart(null, null, "es")).thenReturn(true);
+        when(engineRunnerService.tryStart(null, null, "es", null)).thenReturn(true);
         when(engineRunnerService.getSnapshot()).thenReturn(snapshot(EngineRunnerService.State.RUNNING, null));
 
         mockMvc.perform(post("/api/admin/engine/run"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.state").value("RUNNING"));
 
-        verify(engineRunnerService).tryStart(null, null, "es");
+        verify(engineRunnerService).tryStart(null, null, "es", null);
     }
 
     @Test
@@ -120,7 +136,7 @@ public class EngineControllerTest {
     @WithMockUser(username = "alice", roles = "ADMIN")
     public void runEngine_alreadyRunning_returns400() throws Exception {
         when(appUserRepository.findById("alice")).thenReturn(Optional.empty());
-        when(engineRunnerService.tryStart(null, null, null)).thenReturn(false);
+        when(engineRunnerService.tryStart(null, null, null, null)).thenReturn(false);
 
         mockMvc.perform(post("/api/admin/engine/run"))
                 .andExpect(status().isBadRequest())

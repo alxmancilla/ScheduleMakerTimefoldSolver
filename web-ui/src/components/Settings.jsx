@@ -84,6 +84,7 @@ function Settings() {
   // value as the XML defines it.
   const [minutesSpentLimit, setMinutesSpentLimit] = useState(5);
   const [unimprovedMinutesSpentLimit, setUnimprovedMinutesSpentLimit] = useState(2);
+  const [skipValidation, setSkipValidation] = useState(false);
   const pollRef = useRef(null);
 
   const [adminReports, setAdminReports] = useState([]);
@@ -250,6 +251,7 @@ function Settings() {
       const response = await runEngine({
         minutesSpentLimit: minutesSpentLimit === '' ? null : minutesSpentLimit,
         unimprovedMinutesSpentLimit: unimprovedMinutesSpentLimit === '' ? null : unimprovedMinutesSpentLimit,
+        skipValidation,
       });
       setEngineStatus(response.data);
       startPolling();
@@ -839,6 +841,22 @@ function Settings() {
         <p style={{ marginTop: '6px', color: 'var(--color-text-secondary)', fontSize: '12px' }}>
           {t('settings.solver.limitsDescription')}
         </p>
+        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          <input
+            id="skipValidation"
+            type="checkbox"
+            checked={skipValidation}
+            onChange={(e) => setSkipValidation(e.target.checked)}
+            disabled={engineStatus?.state === 'RUNNING'}
+            style={{ marginTop: '3px' }}
+          />
+          <label htmlFor="skipValidation" style={{ fontSize: '13px' }}>
+            {t('settings.solver.skipValidation')}
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '2px' }}>
+              {t('settings.solver.skipValidationHint')}
+            </div>
+          </label>
+        </div>
         {engineError && <div className="error" role="alert">{engineError}</div>}
         {engineStatus && (
           <div style={{ marginTop: '10px' }}>

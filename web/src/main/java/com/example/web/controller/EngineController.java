@@ -33,10 +33,11 @@ public class EngineController {
             Authentication authentication) {
         Integer minutesSpentLimit = request != null ? request.getMinutesSpentLimit() : null;
         Integer unimprovedMinutesSpentLimit = request != null ? request.getUnimprovedMinutesSpentLimit() : null;
+        Boolean skipValidation = request != null ? request.getSkipValidation() : null;
         String locale = appUserRepository.findById(authentication.getName())
                 .map(AppUserEntity::getPreferredLanguage)
                 .orElse(null);
-        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale)) {
+        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation)) {
             throw new IllegalArgumentException("The engine is already running");
         }
         return new EngineStatusResponse(engineRunnerService.getSnapshot());

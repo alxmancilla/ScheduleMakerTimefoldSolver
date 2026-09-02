@@ -16,6 +16,9 @@
 #   JAVA_OPTS                           Extra JVM flags (e.g. -Xmx1g)
 #   SOLVER_MINUTES_LIMIT                Overrides solverConfig.xml's local search total time budget (default: 5)
 #   SOLVER_UNIMPROVED_MINUTES_LIMIT     Overrides solverConfig.xml's give-up-if-stuck limit (default: 2)
+#   SKIP_PRESOLVE_VALIDATION            Proceed to solve even if PreSolveValidator finds blocking
+#                                        problems (default: false - aborts on any problem). Validation
+#                                        still runs and prints everything it finds either way.
 #
 # Exit code is that of the JVM: non-zero on failure, so cron/orchestrators can
 # detect a failed run.

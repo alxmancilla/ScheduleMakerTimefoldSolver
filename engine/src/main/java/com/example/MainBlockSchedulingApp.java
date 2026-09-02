@@ -62,12 +62,28 @@ public class MainBlockSchedulingApp {
         // least one hard violation mathematically certain regardless of how
         // well the solve goes. Fail fast with a clear report instead of
         // burning the full solve budget to confirm what's already provable.
+        //
+        // SKIP_PRESOLVE_VALIDATION=true proceeds to solve anyway - validation
+        // still runs and prints everything it finds either way, nothing is
+        // hidden; the flag only changes whether a non-empty result aborts the
+        // run. Every check here is a proven mathematical fact, not a
+        // heuristic, so there's no legitimate reason to disable one
+        // selectively - this is a blanket "I know something's broken, let me
+        // see the best-effort result anyway" escape hatch for testing/debugging,
+        // not a way to silence a check you disagree with.
         ValidationResult validation = PreSolveValidator.validate(initialSchedule);
         System.out.println(validation.describe());
         System.out.println();
+        boolean skipValidation = parseBooleanEnv("SKIP_PRESOLVE_VALIDATION");
         if (!validation.isValid()) {
-            System.err.println("Aborting solve: fix the problems above and retry.");
-            System.exit(1);
+            if (skipValidation) {
+                System.out.println("SKIP_PRESOLVE_VALIDATION is set - proceeding despite the problem(s) above.");
+                System.out.println();
+            } else {
+                System.err.println("Aborting solve: fix the problems above and retry "
+                        + "(or set SKIP_PRESOLVE_VALIDATION=true to proceed anyway).");
+                System.exit(1);
+            }
         }
 
         // Build solver, optionally overriding the local search time budget via env
@@ -170,5 +186,10 @@ public class MainBlockSchedulingApp {
             return null;
         }
         return Long.parseLong(value.trim());
+    }
+
+    private static boolean parseBooleanEnv(String name) {
+        String value = System.getenv(name);
+        return value != null && Boolean.parseBoolean(value.trim());
     }
 }

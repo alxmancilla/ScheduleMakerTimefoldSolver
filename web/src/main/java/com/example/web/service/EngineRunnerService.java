@@ -78,7 +78,7 @@ public class EngineRunnerService {
      * @return true if this call started a run, false if one was already in progress
      */
     public boolean tryStart() {
-        return tryStart(null, null, null);
+        return tryStart(null, null, null, null);
     }
 
     /**
@@ -90,7 +90,21 @@ public class EngineRunnerService {
      * @return true if this call started a run, false if one was already in progress
      */
     public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit) {
-        return tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, null);
+        return tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, null, null);
+    }
+
+    /**
+     * Same as the 4-argument overload below, with {@code skipValidation}
+     * left at its default (false - abort on any PreSolveValidator problem).
+     *
+     * @param minutesSpentLimit           overrides solverConfig.xml's time budget if non-null
+     * @param unimprovedMinutesSpentLimit overrides solverConfig.xml's give-up-if-stuck budget if non-null
+     * @param locale                      language for the automatic post-solve compliance snapshot's
+     *                                     report chrome ("es" or anything else -> "en"); null means "en"
+     * @return true if this call started a run, false if one was already in progress
+     */
+    public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale) {
+        return tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, null);
     }
 
     /**
@@ -100,9 +114,14 @@ public class EngineRunnerService {
      * @param unimprovedMinutesSpentLimit overrides solverConfig.xml's give-up-if-stuck budget if non-null
      * @param locale                      language for the automatic post-solve compliance snapshot's
      *                                     report chrome ("es" or anything else -> "en"); null means "en"
+     * @param skipValidation              true proceeds to solve even if PreSolveValidator finds blocking
+     *                                     problems (maps onto the CLI's SKIP_PRESOLVE_VALIDATION env var
+     *                                     for the subprocess); null/false aborts on any problem, same as
+     *                                     the CLI's own default
      * @return true if this call started a run, false if one was already in progress
      */
-    public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale) {
+    public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale,
+            Boolean skipValidation) {
         synchronized (lock) {
             if (state == State.RUNNING) {
                 return false;
@@ -113,11 +132,12 @@ public class EngineRunnerService {
             exitCode = null;
             logLines.clear();
         }
-        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit, locale));
+        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation));
         return true;
     }
 
-    private void runProcess(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale) {
+    private void runProcess(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale,
+            Boolean skipValidation) {
         Integer resultCode = null;
         try {
             ProcessBuilder builder = new ProcessBuilder("bash", "scripts/run-engine.sh");
@@ -128,6 +148,9 @@ public class EngineRunnerService {
             if (unimprovedMinutesSpentLimit != null) {
                 builder.environment().put("SOLVER_UNIMPROVED_MINUTES_LIMIT",
                         String.valueOf(unimprovedMinutesSpentLimit));
+            }
+            if (Boolean.TRUE.equals(skipValidation)) {
+                builder.environment().put("SKIP_PRESOLVE_VALIDATION", "true");
             }
             builder.redirectErrorStream(true);
             Process process = builder.start();
