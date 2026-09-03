@@ -709,6 +709,36 @@ public class DataLoader {
             }
         }
 
+        // Second pass: which rows are pinned (and what teacher/group they
+        // belong to) isn't known until every row above has been read, so the
+        // per-teacher/per-group pinned-occupancy maps can only be built once
+        // the full list exists - then set identically on every assignment
+        // (same shared map reference), mirroring allTimeslots/allRooms above.
+        // See CourseBlockAssignment.getMatchingBlockTimeslots()/
+        // getPinnedOccupiedTimeslots() for how this excludes, from a
+        // non-pinned assignment's own value range, any timeslot that would
+        // double-book its own teacher or clash its own group against a
+        // DIFFERENT, fixed pinned block.
+        Map<String, List<BlockTimeslot>> pinnedTimeslotsByTeacherId = new HashMap<>();
+        Map<String, List<BlockTimeslot>> pinnedTimeslotsByGroupId = new HashMap<>();
+        for (CourseBlockAssignment a : assignments) {
+            if (!a.isPinned() || a.getTimeslot() == null) {
+                continue;
+            }
+            if (a.getTeacher() != null) {
+                pinnedTimeslotsByTeacherId.computeIfAbsent(a.getTeacher().getId(), k -> new ArrayList<>())
+                        .add(a.getTimeslot());
+            }
+            if (a.getGroup() != null) {
+                pinnedTimeslotsByGroupId.computeIfAbsent(a.getGroup().getId(), k -> new ArrayList<>())
+                        .add(a.getTimeslot());
+            }
+        }
+        for (CourseBlockAssignment a : assignments) {
+            a.setPinnedTimeslotsByTeacherId(pinnedTimeslotsByTeacherId);
+            a.setPinnedTimeslotsByGroupId(pinnedTimeslotsByGroupId);
+        }
+
         return assignments;
     }
 

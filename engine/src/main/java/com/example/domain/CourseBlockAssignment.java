@@ -8,6 +8,7 @@ import ai.timefold.solver.core.api.domain.lookup.PlanningId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @PlanningEntity(difficultyComparatorClass = com.example.solver.BlockLengthDifficultyComparator.class)
@@ -54,6 +55,23 @@ public class CourseBlockAssignment {
     // NEW: Support for dual room requirements and custom block decomposition
     private String satisfiesRoomType; // Which room requirement this block satisfies
     private String preferredRoomHint; // Preferred room for soft constraint optimization
+
+    // Not planning variables - shared per-teacher/per-group maps of the
+    // timeslots already committed by PINNED blocks, built once by DataLoader
+    // in a second pass after every row is read (which rows are pinned isn't
+    // known until the whole table has been scanned) and set identically on
+    // every assignment, mirroring allTimeslots/allRooms above. Used by
+    // getMatchingBlockTimeslots() to exclude, from a non-pinned assignment's
+    // own value range, any timeslot that would double-book its own teacher
+    // or clash its own group against a DIFFERENT, fixed pinned block - the
+    // same "structurally unreachable, not just scored" treatment already
+    // given to block-length mismatches and the HARD semester hour limit
+    // below. MatchingLengthSwapFilter also consults getPinnedOccupiedTimeslots()
+    // directly: SwapMove exchanges values without consulting either entity's
+    // own value range (see that filter's class doc), so this exclusion needs
+    // enforcing there too, not just here.
+    private Map<String, List<BlockTimeslot>> pinnedTimeslotsByTeacherId;
+    private Map<String, List<BlockTimeslot>> pinnedTimeslotsByGroupId;
 
     public CourseBlockAssignment() {
         // No-arg constructor required by Timefold
@@ -122,10 +140,50 @@ public class CourseBlockAssignment {
         this.allTimeslots = allTimeslots;
     }
 
+    public void setPinnedTimeslotsByTeacherId(Map<String, List<BlockTimeslot>> pinnedTimeslotsByTeacherId) {
+        this.pinnedTimeslotsByTeacherId = pinnedTimeslotsByTeacherId;
+    }
+
+    public void setPinnedTimeslotsByGroupId(Map<String, List<BlockTimeslot>> pinnedTimeslotsByGroupId) {
+        this.pinnedTimeslotsByGroupId = pinnedTimeslotsByGroupId;
+    }
+
+    /**
+     * The timeslots this (non-pinned) assignment's own teacher and/or group
+     * already has committed to via a DIFFERENT pinned block - the set
+     * getMatchingBlockTimeslots() below excludes from this assignment's own
+     * value range. Public (not just used internally) because
+     * MatchingLengthSwapFilter needs the same list to reject a SwapMove that
+     * would hand this assignment one of these timeslots - SwapMove exchanges
+     * values directly without consulting either entity's own value range, so
+     * the exclusion below alone doesn't reach it.
+     *
+     * <p>
+     * Always empty for a pinned assignment: Timefold's {@code @PlanningPin}
+     * means this assignment's own timeslot/room variables are never
+     * reassigned by the solver in the first place, so there is nothing to
+     * exclude from an irrelevant value range.
+     */
+    public List<BlockTimeslot> getPinnedOccupiedTimeslots() {
+        if (pinned) {
+            return Collections.emptyList();
+        }
+        List<BlockTimeslot> occupied = new ArrayList<>();
+        if (teacher != null && pinnedTimeslotsByTeacherId != null) {
+            occupied.addAll(pinnedTimeslotsByTeacherId.getOrDefault(teacher.getId(), Collections.emptyList()));
+        }
+        if (group != null && pinnedTimeslotsByGroupId != null) {
+            occupied.addAll(pinnedTimeslotsByGroupId.getOrDefault(group.getId(), Collections.emptyList()));
+        }
+        return occupied;
+    }
+
     /**
      * This block's valid timeslot candidates: every timeslot whose length
-     * matches blockLength, and - if this block's course has a HARD-severity
-     * semester_hour_limit configured (see Course.getLatestEndHour()/
+     * matches blockLength; that doesn't overlap a timeslot this block's own
+     * teacher or group already has pinned elsewhere (see
+     * getPinnedOccupiedTimeslots()); and - if this block's course has a
+     * HARD-severity semester_hour_limit configured (see Course.getLatestEndHour()/
      * getLatestEndHourSeverity(), sourced from the semester_hour_limit
      * table) - whose end hour doesn't run past that limit. A SOFT-severity
      * limit does NOT filter here; the solver may still place such a block
@@ -138,7 +196,10 @@ public class CourseBlockAssignment {
      * candidates can never include a slot ending after its limit (mirrored
      * by the HARD constraint semesterHourLimitsMustBeRespected, which exists
      * only to catch a pinned row whose timeslot predates the limit - see
-     * that constraint's doc).
+     * that constraint's doc). The pinned-occupancy exclusion is the same
+     * treatment for a different fact: a slot that's guaranteed to
+     * double-book this block's teacher or clash its group against fixed,
+     * unmovable data is exactly as unreachable as a length mismatch.
      */
     @ValueRangeProvider(id = "matchingBlockTimeslotRange")
     public List<BlockTimeslot> getMatchingBlockTimeslots() {
@@ -148,6 +209,7 @@ public class CourseBlockAssignment {
         Integer hardLatestEndHour = course != null && "HARD".equals(course.getLatestEndHourSeverity())
                 ? course.getLatestEndHour()
                 : null;
+        List<BlockTimeslot> pinnedOccupied = getPinnedOccupiedTimeslots();
         List<BlockTimeslot> matching = new ArrayList<>();
         for (BlockTimeslot candidate : allTimeslots) {
             if (candidate.getLengthHours() != blockLength) {
@@ -157,9 +219,21 @@ public class CourseBlockAssignment {
                     && candidate.getStartHour() + candidate.getLengthHours() > hardLatestEndHour) {
                 continue;
             }
+            if (overlapsAny(candidate, pinnedOccupied)) {
+                continue;
+            }
             matching.add(candidate);
         }
         return matching;
+    }
+
+    private static boolean overlapsAny(BlockTimeslot candidate, List<BlockTimeslot> others) {
+        for (BlockTimeslot other : others) {
+            if (BlockScheduleMath.blocksOverlap(candidate, other)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** True when this block belongs to a first-semester (semester == 1) course. */

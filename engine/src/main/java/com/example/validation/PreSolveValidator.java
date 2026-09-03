@@ -37,9 +37,15 @@ import java.util.TreeSet;
  * It also blocks on assignments belonging to an inactive course (see
  * {@link #validateNoInactiveCourses}), a teacher not qualified for their
  * assigned course regardless of pinned status (see
- * {@link #validateTeacherQualifications}), and several whole-schedule
- * capacity facts (see {@link #validateCapacity},
- * {@link #validateRoomFixedCapacity}, {@link #validateBlockSpreadCapacity}).
+ * {@link #validateTeacherQualifications}), several whole-schedule capacity
+ * facts (see {@link #validateCapacity}, {@link #validateRoomFixedCapacity},
+ * {@link #validateBlockSpreadCapacity}), and a non-pinned assignment whose
+ * timeslot value range has been narrowed down to nothing (see
+ * {@link #validateNonEmptyTimeslotRanges} - this can happen once
+ * {@link CourseBlockAssignment#getMatchingBlockTimeslots()} excludes a
+ * teacher's/group's pinned-occupied timeslots from a movable block's own
+ * candidates, so the solver never even attempts a slot that's guaranteed to
+ * double-book a teacher or clash a group against fixed, unmovable data).
  * </p>
  * <p>
  * The capacity checks in particular aren't invalid data the way the pinned
@@ -87,8 +93,46 @@ public final class PreSolveValidator {
         validateCapacity(schedule.getCourseBlockAssignments(), problems);
         validateRoomFixedCapacity(schedule.getCourseBlockAssignments(), problems);
         validateBlockSpreadCapacity(schedule.getCourseBlockAssignments(), problems);
+        validateNonEmptyTimeslotRanges(schedule.getCourseBlockAssignments(), problems);
 
         return new ValidationResult(problems);
+    }
+
+    /**
+     * Blocks when a non-pinned assignment's own timeslot value range
+     * ({@link CourseBlockAssignment#getMatchingBlockTimeslots()}) is empty -
+     * there is literally nowhere left the solver could ever place it. This
+     * is deliberately a direct emptiness check rather than an aggregate
+     * hours comparison: {@link #validateCapacity} already catches the pure
+     * "not enough total hours" case (mathematically identical to comparing
+     * assigned hours against availability), but excluding a teacher's/
+     * group's pinned-occupied timeslots from this value range (see
+     * getMatchingBlockTimeslots()'s doc) can fail for a *shape* reason
+     * capacity math can't see - e.g. a teacher with plenty of hours left in
+     * total, but none of it in one contiguous window as long as a 3-hour
+     * block still needs. Checking the value range itself, after every
+     * exclusion has been applied, catches that exactly rather than
+     * approximating it.
+     */
+    private static void validateNonEmptyTimeslotRanges(List<CourseBlockAssignment> assignments,
+            List<String> problems) {
+        for (CourseBlockAssignment a : assignments) {
+            // allTimeslots == null means the timeslot catalog was never wired
+            // up at all (only ever true for a hand-built schedule that skips
+            // it, e.g. a unit test not exercising this) - a different,
+            // uninteresting state from "wired up and genuinely empty", which
+            // is the only thing this check means to catch.
+            if (a.isPinned() || a.getAllTimeslots() == null) {
+                continue;
+            }
+            if (a.getMatchingBlockTimeslots().isEmpty()) {
+                problems.add(String.format(
+                        "%s has no valid timeslot left: every %dh slot either doesn't exist, runs past a HARD "
+                                + "semester hour limit, or would double-book its teacher/group against a pinned "
+                                + "block. Widen availability, move a conflicting pinned block, or reassign this block.",
+                        describe(a), a.getBlockLength()));
+            }
+        }
     }
 
     /**

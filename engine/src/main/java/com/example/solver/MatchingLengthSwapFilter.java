@@ -4,6 +4,7 @@ import ai.timefold.solver.core.api.score.director.ScoreDirector;
 import ai.timefold.solver.core.impl.heuristic.move.Move;
 import ai.timefold.solver.core.impl.heuristic.selector.common.decorator.SelectionFilter;
 import ai.timefold.solver.core.impl.heuristic.selector.move.generic.SwapMove;
+import com.example.domain.BlockScheduleMath;
 import com.example.domain.BlockTimeslot;
 import com.example.domain.CourseBlockAssignment;
 import com.example.domain.Room;
@@ -17,6 +18,8 @@ import java.util.Objects;
  * 1. The two assignments have different block lengths
  * 2. Either teacher would be unavailable after the swap
  * 3. Either assignment's room is "fixed" and the swap would actually change it
+ * 4. Either assignment's new (post-swap) timeslot would double-book its own
+ *    teacher or clash its own group against a DIFFERENT, fixed pinned block
  *
  * This prevents swapping a 3-hour block with a 1-hour block, which would
  * create block length mismatches after the swap, and ensures teachers
@@ -25,7 +28,12 @@ import java.util.Objects;
  * room, now that it's a second planning variable on CourseBlockAssignment),
  * and unlike ChangeMove it doesn't consult either entity's own value range -
  * so a room-fixed entity's singleton room range on its own doesn't stop a
- * swap from handing it a different room.
+ * swap from handing it a different room. Check 4 exists for exactly the same
+ * reason: CourseBlockAssignment.getMatchingBlockTimeslots() already excludes
+ * a teacher's/group's pinned-occupied timeslots from ChangeMove's candidates,
+ * but SwapMove bypasses that value range entirely, so without this check a
+ * swap could silently hand a block right back into a slot its own teacher or
+ * group already has pinned elsewhere.
  */
 public class MatchingLengthSwapFilter implements SelectionFilter<SchoolSchedule, Move<SchoolSchedule>> {
 
@@ -84,6 +92,22 @@ public class MatchingLengthSwapFilter implements SelectionFilter<SchoolSchedule,
             return false;
         }
 
+        // Reject if either assignment's post-swap timeslot would double-book
+        // its own teacher or clash its own group against a pinned block.
+        if (conflictsWithPinnedData(leftAssignment, rightTimeslot)
+                || conflictsWithPinnedData(rightAssignment, leftTimeslot)) {
+            return false;
+        }
+
         return true;
+    }
+
+    private static boolean conflictsWithPinnedData(CourseBlockAssignment assignment, BlockTimeslot candidateTimeslot) {
+        for (BlockTimeslot occupied : assignment.getPinnedOccupiedTimeslots()) {
+            if (BlockScheduleMath.blocksOverlap(candidateTimeslot, occupied)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

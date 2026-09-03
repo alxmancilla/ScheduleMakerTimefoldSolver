@@ -511,4 +511,65 @@ public class PreSolveValidatorTest {
 
         assertTrue(PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0]))).isValid());
     }
+
+    // ---- Empty timeslot range: every candidate excluded by pinned occupancy ----
+
+    @Test
+    public void emptyTimeslotRangeFromPinnedConflict_isReported() {
+        // Only one 2h timeslot exists at all for this block's teacher/day, and
+        // it's already pinned elsewhere by the same teacher - nothing legal
+        // remains for this movable block.
+        BlockTimeslot onlyMatchingSlot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", new HashSet<>(Arrays.asList("Matemáticas")),
+                new HashMap<>(), 40);
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+
+        CourseBlockAssignment a = new CourseBlockAssignment("A1", group, MATH, 2);
+        a.setTeacher(teacher);
+        a.setSatisfiesRoomType("estándar");
+        a.setPinned(false);
+        a.setAllTimeslots(List.of(onlyMatchingSlot));
+        a.setPinnedTimeslotsByTeacherId(Map.of("T1", List.of(onlyMatchingSlot)));
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a));
+        assertFalse(r.isValid());
+        assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("no valid timeslot")));
+    }
+
+    @Test
+    public void nonEmptyTimeslotRange_passes() {
+        BlockTimeslot pinnedElsewhere = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        BlockTimeslot stillFree = new BlockTimeslot("s2", DayOfWeek.TUESDAY, 7, 2);
+        // Enough declared availability to also satisfy validateCapacity - this
+        // test is only about the timeslot-range check, not capacity.
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7, 8)));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", new HashSet<>(Arrays.asList("Matemáticas")), avail, 40);
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+
+        CourseBlockAssignment a = new CourseBlockAssignment("A1", group, MATH, 2);
+        a.setTeacher(teacher);
+        a.setSatisfiesRoomType("estándar");
+        a.setPinned(false);
+        a.setAllTimeslots(List.of(pinnedElsewhere, stillFree));
+        a.setPinnedTimeslotsByTeacherId(Map.of("T1", List.of(pinnedElsewhere)));
+
+        assertTrue(PreSolveValidator.validate(scheduleWith(a)).isValid());
+    }
+
+    @Test
+    public void pinnedAssignmentWithNoTimeslotCandidates_isNotFlaggedByEmptyRangeCheck() {
+        // A pinned assignment's own value range is irrelevant to the solver
+        // (Timefold never reassigns a pinned entity), so this check must
+        // skip it regardless of what getMatchingBlockTimeslots() would say.
+        Teacher teacher = qualifiedAvailableTeacher();
+        Room room = new Room("AULA 1", "A", "estándar");
+        BlockTimeslot slot = new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2);
+        CourseBlockAssignment a = pinnedBlock("A1", 2, slot, room, teacher, "estándar");
+        // allTimeslots deliberately left unset, as pinnedBlock() always leaves it -
+        // if this check didn't skip pinned rows, it would false-positive here too.
+
+        assertTrue(PreSolveValidator.validate(scheduleWith(a)).isValid());
+    }
 }
