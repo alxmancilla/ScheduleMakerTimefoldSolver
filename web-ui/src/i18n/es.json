@@ -789,7 +789,8 @@
       "pinned": "Fijado"
     },
     "noAssignments": "No se encontraron asignaciones para los filtros seleccionados",
-    "pinnedLabel": "FIJADO"
+    "pinnedLabel": "FIJADO",
+    "conflictLabel": "CONFLICTO - reservas superpuestas"
   },
   "mySchedule": {
     "title": "Mi Horario",

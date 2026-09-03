@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getMyScheduleView } from '../api';
-import { formatHour } from '../constants';
+import { formatHour, buildDayWindows } from '../constants';
+import ScheduleEntryCard from './ScheduleEntryCard';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
@@ -37,23 +38,16 @@ function MySchedule() {
     }
   };
 
-  const getEntriesStartingAt = (dayOfWeek, hour) => {
-    if (!schedule) return [];
-    return schedule.entries.filter((entry) => entry.dayOfWeek === dayOfWeek && entry.startHour === hour);
-  };
-
-  const getEntriesForDayAndHour = (dayOfWeek, hour) => {
-    if (!schedule) return [];
-    return schedule.entries.filter((entry) => {
-      const entryEnd = entry.startHour + entry.lengthHours;
-      return entry.dayOfWeek === dayOfWeek && hour >= entry.startHour && hour < entryEnd;
-    });
-  };
-
   if (loading) return <div className="loading">{t('mySchedule.loading')}</div>;
   if (error) return <div className="error" role="alert">{error}</div>;
 
   const hasEntries = schedule && schedule.entries.length > 0;
+  // One merged-window list per day - see buildDayWindows in constants.js for
+  // why overlapping entries (a real double-booking) must be merged into one
+  // shared window instead of each claiming their own table cell.
+  const dayWindows = hasEntries
+    ? DAY_KEYS.map((_, idx) => buildDayWindows(schedule.entries.filter((entry) => entry.dayOfWeek === idx + 1)))
+    : [];
 
   return (
     <div>
@@ -83,46 +77,40 @@ function MySchedule() {
                 <tr key={hour}>
                   <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{formatHour(hour)}-{formatHour(hour + 1)}</td>
                   {DAYS.map((day, dayIdx) => {
-                    const dayOfWeek = dayIdx + 1;
-                    const entriesStartingHere = getEntriesStartingAt(dayOfWeek, hour);
-                    const allEntries = getEntriesForDayAndHour(dayOfWeek, hour);
-                    const isCoveredByPreviousBlock = allEntries.some((entry) => entry.startHour < hour);
+                    const windows = dayWindows[dayIdx];
+                    const cellWindow = windows.find((w) => w.startHour === hour);
 
-                    if (isCoveredByPreviousBlock && entriesStartingHere.length === 0) {
-                      return null;
+                    if (!cellWindow) {
+                      const isCoveredByEarlierWindow = windows.some((w) => w.startHour < hour && hour < w.endHour);
+                      return isCoveredByEarlierWindow ? null : (
+                        <td key={dayIdx} style={{ border: '1px solid #ddd', height: '60px' }} />
+                      );
                     }
+
+                    const hasConflict = cellWindow.entries.length > 1;
 
                     return (
                       <td
                         key={dayIdx}
-                        rowSpan={entriesStartingHere.length > 0 && entriesStartingHere[0].lengthHours > 1 ? entriesStartingHere[0].lengthHours : 1}
-                        style={{ verticalAlign: 'top', padding: '0', border: '1px solid #ddd', height: '60px' }}
+                        rowSpan={cellWindow.endHour - cellWindow.startHour}
+                        style={{
+                          verticalAlign: 'top',
+                          padding: '0',
+                          border: '1px solid #ddd',
+                          height: '60px',
+                          ...(hasConflict ? { backgroundColor: '#fdecea' } : {}),
+                        }}
                       >
-                        {entriesStartingHere.map((entry, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              backgroundColor: entry.pinned ? '#ffe6e6' : '#e8f4f8',
-                              border: '2px solid ' + (entry.pinned ? '#ffcccc' : '#b3d9e6'),
-                              borderRadius: '4px',
-                              padding: '8px',
-                              margin: '4px',
-                              fontSize: '12px',
-                              height: 'calc(100% - 8px)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box',
-                            }}
-                          >
-                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{entry.courseName}</div>
-                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.groupName}</div>
-                            <div style={{ fontSize: '11px', color: '#555' }}>{entry.roomName}</div>
-                            <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
-                              {formatHour(entry.startHour)} - {formatHour(entry.startHour + entry.lengthHours)} ({entry.lengthHours}h)
-                            </div>
-                            {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 {t('schedule.pinnedLabel')}</div>}
+                        {hasConflict && (
+                          <div style={{
+                            background: '#e74c3c', color: 'white', fontSize: '10px', fontWeight: 'bold',
+                            padding: '3px 6px', textAlign: 'center',
+                          }}>
+                            ⚠ {t('schedule.conflictLabel')}
                           </div>
+                        )}
+                        {cellWindow.entries.map((entry, idx) => (
+                          <ScheduleEntryCard key={idx} entry={entry} hasConflict={hasConflict} showTeacher={false} />
                         ))}
                       </td>
                     );

@@ -789,7 +789,8 @@
       "pinned": "Pinned"
     },
     "noAssignments": "No assignments found for the selected filters",
-    "pinnedLabel": "PINNED"
+    "pinnedLabel": "PINNED",
+    "conflictLabel": "CONFLICT - overlapping bookings"
   },
   "mySchedule": {
     "title": "My Schedule",
