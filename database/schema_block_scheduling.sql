@@ -952,7 +952,15 @@ CREATE TABLE IF NOT EXISTS schedule_run (
     -- own defaults unless overridden) - always populated, never null, so a run
     -- without an override is still fully described.
     minutes_spent_limit INTEGER NOT NULL DEFAULT 5,
-    unimproved_minutes_spent_limit INTEGER NOT NULL DEFAULT 2
+    unimproved_minutes_spent_limit INTEGER NOT NULL DEFAULT 2,
+    -- Run metadata - see add_schedule_run_metadata.sql for the full rationale
+    -- behind each column.
+    random_seed BIGINT,
+    environment_mode VARCHAR(50),
+    skip_validation BOOLEAN NOT NULL DEFAULT FALSE,
+    finished_at TIMESTAMP,
+    engine_git_commit VARCHAR(100),
+    termination_reason VARCHAR(50)
 );
 
 -- Frozen per-(run, assignment) snapshot: both the solved timeslot AND the
@@ -1019,6 +1027,12 @@ LEFT JOIN (
 ) latest ON latest.assignment_id = cba.id;
 
 COMMENT ON TABLE schedule_run IS 'One row per solver run. DataSaver prunes to the most recent 10 after every insert.';
+COMMENT ON COLUMN schedule_run.random_seed IS 'The Timefold randomSeed actually used for this run - null means solverConfig.xml''s own fixed default (reproducible) was used unchanged. Set only when SOLVER_RANDOM_SEED was supplied (a specific value to replay a past exploratory run, or a freshly generated one), so an exploratory run can still be reproduced on demand later.';
+COMMENT ON COLUMN schedule_run.environment_mode IS 'The Timefold EnvironmentMode actually active for this run (e.g. PHASE_ASSERT, solverConfig.xml''s unconfigured default) - logged for visibility, not currently overridable per run.';
+COMMENT ON COLUMN schedule_run.skip_validation IS 'True when SKIP_PRESOLVE_VALIDATION let this run proceed despite PreSolveValidator finding blocking problems - this run''s schedule is known to contain at least one structurally-provable violation, not just an ordinary unconverged one.';
+COMMENT ON COLUMN schedule_run.finished_at IS 'When the solve actually completed - lets actual wall-clock duration be compared against the configured minutes_spent_limit/unimproved_minutes_spent_limit budget, distinct from what was merely allowed.';
+COMMENT ON COLUMN schedule_run.engine_git_commit IS 'The engine module''s git commit hash at run time (from scripts/run-engine.sh via git rev-parse HEAD), so a score change can be told apart from a genuine solver-logic change - the same purpose schedule_run_constraint serves for constraint-set changes.';
+COMMENT ON COLUMN schedule_run.termination_reason IS 'Best-effort inferred reason this run stopped (BEST_SCORE_LIMIT / TIME_SPENT_LIMIT / UNIMPROVED_TIME_SPENT_LIMIT) - Timefold''s OR-combined termination (solverConfig.xml) doesn''t report which condition actually fired via its public API, so this is computed from the final score and actual duration vs. the configured limits, not a value Timefold itself returns.';
 COMMENT ON TABLE schedule_run_result IS 'One row per assignment per run: the solved (or still-unassigned) timeslot for that run.';
 COMMENT ON TABLE schedule_run_constraint IS 'Which constraints (by name) were active for a given schedule_run - lets score-history analysis separate normal solver variance from a genuine constraint-set change between runs.';
 COMMENT ON VIEW course_block_assignment_current IS 'Resolved "current schedule": pinned rows use their own input timeslot/room, everything else uses the most recent schedule_run''s result for both.';

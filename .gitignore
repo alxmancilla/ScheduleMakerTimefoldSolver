@@ -61,6 +61,7 @@ database/migrations/*
 !database/migrations/add_constraint_config.sql
 !database/migrations/add_semester_hour_limit.sql
 !database/migrations/fix_course_block_assignment_current_room_name.sql
+!database/migrations/add_schedule_run_metadata.sql
 md_files/
 
 # Build artifacts

@@ -34,10 +34,12 @@ public class EngineController {
         Integer minutesSpentLimit = request != null ? request.getMinutesSpentLimit() : null;
         Integer unimprovedMinutesSpentLimit = request != null ? request.getUnimprovedMinutesSpentLimit() : null;
         Boolean skipValidation = request != null ? request.getSkipValidation() : null;
+        String randomSeed = request != null ? request.getRandomSeed() : null;
         String locale = appUserRepository.findById(authentication.getName())
                 .map(AppUserEntity::getPreferredLanguage)
                 .orElse(null);
-        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation)) {
+        if (!engineRunnerService.tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation,
+                randomSeed)) {
             throw new IllegalArgumentException("The engine is already running");
         }
         return new EngineStatusResponse(engineRunnerService.getSnapshot());

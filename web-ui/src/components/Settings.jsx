@@ -86,6 +86,14 @@ function Settings() {
   const [minutesSpentLimit, setMinutesSpentLimit] = useState(5);
   const [unimprovedMinutesSpentLimit, setUnimprovedMinutesSpentLimit] = useState(2);
   const [skipValidation, setSkipValidation] = useState(false);
+  // "Option B": solverConfig.xml's own seed is fixed, so a warm-started
+  // re-solve of unchanged data tends to land back on the same locally-optimal
+  // arrangement. randomizeSeed requests a fresh, freshly-logged seed instead;
+  // fixedSeed replays one exact seed (e.g. copied from a past run's log or
+  // schedule_run.random_seed) - mutually exclusive, both default off/empty
+  // (solverConfig.xml's own seed used unchanged).
+  const [randomizeSeed, setRandomizeSeed] = useState(false);
+  const [fixedSeed, setFixedSeed] = useState('');
   const pollRef = useRef(null);
 
   const [adminReports, setAdminReports] = useState([]);
@@ -249,10 +257,12 @@ function Settings() {
   const handleRunEngine = async () => {
     setEngineError(null);
     try {
+      const randomSeed = randomizeSeed ? 'random' : (fixedSeed.trim() === '' ? null : fixedSeed.trim());
       const response = await runEngine({
         minutesSpentLimit: minutesSpentLimit === '' ? null : minutesSpentLimit,
         unimprovedMinutesSpentLimit: unimprovedMinutesSpentLimit === '' ? null : unimprovedMinutesSpentLimit,
         skipValidation,
+        randomSeed,
       });
       setEngineStatus(response.data);
       startPolling();
@@ -857,6 +867,41 @@ function Settings() {
               {t('settings.solver.skipValidationHint')}
             </div>
           </label>
+        </div>
+        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          <input
+            id="randomizeSeed"
+            type="checkbox"
+            checked={randomizeSeed}
+            onChange={(e) => {
+              setRandomizeSeed(e.target.checked);
+              if (e.target.checked) setFixedSeed('');
+            }}
+            disabled={engineStatus?.state === 'RUNNING'}
+            style={{ marginTop: '3px' }}
+          />
+          <label htmlFor="randomizeSeed" style={{ fontSize: '13px' }}>
+            {t('settings.solver.randomizeSeed')}
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '2px' }}>
+              {t('settings.solver.randomizeSeedHint')}
+            </div>
+          </label>
+        </div>
+        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label htmlFor="fixedSeed">{t('settings.solver.fixedSeed')}</label>
+          <input
+            id="fixedSeed"
+            type="text"
+            inputMode="numeric"
+            placeholder={t('settings.solver.fixedSeedPlaceholder')}
+            value={fixedSeed}
+            onChange={(e) => {
+              setFixedSeed(e.target.value);
+              if (e.target.value.trim() !== '') setRandomizeSeed(false);
+            }}
+            disabled={engineStatus?.state === 'RUNNING' || randomizeSeed}
+            style={{ width: '180px', padding: '6px' }}
+          />
         </div>
         {engineError && <div className="error" role="alert">{engineError}</div>}
         {engineStatus && (

@@ -14,7 +14,10 @@ import com.example.analysis.BlockScheduleAnalyzer;
 import com.example.validation.PreSolveValidator;
 import com.example.validation.ValidationResult;
 
+import com.example.data.ScheduleRunMetadata;
+
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -100,25 +103,40 @@ public class MainBlockSchedulingApp {
         // Build solver, optionally overriding the local search time budget via env
         // vars (SOLVER_MINUTES_LIMIT / SOLVER_UNIMPROVED_MINUTES_LIMIT) - unset means
         // "use solverConfig.xml's own values" (5 / 2 minutes), same as before this
-        // override point existed.
+        // override point existed. SOLVER_RANDOM_SEED is "Option B": unset keeps
+        // solverConfig.xml's own fixed (reproducible) seed; a numeric value replays
+        // that exact seed (e.g. to reproduce a past exploratory run found in
+        // schedule_run); "random" generates a fresh seed for genuine exploration,
+        // logged below so it can be replayed later the same way.
         Long minutesSpentLimit = parseLongEnv("SOLVER_MINUTES_LIMIT");
         Long unimprovedMinutesSpentLimit = parseLongEnv("SOLVER_UNIMPROVED_MINUTES_LIMIT");
-        SchoolSolverConfig.Built built = SchoolSolverConfig.build(minutesSpentLimit, unimprovedMinutesSpentLimit);
+        Long randomSeed = parseRandomSeedEnv("SOLVER_RANDOM_SEED");
+        SchoolSolverConfig.Built built = SchoolSolverConfig.build(minutesSpentLimit, unimprovedMinutesSpentLimit,
+                randomSeed);
+        if (randomSeed != null) {
+            System.out.println("Using random seed override: " + built.randomSeed()
+                    + " (set SOLVER_RANDOM_SEED=" + built.randomSeed() + " to replay this exact run)");
+            System.out.println();
+        }
         SolverFactory<SchoolSchedule> solverFactory = built.factory();
         Solver<SchoolSchedule> solver = solverFactory.buildSolver();
 
         // Add event listener to track progress. Best-solution events can fire very
         // frequently, so throttle logging to at most one line every 5 seconds (plus
-        // the first improvement) to keep the output readable.
+        // the first improvement) to keep the output readable. lastImprovementMillis
+        // is updated on every event regardless of the log throttle, so it stays an
+        // accurate "time of last improvement" for inferring termination_reason below.
         final AtomicInteger improvementCounter = new AtomicInteger(0);
         final AtomicLong lastLogMillis = new AtomicLong(0);
         final long startTime = System.currentTimeMillis();
+        final AtomicLong lastImprovementMillis = new AtomicLong(startTime);
 
         solver.addEventListener(new SolverEventListener<SchoolSchedule>() {
             @Override
             public void bestSolutionChanged(BestSolutionChangedEvent<SchoolSchedule> event) {
                 int improvement = improvementCounter.incrementAndGet();
                 long now = System.currentTimeMillis();
+                lastImprovementMillis.set(now);
                 long previous = lastLogMillis.get();
                 // Log the first improvement, then at most one line every 5 seconds.
                 boolean shouldLog = previous == 0 || now - previous >= 5000;
@@ -137,6 +155,7 @@ public class MainBlockSchedulingApp {
         System.out.println("NOTE: If no progress is shown after 30 seconds, the solver may be stuck.");
         System.out.println();
         SchoolSchedule solvedSchedule = solver.solve(initialSchedule);
+        LocalDateTime finishedAt = LocalDateTime.now();
 
         // Print results
         System.out.println();
@@ -170,10 +189,13 @@ public class MainBlockSchedulingApp {
 
         // Save to database
         System.out.println("=== Saving to Database ===");
+        String terminationReason = inferTerminationReason(solvedSchedule, built, lastImprovementMillis.get());
+        ScheduleRunMetadata runMetadata = new ScheduleRunMetadata(built.randomSeed(), built.environmentMode(),
+                skipValidation, finishedAt, System.getenv("ENGINE_GIT_COMMIT"), terminationReason);
         DataSaver dataSaver = new DataSaver(jdbcUrl, username, password);
         try {
             dataSaver.saveSchedule(solvedSchedule, built.minutesSpentLimit(), built.unimprovedMinutesSpentLimit(),
-                    violations.keySet(), softViolations.keySet());
+                    violations.keySet(), softViolations.keySet(), runMetadata);
 
             // Print statistics
             System.out.println();
@@ -202,5 +224,50 @@ public class MainBlockSchedulingApp {
     private static boolean parseBooleanEnv(String name) {
         String value = System.getenv(name);
         return value != null && Boolean.parseBoolean(value.trim());
+    }
+
+    /**
+     * Null if unset/blank (solverConfig.xml's own fixed seed is used
+     * unchanged); a specific value replays that exact seed; "random"
+     * (case-insensitive) generates a fresh one so each run explores
+     * differently while staying reproducible on demand by supplying the
+     * seed this method logs back out.
+     */
+    private static Long parseRandomSeedEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.equalsIgnoreCase("random")) {
+            // Not itself used as the seed - just a source of entropy to pick one.
+            return new java.security.SecureRandom().nextLong();
+        }
+        return Long.parseLong(trimmed);
+    }
+
+    /**
+     * Best-effort inferred label for which OR-combined termination condition
+     * (solverConfig.xml: bestScoreLimit / minutesSpentLimit /
+     * unimprovedMinutesSpentLimit) actually stopped this run - Timefold
+     * doesn't report that directly via its public API. A 0hard/0soft final
+     * score means bestScoreLimit was reached; otherwise, whichever budget the
+     * actual elapsed/idle time landed closest to (within a few seconds of
+     * tolerance for termination-check granularity) is reported, defaulting to
+     * the total time budget when neither clearly matches.
+     */
+    private static String inferTerminationReason(SchoolSchedule solvedSchedule, SchoolSolverConfig.Built built,
+            long lastImprovementMillis) {
+        var score = solvedSchedule.getScore();
+        if (score != null && score.hardScore() == 0 && score.softScore() == 0) {
+            return "BEST_SCORE_LIMIT";
+        }
+        long toleranceMillis = 5_000L;
+        long idleMillis = System.currentTimeMillis() - lastImprovementMillis;
+        long unimprovedBudgetMillis = built.unimprovedMinutesSpentLimit() * 60_000L;
+        if (idleMillis >= unimprovedBudgetMillis - toleranceMillis) {
+            return "UNIMPROVED_TIME_SPENT_LIMIT";
+        }
+        return "TIME_SPENT_LIMIT";
     }
 }

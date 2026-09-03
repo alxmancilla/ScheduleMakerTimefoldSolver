@@ -108,7 +108,8 @@ public class EngineRunnerService {
     }
 
     /**
-     * Starts the engine subprocess if one isn't already running.
+     * Same as the 5-argument overload below, with {@code randomSeed} left
+     * unset (solverConfig.xml's own fixed seed is used unchanged).
      *
      * @param minutesSpentLimit           overrides solverConfig.xml's time budget if non-null
      * @param unimprovedMinutesSpentLimit overrides solverConfig.xml's give-up-if-stuck budget if non-null
@@ -122,6 +123,28 @@ public class EngineRunnerService {
      */
     public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale,
             Boolean skipValidation) {
+        return tryStart(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation, null);
+    }
+
+    /**
+     * Starts the engine subprocess if one isn't already running.
+     *
+     * @param minutesSpentLimit           overrides solverConfig.xml's time budget if non-null
+     * @param unimprovedMinutesSpentLimit overrides solverConfig.xml's give-up-if-stuck budget if non-null
+     * @param locale                      language for the automatic post-solve compliance snapshot's
+     *                                     report chrome ("es" or anything else -> "en"); null means "en"
+     * @param skipValidation              true proceeds to solve even if PreSolveValidator finds blocking
+     *                                     problems (maps onto the CLI's SKIP_PRESOLVE_VALIDATION env var
+     *                                     for the subprocess); null/false aborts on any problem, same as
+     *                                     the CLI's own default
+     * @param randomSeed                  maps onto the CLI's SOLVER_RANDOM_SEED env var for the subprocess -
+     *                                     "random" (case-insensitive) generates and logs a fresh seed, a
+     *                                     specific decimal value replays that exact seed; null/blank leaves
+     *                                     solverConfig.xml's own fixed seed unchanged (see EngineRunRequest)
+     * @return true if this call started a run, false if one was already in progress
+     */
+    public boolean tryStart(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale,
+            Boolean skipValidation, String randomSeed) {
         synchronized (lock) {
             if (state == State.RUNNING) {
                 return false;
@@ -132,12 +155,13 @@ public class EngineRunnerService {
             exitCode = null;
             logLines.clear();
         }
-        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation));
+        executor.submit(() -> runProcess(minutesSpentLimit, unimprovedMinutesSpentLimit, locale, skipValidation,
+                randomSeed));
         return true;
     }
 
     private void runProcess(Integer minutesSpentLimit, Integer unimprovedMinutesSpentLimit, String locale,
-            Boolean skipValidation) {
+            Boolean skipValidation, String randomSeed) {
         Integer resultCode = null;
         try {
             ProcessBuilder builder = new ProcessBuilder("bash", "scripts/run-engine.sh");
@@ -151,6 +175,9 @@ public class EngineRunnerService {
             }
             if (Boolean.TRUE.equals(skipValidation)) {
                 builder.environment().put("SKIP_PRESOLVE_VALIDATION", "true");
+            }
+            if (randomSeed != null && !randomSeed.isBlank()) {
+                builder.environment().put("SOLVER_RANDOM_SEED", randomSeed.trim());
             }
             builder.redirectErrorStream(true);
             Process process = builder.start();

@@ -63,16 +63,20 @@ public class DataSaver {
      *                                     the same ground truth rather than a second, hand-maintained
      *                                     list that could drift out of sync with SchoolConstraintProvider
      * @param activeSoftConstraintNames   the SOFT constraint names active for this solve, same source
+     * @param runMetadata                 random seed / environment mode / skip-validation / timing /
+     *                                     git commit / inferred termination reason for this run - see
+     *                                     {@link ScheduleRunMetadata}
      * @throws SQLException if database access fails
      */
     public void saveSchedule(SchoolSchedule schedule, Long minutesSpentLimit, Long unimprovedMinutesSpentLimit,
-            Set<String> activeHardConstraintNames, Set<String> activeSoftConstraintNames)
+            Set<String> activeHardConstraintNames, Set<String> activeSoftConstraintNames,
+            ScheduleRunMetadata runMetadata)
             throws SQLException {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             conn.setAutoCommit(false); // Start transaction
             try {
                 int runId = insertScheduleRun(conn, schedule.getScore(), minutesSpentLimit,
-                        unimprovedMinutesSpentLimit);
+                        unimprovedMinutesSpentLimit, runMetadata);
                 insertScheduleRunResults(conn, runId, schedule.getCourseBlockAssignments());
                 insertScheduleRunConstraints(conn, runId, activeHardConstraintNames, activeSoftConstraintNames);
                 pruneOldRuns(conn);
@@ -88,13 +92,29 @@ public class DataSaver {
     }
 
     private int insertScheduleRun(Connection conn, HardSoftScore score, Long minutesSpentLimit,
-            Long unimprovedMinutesSpentLimit) throws SQLException {
-        String sql = "INSERT INTO schedule_run (hard_score, soft_score, minutes_spent_limit, unimproved_minutes_spent_limit) VALUES (?, ?, ?, ?)";
+            Long unimprovedMinutesSpentLimit, ScheduleRunMetadata runMetadata) throws SQLException {
+        String sql = "INSERT INTO schedule_run (hard_score, soft_score, minutes_spent_limit, "
+                + "unimproved_minutes_spent_limit, random_seed, environment_mode, skip_validation, "
+                + "finished_at, engine_git_commit, termination_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setInt(1, score != null ? score.hardScore() : 0);
             stmt.setInt(2, score != null ? score.softScore() : 0);
             stmt.setLong(3, minutesSpentLimit != null ? minutesSpentLimit : 5L);
             stmt.setLong(4, unimprovedMinutesSpentLimit != null ? unimprovedMinutesSpentLimit : 2L);
+            if (runMetadata != null && runMetadata.randomSeed() != null) {
+                stmt.setLong(5, runMetadata.randomSeed());
+            } else {
+                stmt.setNull(5, Types.BIGINT);
+            }
+            stmt.setString(6, runMetadata != null ? runMetadata.environmentMode() : null);
+            stmt.setBoolean(7, runMetadata != null && runMetadata.skipValidation());
+            if (runMetadata != null && runMetadata.finishedAt() != null) {
+                stmt.setTimestamp(8, Timestamp.valueOf(runMetadata.finishedAt()));
+            } else {
+                stmt.setNull(8, Types.TIMESTAMP);
+            }
+            stmt.setString(9, runMetadata != null ? runMetadata.engineGitCommit() : null);
+            stmt.setString(10, runMetadata != null ? runMetadata.terminationReason() : null);
             stmt.executeUpdate();
             try (ResultSet keys = stmt.getGeneratedKeys()) {
                 if (keys.next()) {

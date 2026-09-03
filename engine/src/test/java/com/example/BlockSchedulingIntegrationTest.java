@@ -145,7 +145,7 @@ public class BlockSchedulingIntegrationTest {
                 DataSaver saver = new DataSaver(url, user, password);
                 saver.saveSchedule(solved, null, null,
                                 BlockScheduleAnalyzer.analyzeHardConstraintViolations(solved).keySet(),
-                                BlockScheduleAnalyzer.analyzeSoftConstraintViolations(solved).keySet());
+                                BlockScheduleAnalyzer.analyzeSoftConstraintViolations(solved).keySet(), null);
 
                 // VERIFY: the persisted schedule reports assigned blocks (teacher, room
                 // and timeslot all set).

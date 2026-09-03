@@ -16,6 +16,11 @@
 #   JAVA_OPTS                           Extra JVM flags (e.g. -Xmx1g)
 #   SOLVER_MINUTES_LIMIT                Overrides solverConfig.xml's local search total time budget (default: 5)
 #   SOLVER_UNIMPROVED_MINUTES_LIMIT     Overrides solverConfig.xml's give-up-if-stuck limit (default: 2)
+#   SOLVER_RANDOM_SEED                  Overrides solverConfig.xml's own fixed (reproducible) random seed
+#                                        (default: unset - use solverConfig.xml's seed unchanged). A specific
+#                                        numeric value replays that exact seed (e.g. to reproduce a past run
+#                                        found in schedule_run); "random" generates and logs a fresh seed each
+#                                        run, for genuine exploration that stays reproducible on demand later.
 #   SKIP_PRESOLVE_VALIDATION            Proceed to solve even if PreSolveValidator finds blocking
 #                                        problems (default: false - aborts on any problem). Validation
 #                                        still runs and prints everything it finds either way.
@@ -51,6 +56,15 @@ fi
 export DB_URL="${DB_URL:-jdbc:postgresql://localhost:5432/school_schedule}"
 export DB_USER="${DB_USER:-mancilla}"
 export DB_PASSWORD="${DB_PASSWORD:-}"
+
+# Record which engine commit produced this run, so a schedule_run score change
+# can be told apart from a genuine solver-logic change later. Best-effort: an
+# ENGINE_JAR built from a source tree that isn't a git checkout (or is dirty)
+# still runs fine, just without this provenance.
+if [[ -z "${ENGINE_GIT_COMMIT:-}" ]]; then
+  ENGINE_GIT_COMMIT="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+fi
+export ENGINE_GIT_COMMIT
 
 # PDF reports are written to the process working directory; honour ENGINE_OUTPUT_DIR.
 OUTPUT_DIR="${ENGINE_OUTPUT_DIR:-$(pwd)}"

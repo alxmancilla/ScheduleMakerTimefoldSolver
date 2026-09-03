@@ -2,6 +2,7 @@ package com.example.web.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 
 /**
  * Optional per-run overrides for the solver's local search time budget, plus
@@ -34,6 +35,20 @@ public class EngineRunRequest {
      */
     private Boolean skipValidation;
 
+    /**
+     * Optional randomSeed override for this run only (maps onto the CLI's
+     * SOLVER_RANDOM_SEED env var for the engine subprocess) - "Option B" for
+     * exploring past the same locally-optimal arrangement every run
+     * otherwise converges to (solverConfig.xml's own seed is fixed, so
+     * warm-started re-solves of unchanged data tend to land in the same
+     * place). Either "random" (case-insensitive, generates and logs a fresh
+     * seed for this run) or a specific decimal seed value (replays that
+     * exact run, e.g. one found in schedule_run's random_seed column).
+     * Null/omitted leaves solverConfig.xml's own fixed seed unchanged.
+     */
+    @Pattern(regexp = "(?i)random|-?\\d{1,19}", message = "must be \"random\" or a numeric seed")
+    private String randomSeed;
+
     public Integer getMinutesSpentLimit() {
         return minutesSpentLimit;
     }
@@ -56,5 +71,13 @@ public class EngineRunRequest {
 
     public void setSkipValidation(Boolean skipValidation) {
         this.skipValidation = skipValidation;
+    }
+
+    public String getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(String randomSeed) {
+        this.randomSeed = randomSeed;
     }
 }

@@ -25,17 +25,35 @@ public class SchoolSolverConfig {
      */
     public static SolverFactory<SchoolSchedule> buildSolverFactory(Long minutesSpentLimit,
             Long unimprovedMinutesSpentLimit) {
-        return build(minutesSpentLimit, unimprovedMinutesSpentLimit).factory();
+        return build(minutesSpentLimit, unimprovedMinutesSpentLimit, null).factory();
+    }
+
+    /**
+     * Same as {@link #build(Long, Long, Long)} with no randomSeed override -
+     * solverConfig.xml's own fixed (reproducible) default is used unchanged.
+     */
+    public static Built build(Long minutesSpentLimit, Long unimprovedMinutesSpentLimit) {
+        return build(minutesSpentLimit, unimprovedMinutesSpentLimit, null);
     }
 
     /**
      * Same as {@link #buildSolverFactory(Long, Long)}, but also returns the
-     * *effective* time budget actually resolved (the override if given,
-     * otherwise solverConfig.xml's own value) - so a caller that records a run
-     * (see DataSaver) can persist what was really used, not just what was
-     * explicitly passed in.
+     * *effective* time budget, random seed, and environment mode actually
+     * resolved (the override if given, otherwise solverConfig.xml's own
+     * value/default) - so a caller that records a run (see DataSaver) can
+     * persist what was really used, not just what was explicitly passed in.
+     *
+     * @param minutesSpentLimit           overrides <minutesSpentLimit> if non-null
+     * @param unimprovedMinutesSpentLimit overrides <unimprovedMinutesSpentLimit> if non-null
+     * @param randomSeed                  overrides <randomSeed> if non-null - solverConfig.xml
+     *                                     defines neither <randomSeed> nor <environmentMode>, so
+     *                                     Timefold's own default (a fixed seed, fully reproducible
+     *                                     given identical starting data) applies when this is null.
+     *                                     A non-null value here is "Option B": a genuinely different
+     *                                     search each time it's supplied, while staying reproducible
+     *                                     on demand later by supplying that exact same value again.
      */
-    public static Built build(Long minutesSpentLimit, Long unimprovedMinutesSpentLimit) {
+    public static Built build(Long minutesSpentLimit, Long unimprovedMinutesSpentLimit, Long randomSeed) {
         try {
             SolverConfig solverConfig = SolverConfig.createFromXmlResource("solverConfig.xml");
             TerminationConfig terminationConfig = resolveLocalSearchTermination(solverConfig);
@@ -45,9 +63,13 @@ public class SchoolSolverConfig {
             if (unimprovedMinutesSpentLimit != null) {
                 terminationConfig.setUnimprovedMinutesSpentLimit(unimprovedMinutesSpentLimit);
             }
+            if (randomSeed != null) {
+                solverConfig.setRandomSeed(randomSeed);
+            }
             SolverFactory<SchoolSchedule> factory = SolverFactory.create(solverConfig);
             return new Built(factory, terminationConfig.getMinutesSpentLimit(),
-                    terminationConfig.getUnimprovedMinutesSpentLimit());
+                    terminationConfig.getUnimprovedMinutesSpentLimit(), solverConfig.getRandomSeed(),
+                    solverConfig.determineEnvironmentMode().name());
         } catch (Exception e) {
             throw new RuntimeException("Failed to load solver configuration", e);
         }
@@ -69,8 +91,12 @@ public class SchoolSolverConfig {
                 "solverConfig.xml has no <localSearch> phase to apply termination overrides to");
     }
 
-    /** The built solver factory plus the effective (override-or-XML-default) time budget it resolved. */
+    /**
+     * The built solver factory plus the effective (override-or-XML-default)
+     * time budget, random seed (null when solverConfig.xml's own fixed
+     * default was used unchanged), and environment mode it resolved.
+     */
     public record Built(SolverFactory<SchoolSchedule> factory, Long minutesSpentLimit,
-            Long unimprovedMinutesSpentLimit) {
+            Long unimprovedMinutesSpentLimit, Long randomSeed, String environmentMode) {
     }
 }
