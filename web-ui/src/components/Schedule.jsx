@@ -255,7 +255,7 @@ function Schedule() {
                         </div>
                       )}
                       {cellWindow.entries.map((entry, idx) => (
-                        <ScheduleEntryCard key={idx} entry={entry} hasConflict={hasConflict} />
+                        <ScheduleEntryCard key={idx} entry={entry} hasConflict={hasConflict} fillHeight={!hasConflict} />
                       ))}
                     </td>
                   );
