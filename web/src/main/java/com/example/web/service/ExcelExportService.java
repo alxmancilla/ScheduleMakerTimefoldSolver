@@ -217,6 +217,7 @@ public class ExcelExportService {
         Row header = sheet.createRow(0);
         header.createCell(0).setCellValue("group_id");
         header.createCell(1).setCellValue("course_name");
+        header.createCell(2).setCellValue("default_teacher_id");
 
         List<StudentGroupEntity> groups = studentGroupRepository.findAll().stream()
                 .sorted(Comparator.comparing(StudentGroupEntity::getId))
@@ -224,18 +225,20 @@ public class ExcelExportService {
 
         int rowNum = 1;
         for (StudentGroupEntity group : groups) {
-            List<String> courseNames = group.getCourses().stream()
-                    .map(GroupCourseEntity::getCourseName)
-                    .sorted()
+            List<GroupCourseEntity> groupCourses = group.getCourses().stream()
+                    .sorted(Comparator.comparing(GroupCourseEntity::getCourseName))
                     .toList();
-            for (String courseName : courseNames) {
+            for (GroupCourseEntity groupCourse : groupCourses) {
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(group.getId());
-                row.createCell(1).setCellValue(courseName);
+                row.createCell(1).setCellValue(groupCourse.getCourseName());
+                if (groupCourse.getDefaultTeacherId() != null) {
+                    row.createCell(2).setCellValue(groupCourse.getDefaultTeacherId());
+                }
             }
         }
 
-        autosizeColumns(sheet, 2);
+        autosizeColumns(sheet, 3);
     }
 
     private void autosizeColumns(Sheet sheet, int numColumns) {

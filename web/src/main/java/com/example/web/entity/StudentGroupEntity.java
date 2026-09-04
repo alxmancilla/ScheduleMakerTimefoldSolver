@@ -100,10 +100,11 @@ public class StudentGroupEntity {
     }
 
     // Helper method
-    public void addCourse(String courseName) {
+    public GroupCourseEntity addCourse(String courseName) {
         GroupCourseEntity entity = new GroupCourseEntity();
         entity.setGroup(this);
         entity.setCourseName(courseName);
         courses.add(entity);
+        return entity;
     }
 }

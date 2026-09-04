@@ -210,6 +210,80 @@ public class ExcelImportServiceTest {
     }
 
     @Test
+    public void groupCourses_rowSpecifiesTeacher_setsDefaultTeacherId() throws IOException {
+        when(teacherRepository.findAll())
+                .thenReturn(List.of(new TeacherEntity("T1", "Ada", "Lovelace", 40)));
+        com.example.web.entity.StudentGroupEntity group = new com.example.web.entity.StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics"); // pre-existing link, no default teacher yet
+        when(studentGroupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findAll())
+                .thenReturn(List.of(new com.example.web.entity.CourseEntity("C1", "Mathematics", "Standard", 4)));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook()) {
+            Sheet groupCourses = wb.createSheet("Group_Courses");
+            addRow(groupCourses, 0, "group_id", "course_name", "default_teacher_id");
+            addRow(groupCourses, 1, "G1", "Mathematics", "T1");
+
+            ExcelImportService.ImportResult result = service.importFromExcel(toStream(wb));
+
+            assertTrue("expected success but got errors: " + result.getErrors(), result.isSuccess());
+            com.example.web.entity.GroupCourseEntity saved = group.getCourses().iterator().next();
+            assertEquals("T1", saved.getDefaultTeacherId());
+        }
+    }
+
+    @Test
+    public void groupCourses_rowLeavesTeacherBlank_preservesExistingDefaultTeacher() throws IOException {
+        com.example.web.entity.StudentGroupEntity group = new com.example.web.entity.StudentGroupEntity("G1", "Group One");
+        com.example.web.entity.GroupCourseEntity existingLink = group.addCourse("Mathematics");
+        existingLink.setDefaultTeacherId("T1"); // already set (e.g. via the Groups page)
+        when(studentGroupRepository.findById("G1")).thenReturn(Optional.of(group));
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findAll())
+                .thenReturn(List.of(new com.example.web.entity.CourseEntity("C1", "Mathematics", "Standard", 4)));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook()) {
+            Sheet groupCourses = wb.createSheet("Group_Courses");
+            // Older-format export (or one hand-edited without the new column) - no
+            // default_teacher_id column at all.
+            addRow(groupCourses, 0, "group_id", "course_name");
+            addRow(groupCourses, 1, "G1", "Mathematics");
+
+            ExcelImportService.ImportResult result = service.importFromExcel(toStream(wb));
+
+            assertTrue("expected success but got errors: " + result.getErrors(), result.isSuccess());
+            com.example.web.entity.GroupCourseEntity saved = group.getCourses().iterator().next();
+            assertEquals("Re-importing without the teacher column must not wipe an existing default teacher",
+                    "T1", saved.getDefaultTeacherId());
+        }
+    }
+
+    @Test
+    public void groupCoursesReferencingUnknownTeacher_failsValidation() throws IOException {
+        try (XSSFWorkbook wb = new XSSFWorkbook()) {
+            Sheet groups = wb.createSheet("Groups");
+            addRow(groups, 0, "id", "name", "preferred_room_name");
+            addRow(groups, 1, "G1", "Group One", null);
+
+            Sheet courses = wb.createSheet("Courses");
+            addRow(courses, 0, "id", "name", "abbreviation", "semester", "designation", "room_requirement",
+                    "required_hours_per_week", "active");
+            addRow(courses, 1, "C1", "Mathematics", "MATH", 2, "Core", "Standard", 4, true);
+
+            Sheet groupCourses = wb.createSheet("Group_Courses");
+            addRow(groupCourses, 0, "group_id", "course_name", "default_teacher_id");
+            addRow(groupCourses, 1, "G1", "Mathematics", "NOPE");
+
+            ExcelImportService.ImportResult result = service.importFromExcel(toStream(wb));
+
+            assertFalse(result.isSuccess());
+            assertTrue(result.getErrors().stream().anyMatch(e -> e.contains("default_teacher_id") && e.contains("does not match any teacher")));
+            verify(studentGroupRepository, never()).save(any());
+        }
+    }
+
+    @Test
     public void emptyWorkbook_noSheets_succeedsWithZeroCounts() throws IOException {
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
             ExcelImportService.ImportResult result = service.importFromExcel(toStream(wb));

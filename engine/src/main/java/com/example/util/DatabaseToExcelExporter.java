@@ -274,8 +274,9 @@ public class DatabaseToExcelExporter {
         Row header = sheet.createRow(0);
         header.createCell(0).setCellValue("group_id");
         header.createCell(1).setCellValue("course_name");
+        header.createCell(2).setCellValue("default_teacher_id");
 
-        String sql = "SELECT group_id, course_name FROM group_course ORDER BY group_id, course_name";
+        String sql = "SELECT group_id, course_name, default_teacher_id FROM group_course ORDER BY group_id, course_name";
         try (Statement stmt = conn.createStatement();
                 ResultSet rs = stmt.executeQuery(sql)) {
 
@@ -284,10 +285,14 @@ public class DatabaseToExcelExporter {
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(rs.getString("group_id"));
                 row.createCell(1).setCellValue(rs.getString("course_name"));
+                String defaultTeacherId = rs.getString("default_teacher_id");
+                if (defaultTeacherId != null) {
+                    row.createCell(2).setCellValue(defaultTeacherId);
+                }
             }
         }
 
-        autosizeColumns(sheet, 2);
+        autosizeColumns(sheet, 3);
         System.out.println("  ✓ Exported Group_Courses sheet");
     }
 

@@ -1,6 +1,7 @@
 package com.example.web.service;
 
 import com.example.web.entity.CourseEntity;
+import com.example.web.entity.GroupCourseEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
@@ -67,7 +68,7 @@ public class ExcelImportService {
         List<RoomRow> roomRows;
         List<CourseRow> courseRows;
         List<GroupRow> groupRows;
-        Map<String, List<String>> groupCourseRows;
+        List<GroupCourseRow> groupCourseRows;
 
         try (Workbook wb = WorkbookFactory.create(excelInputStream)) {
             teacherRows = parseTeachers(wb, errors);
@@ -76,7 +77,7 @@ public class ExcelImportService {
             groupRows = parseGroups(wb, errors);
             groupCourseRows = parseGroupCourses(wb, errors);
 
-            validateCrossReferences(roomRows, courseRows, groupRows, groupCourseRows, errors);
+            validateCrossReferences(roomRows, courseRows, groupRows, teacherRows, groupCourseRows, errors);
         }
 
         if (!errors.isEmpty()) {
@@ -370,9 +371,17 @@ public class ExcelImportService {
 
     // ---- Group_Courses ----
 
-    /** Maps group_id -> list of course_name, replacing that group's associations wholesale. */
-    private Map<String, List<String>> parseGroupCourses(Workbook wb, List<String> errors) {
-        Map<String, List<String>> result = new LinkedHashMap<>();
+    /**
+     * @param teacherId the sheet's default_teacher_id for this row, or null if
+     *                  blank/absent - a blank value doesn't mean "clear the
+     *                  teacher", it means "not specified in this file"; see
+     *                  persistGroupCourses for how that's resolved.
+     */
+    private record GroupCourseRow(String groupId, String courseName, String teacherId) {
+    }
+
+    private List<GroupCourseRow> parseGroupCourses(Workbook wb, List<String> errors) {
+        List<GroupCourseRow> result = new ArrayList<>();
         Sheet sheet = wb.getSheet("Group_Courses");
         if (sheet == null) {
             return result;
@@ -385,6 +394,7 @@ public class ExcelImportService {
             String location = "Group_Courses row " + (i + 1);
             String groupId = stringOf(row.getCell(0));
             String courseName = stringOf(row.getCell(1));
+            String teacherId = isBlank(stringOf(row.getCell(2))) ? null : stringOf(row.getCell(2));
 
             if (isBlank(groupId)) {
                 errors.add(location + ": group_id is required");
@@ -393,24 +403,49 @@ public class ExcelImportService {
                 errors.add(location + ": course_name is required");
             }
             if (!isBlank(groupId) && !isBlank(courseName)) {
-                result.computeIfAbsent(groupId, k -> new ArrayList<>()).add(courseName);
+                result.add(new GroupCourseRow(groupId, courseName, teacherId));
             }
         }
         return result;
     }
 
-    private int persistGroupCourses(Map<String, List<String>> groupCourseRows) {
+    /**
+     * Rebuilds each group's course list from the sheet, same wholesale-replace
+     * behavior as before (a group's rows in the file are the complete list for
+     * that group). The one thing this preserves across that rebuild is
+     * default_teacher_id: a row that specifies teacher_id uses it; a row that
+     * leaves it blank falls back to whatever that (group, course) pair's
+     * default_teacher_id already was before the rebuild - so re-importing an
+     * older-format export (or one edited without touching that column) doesn't
+     * silently wipe teacher assignments that GroupCourseDefaultTeacherSyncService
+     * or the Groups page had already set.
+     */
+    private int persistGroupCourses(List<GroupCourseRow> groupCourseRows) {
+        Map<String, List<GroupCourseRow>> byGroup = new LinkedHashMap<>();
+        for (GroupCourseRow row : groupCourseRows) {
+            byGroup.computeIfAbsent(row.groupId(), k -> new ArrayList<>()).add(row);
+        }
+
         int count = 0;
-        for (Map.Entry<String, List<String>> entry : groupCourseRows.entrySet()) {
+        for (Map.Entry<String, List<GroupCourseRow>> entry : byGroup.entrySet()) {
             StudentGroupEntity group = studentGroupRepository.findById(entry.getKey())
                     .orElseThrow(() -> new IllegalStateException("Group '" + entry.getKey() + "' not found"));
+            Map<String, String> existingDefaultTeacherByCourse = new LinkedHashMap<>();
+            for (GroupCourseEntity existing : group.getCourses()) {
+                if (existing.getDefaultTeacherId() != null) {
+                    existingDefaultTeacherByCourse.put(existing.getCourseName(), existing.getDefaultTeacherId());
+                }
+            }
             group.getCourses().clear();
             // Flush the clear (orphan-removal DELETE) before re-adding, same reasoning
             // as persistTeachers: avoids colliding with a not-yet-deleted (group,
             // course) pair that appears in both the old and new association set.
             studentGroupRepository.saveAndFlush(group);
-            for (String courseName : entry.getValue()) {
-                group.addCourse(courseName);
+            for (GroupCourseRow row : entry.getValue()) {
+                String teacherId = row.teacherId() != null ? row.teacherId()
+                        : existingDefaultTeacherByCourse.get(row.courseName());
+                GroupCourseEntity groupCourse = group.addCourse(row.courseName());
+                groupCourse.setDefaultTeacherId(teacherId);
                 count++;
             }
             studentGroupRepository.save(group);
@@ -421,7 +456,7 @@ public class ExcelImportService {
     // ---- Cross-sheet reference validation (before any DB write) ----
 
     private void validateCrossReferences(List<RoomRow> roomRows, List<CourseRow> courseRows, List<GroupRow> groupRows,
-            Map<String, List<String>> groupCourseRows, List<String> errors) {
+            List<TeacherRow> teacherRows, List<GroupCourseRow> groupCourseRows, List<String> errors) {
         Set<String> knownCourseNames = new HashSet<>();
         courseRows.forEach(c -> knownCourseNames.add(c.name));
         courseRepository.findAll().forEach(c -> knownCourseNames.add(c.getName()));
@@ -430,15 +465,21 @@ public class ExcelImportService {
         groupRows.forEach(g -> knownGroupIds.add(g.id));
         studentGroupRepository.findAll().forEach(g -> knownGroupIds.add(g.getId()));
 
-        for (Map.Entry<String, List<String>> entry : groupCourseRows.entrySet()) {
-            if (!knownGroupIds.contains(entry.getKey())) {
-                errors.add("Group_Courses: group_id '" + entry.getKey() + "' does not match any group (existing or in this file)");
+        Set<String> knownTeacherIds = new HashSet<>();
+        teacherRows.forEach(t -> knownTeacherIds.add(t.id));
+        teacherRepository.findAll().forEach(t -> knownTeacherIds.add(t.getId()));
+
+        for (GroupCourseRow row : groupCourseRows) {
+            if (!knownGroupIds.contains(row.groupId())) {
+                errors.add("Group_Courses: group_id '" + row.groupId() + "' does not match any group (existing or in this file)");
             }
-            for (String courseName : entry.getValue()) {
-                if (!knownCourseNames.contains(courseName)) {
-                    errors.add("Group_Courses: course_name '" + courseName
-                            + "' (for group '" + entry.getKey() + "') does not match any course (existing or in this file)");
-                }
+            if (!knownCourseNames.contains(row.courseName())) {
+                errors.add("Group_Courses: course_name '" + row.courseName()
+                        + "' (for group '" + row.groupId() + "') does not match any course (existing or in this file)");
+            }
+            if (row.teacherId() != null && !knownTeacherIds.contains(row.teacherId())) {
+                errors.add("Group_Courses: default_teacher_id '" + row.teacherId() + "' (for group '" + row.groupId()
+                        + "', course '" + row.courseName() + "') does not match any teacher (existing or in this file)");
             }
         }
     }

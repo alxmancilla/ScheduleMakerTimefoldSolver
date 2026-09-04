@@ -139,7 +139,7 @@ public class ExcelExportServiceTest {
         when(courseRepository.findAll()).thenReturn(List.of(course));
 
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
-        group.addCourse("Math");
+        group.addCourse("Math").setDefaultTeacherId("T1");
         when(studentGroupRepository.findAll()).thenReturn(List.of(group));
 
         byte[] bytes = exportService.exportToExcel();
@@ -154,6 +154,7 @@ public class ExcelExportServiceTest {
         when(importTeacherRepo.findById("T1")).thenReturn(Optional.empty());
         when(importTeacherRepo.saveAndFlush(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
         when(importTeacherRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+        when(importTeacherRepo.findAll()).thenReturn(List.of(teacher));
         when(importCourseRepo.findById("C1")).thenReturn(Optional.empty());
         when(importCourseRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
         when(importCourseRepo.findAll()).thenReturn(List.of());
@@ -178,6 +179,10 @@ public class ExcelExportServiceTest {
         assertEquals(1, result.getRoomsImported());
         assertEquals(1, result.getGroupsImported());
         assertEquals(1, result.getGroupCoursesImported());
+
+        // The actual point of this test: default_teacher_id must survive
+        // export -> import intact, not just the (group, course) link itself.
+        assertEquals("T1", group.getCourses().iterator().next().getDefaultTeacherId());
     }
 
     private static void setField(Object target, String fieldName, Object value) {
