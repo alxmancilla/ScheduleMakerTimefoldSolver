@@ -7,6 +7,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.service.AssignmentExcelService;
+import com.example.web.service.GroupCourseDefaultTeacherSyncService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
@@ -65,6 +66,9 @@ public class CourseBlockAssignmentControllerTest {
 
     @MockBean
     private AssignmentExcelService assignmentExcelService;
+
+    @MockBean
+    private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
 
     private CourseBlockAssignmentEntity assignment;
 
@@ -250,6 +254,35 @@ public class CourseBlockAssignmentControllerTest {
                 .andExpect(jsonPath("$.roomName").value("AULA1"));
     }
 
+    @Test
+    public void createAssignment_withTeacher_syncsGroupCourseDefaultTeacher() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        Map<String, Object> body = validPayload();
+        body.put("teacherId", "T1");
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+
+        verify(groupCourseDefaultTeacherSyncService).sync("G1", "C1", "T1");
+    }
+
+    @Test
+    public void createAssignment_withoutTeacher_stillSyncsWithNullTeacher() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(validPayload())))
+                .andExpect(status().isOk());
+
+        // The sync service itself is responsible for no-op'ing on a null teacherId
+        // (see GroupCourseDefaultTeacherSyncServiceTest) - the controller always
+        // calls through unconditionally.
+        verify(groupCourseDefaultTeacherSyncService).sync("G1", "C1", null);
+    }
+
     // ---- PUT (update) ----
 
     @Test
@@ -263,6 +296,22 @@ public class CourseBlockAssignmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.blockLength").value(3));
         verify(assignmentRepository).save(any(CourseBlockAssignmentEntity.class));
+    }
+
+    @Test
+    public void updateAssignment_withTeacher_syncsGroupCourseDefaultTeacher() throws Exception {
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("teacherId", "T1");
+        mockMvc.perform(put("/api/assignments/A1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk());
+
+        verify(groupCourseDefaultTeacherSyncService).sync("G1", "C1", "T1");
     }
 
     @Test

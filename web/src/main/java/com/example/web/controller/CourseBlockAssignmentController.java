@@ -10,6 +10,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.service.AssignmentExcelService;
+import com.example.web.service.GroupCourseDefaultTeacherSyncService;
 import com.example.common.RoomTypeCompatibility;
 import jakarta.validation.Valid;
 import jakarta.validation.groups.Default;
@@ -41,6 +42,9 @@ public class CourseBlockAssignmentController {
 
     @Autowired
     private AssignmentExcelService assignmentExcelService;
+
+    @Autowired
+    private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
 
     @GetMapping
     public List<CourseBlockAssignmentEntity> getAllAssignments() {
@@ -93,7 +97,9 @@ public class CourseBlockAssignmentController {
         CourseBlockAssignmentEntity assignment = new CourseBlockAssignmentEntity();
         assignment.setId(request.getId());
         applyFields(assignment, request);
-        return assignmentRepository.save(assignment);
+        CourseBlockAssignmentEntity saved = assignmentRepository.save(assignment);
+        groupCourseDefaultTeacherSyncService.sync(saved.getGroupId(), saved.getCourseId(), saved.getTeacherId());
+        return saved;
     }
 
     @PutMapping("/{id}")
@@ -102,7 +108,9 @@ public class CourseBlockAssignmentController {
         CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
         applyFields(assignment, request);
-        return assignmentRepository.save(assignment);
+        CourseBlockAssignmentEntity saved = assignmentRepository.save(assignment);
+        groupCourseDefaultTeacherSyncService.sync(saved.getGroupId(), saved.getCourseId(), saved.getTeacherId());
+        return saved;
     }
 
     @DeleteMapping("/{id}")

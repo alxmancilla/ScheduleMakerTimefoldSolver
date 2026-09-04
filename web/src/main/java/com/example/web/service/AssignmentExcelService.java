@@ -67,6 +67,8 @@ public class AssignmentExcelService {
     private TeacherRepository teacherRepository;
     @Autowired
     private RoomRepository roomRepository;
+    @Autowired
+    private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
 
     // ---- Export ----
 
@@ -243,6 +245,8 @@ public class AssignmentExcelService {
             entity.setBlockTimeslotId(r.blockTimeslotId);
             entity.setPinned(r.pinned);
             assignmentRepository.save(entity);
+            groupCourseDefaultTeacherSyncService.sync(entity.getGroupId(), entity.getCourseId(),
+                    entity.getTeacherId());
         }
         return rows.size();
     }

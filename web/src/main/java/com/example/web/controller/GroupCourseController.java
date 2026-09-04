@@ -77,8 +77,15 @@ public class GroupCourseController {
      * Pre-assigns (or clears, when teacherId is null) a teacher for this
      * (group, course) pairing before blocks exist. Applied by
      * BlockGenerationService to every block it creates for this pairing; has
-     * no effect once blocks already exist (that pairing is then skipped by
-     * "Generate Blocks" and its blocks carry their own teacher_id).
+     * no effect on this endpoint's own write once blocks already exist (that
+     * pairing is then skipped by "Generate Blocks" and its blocks carry their
+     * own teacher_id) - but default_teacher_id itself is still kept current
+     * for such pairings via a different path: {@link
+     * com.example.web.service.GroupCourseDefaultTeacherSyncService} writes it
+     * automatically whenever an assignment's teacher is set through
+     * CourseBlockAssignmentController or the Excel import, so a future
+     * regeneration of that pairing's blocks still has an accurate teacher to
+     * read.
      */
     @PutMapping("/{courseName}/default-teacher")
     public GroupCourseEntity setDefaultTeacher(@PathVariable String groupId, @PathVariable String courseName,

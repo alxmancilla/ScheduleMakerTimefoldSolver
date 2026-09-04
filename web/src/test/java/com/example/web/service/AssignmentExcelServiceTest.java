@@ -59,6 +59,8 @@ public class AssignmentExcelServiceTest {
     private TeacherRepository teacherRepository;
     @Mock
     private RoomRepository roomRepository;
+    @Mock
+    private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
 
     @InjectMocks
     private AssignmentExcelService service;
@@ -116,6 +118,7 @@ public class AssignmentExcelServiceTest {
             assertTrue(result.isSuccess());
             assertEquals(1, result.getAssignmentsImported());
             verify(assignmentRepository).save(any(CourseBlockAssignmentEntity.class));
+            verify(groupCourseDefaultTeacherSyncService).sync("G1", "C1", "T1");
         }
     }
 

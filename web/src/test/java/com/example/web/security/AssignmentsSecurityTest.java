@@ -5,6 +5,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.service.AssignmentExcelService;
+import com.example.web.service.GroupCourseDefaultTeacherSyncService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,9 @@ public class AssignmentsSecurityTest {
     // Required by CourseBlockAssignmentController's export/import endpoints.
     @MockBean
     private AssignmentExcelService assignmentExcelService;
+
+    @MockBean
+    private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
 
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean
