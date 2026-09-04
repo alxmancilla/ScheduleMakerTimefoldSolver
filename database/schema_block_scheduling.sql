@@ -274,7 +274,7 @@ CREATE INDEX idx_group_course_default_teacher ON group_course(default_teacher_id
 COMMENT ON TABLE group_course IS 'Defines which courses each student group must take';
 COMMENT ON COLUMN group_course.group_id IS 'Reference to student group';
 COMMENT ON COLUMN group_course.course_name IS 'Reference to course name';
-COMMENT ON COLUMN group_course.default_teacher_id IS 'Optional teacher pre-assigned to this pairing before blocks exist; applied by BlockGenerationService to every block it creates for this pairing. No effect once blocks already exist.';
+COMMENT ON COLUMN group_course.default_teacher_id IS 'Teacher for this (group, course) pairing. Applied by BlockGenerationService to every block it creates for this pairing when no blocks exist yet; setting it via GroupCourseController''s own endpoint has no effect once blocks already exist. Kept current for such pairings anyway by GroupCourseDefaultTeacherSyncService, which writes this column automatically whenever an assignment''s teacher is set through CourseBlockAssignmentController or the Excel import - so a future regeneration of that pairing''s blocks still reads an accurate teacher, not a stale or empty one.';
 
 
 
