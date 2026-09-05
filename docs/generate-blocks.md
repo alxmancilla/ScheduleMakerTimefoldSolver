@@ -4,12 +4,16 @@ This documents the current implementation of `BlockGenerationService` (web
 module) as of the availability-aware block generation feature
 (`feature/availability-aware-block-generation`), including the two
 generation-time heuristics ("Scenario 1" and "Scenario 2") added on top of
-the original template/room-requirement decomposition, and the shared
-per-teacher calendar ("Option C", added 2026-09-05 — see "Stage 0.5" below)
-that lets those heuristics see a teacher's *other* pairings, not just the one
-currently being decomposed. It's a companion to CLAUDE.md's
-"Availability-aware block generation" summary — this file goes into the full
-mechanics; CLAUDE.md keeps the short version and links here.
+the original template/room-requirement decomposition, the shared per-teacher
+calendar ("Option C", added 2026-09-05 — see "Stage 0.5" below) that lets
+those heuristics see a teacher's *other* pairings, not just the one currently
+being decomposed, its "effective calendar" follow-up (same date, see "Stage
+0.5" below) that extends this to a teacher's *pre-existing* assignments too,
+and Core's minimal-upgrade shape preference (same date, see Stage 2) that
+keeps as many small blocks as possible instead of uniformly resizing
+everything. It's a companion to CLAUDE.md's "Availability-aware block
+generation" summary — this file goes into the full mechanics; CLAUDE.md
+keeps the short version and links here.
 
 ## Entry point and scope
 
@@ -56,29 +60,42 @@ pending (group, course) pair needing generation into a `PendingPair` list,
 then groups the ones with a resolved `default_teacher_id` by that teacher.
 
 - **A teacher with exactly one pending pairing** gets `sharedCalendar =
-  null`. Nothing changes from the description below — `decomposeHours` and
-  `assignWindows` build a fresh `windowsByDay(teacher)` per call, exactly as
-  before this feature existed. This is deliberate: it's the common case, and
-  it must be byte-for-byte unaffected (verified by running every pre-existing
-  test unchanged after this feature landed).
-- **A teacher with 2+ pending pairings** gets one shared, mutable calendar —
-  `AvailabilityAwareBlockShaper.windowsByDay(teacher)` computed *once* — and
-  their pairings are sorted **largest-hours-first** (`totalHoursFor`, summing
-  `course_room_requirement` hours when present, else
-  `requiredHoursPerWeek`) before being processed against it, one at a time.
-  This is a bin-packing heuristic: giving the pairing with the least
-  flexibility (the most hours to place) first claim on the calendar produces
-  better outcomes than an arbitrary/input order would.
+  null`. `generateBlocksForGroupCourse` builds this teacher's *effective*
+  calendar fresh for that single call instead (see "Effective calendar"
+  below) — this is deliberate: it's the common case, and its
+  single-pairing behavior must be byte-for-byte unaffected by anything
+  added here (verified by running every pre-existing test unchanged after
+  each of these features landed).
+- **A teacher with 2+ pending pairings** gets one shared, mutable effective
+  calendar computed *once*, and their pairings are sorted
+  **largest-hours-first** (`totalHoursFor`, summing `course_room_requirement`
+  hours when present, else `requiredHoursPerWeek`), **tie-broken by
+  ascending course semester, then by group id** (added 2026-09-05), before
+  being processed against it, one at a time. Largest-hours-first is a
+  bin-packing heuristic: giving the pairing with the least flexibility (the
+  most hours to place) first claim on the calendar produces better outcomes
+  than an arbitrary/input order would. The semester/id tie-break exists
+  because the hours-only comparator left ties (a real, common case — e.g.
+  six groups all needing the same 5h/week of one course) falling through to
+  whatever order `studentGroupRepository.findAll()` happened to return, which
+  isn't contractually stable — that incidental order was silently deciding
+  which group's shape got squeezed. Breaking by ascending semester gives a
+  lower-semester group first claim on the calendar's more comfortable
+  shapes, consistent with how this system already privileges semester-1
+  groups elsewhere (earlier starts, the harder 2pm cutoff); the group-id
+  tiebreak after that makes the whole ordering fully reproducible across
+  reruns of identical data.
 
 Each pairing in a shared group still goes through the *same* `decomposeHours`
-call as any other pairing — the only difference is what `Map<Integer,
-List<int[]>>` gets passed in. After a shape is chosen for a pairing,
-`consumeFromCalendar` calls `AvailabilityAwareBlockShaper.assignWindows(...)`
-against the shared map to actually remove those hours from it (discarding the
-specific day/hour placement — a non-exclusive teacher's blocks are still left
-for the solver to place; only the *hours consumed* matter to the next
-pairing in line), so the *next* pairing sharing that teacher sees a
-genuinely reduced calendar, not the full one.
+call as any other pairing — the only difference is what `TeacherCalendar`
+(windows + extra margin, see below) gets passed in. After a shape is chosen
+for a pairing, `consumeFromCalendar` calls
+`AvailabilityAwareBlockShaper.assignWindows(...)` against the shared map to
+actually remove those hours from it (discarding the specific day/hour
+placement — a non-exclusive teacher's blocks are still left for the solver
+to place; only the *hours consumed* matter to the next pairing in line), so
+the *next* pairing sharing that teacher sees a genuinely reduced calendar,
+not the full one.
 
 This is also why `AvailabilityAwareBlockShaper.assignWindows(List, int, Map)`
 is transactional (deep-copies the map, only commits on full success): since
@@ -91,6 +108,43 @@ Only Stage 2 (shape adaptation) is affected by sharing. Stage 4
 by construction — pinning already required the teacher to have *no other*
 pairing at all, which is mutually exclusive with belonging to a 2+-pairing
 group here.
+
+### Effective calendar: a teacher's own existing load (added 2026-09-05)
+
+The mechanism above only protected pairings pending *in the same
+`generateBlocks()` run*. A brand-new pairing for a teacher who already has
+other, previously-generated (or manually created) assignments was still
+shaped against their full raw availability, blind to hours those existing
+assignments already claim — the same blind spot the section above fixes,
+recurring one level up across *runs* instead of within one.
+
+`BlockGenerationService.buildEffectiveCalendar(teacher, existingAssignments)`
+closes this, and runs for **every** resolved teacher now — not just when 2+
+pairings are pending together:
+
+- A **pinned** existing assignment has a known day/hour, so its hours are
+  subtracted from the calendar exactly:
+  `AvailabilityAwareBlockShaper.windowsByDay(teacher, consumedRanges)` (a new
+  overload of the existing method) removes specific `[dayOfWeek, startHour,
+  length]` ranges from the teacher's raw declared availability before any
+  window is computed — removing an hour from the middle of an otherwise-open
+  run naturally splits it into two windows once the remaining hours are
+  re-scanned.
+- A still-**movable** (non-pinned) existing assignment can't be subtracted
+  the same way — it has no placed day yet — so its mere presence instead
+  requires one extra margin day
+  (`EXTRA_MARGIN_DAYS_FOR_EXISTING_MOVABLE_LOAD`, currently 1) on top of
+  `AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS` for every pairing
+  decomposed against that calendar. This is coarser than exact subtraction,
+  but still meaningfully conservative — the alternative (ignoring that load
+  entirely) is exactly the gap being closed here.
+
+The result is a `TeacherCalendar` record (`windows` + `extraMarginDays`)
+threaded through `decomposeHours` and `consumeFromCalendar` instead of a bare
+`Map`. A teacher with no existing assignments at all — the common case, and
+always true for an exclusive teacher (Stage 4's own trigger condition
+requires zero pre-existing assignments) — gets back exactly the unmodified
+raw calendar, so this is purely additive.
 
 ## Stage 1 — where a block's shape comes from (priority order)
 
@@ -146,8 +200,9 @@ above (never for explicit templates, which specify their own length).
    consumed by an earlier pairing in the same run — the map passed in is
    whatever's left at the time this pairing's turn comes up, not necessarily
    the teacher's full raw availability.
-5. If it doesn't, `AvailabilityAwareBlockShaper.tryAvailabilityAwareShape()`
-   tries progressively longer block sizes — from `preferredBlockSize` up to
+5. If it doesn't, and the designation is **not** `Core`,
+   `AvailabilityAwareBlockShaper.tryAvailabilityAwareShape()` tries
+   progressively longer block sizes — from `preferredBlockSize` up to
    `min(4, the largest single contiguous available window still in the
    map)` — and returns the first size whose block count reaches the margin.
    If no size reaches real margin, it gracefully **falls back to the first
@@ -155,12 +210,47 @@ above (never for explicit templates, which specify their own length).
    If nothing is even bare-feasible, `decomposeHours` falls back to the
    original naive shape — a genuinely infeasible pairing that
    `PreSolveValidator.validateBlockSpreadCapacity` will still report,
-   exactly as it always has.
+   exactly as it always has. If the designation **is** `Core`, a different,
+   more conservative path runs instead — see "Core's minimal-upgrade
+   preference" below.
 
 **Critically, this stage never assigns a specific day.** It only decides
 block *count* and *length*. The solver still freely places each block among
 the teacher's available days — same as any other generated block — unless
 Stage 4 below applies.
+
+### Core's minimal-upgrade preference (added 2026-09-05)
+
+Per request, `Core` (hardcoded by this literal designation name, not driven
+by whatever `preferredBlockSize` happens to be configured for any component
+in general) never goes through the uniform-resize ladder above. Instead,
+`AvailabilityAwareBlockShaper.tryMinimalUpgradeShape()` finds the largest
+block count — fewest merges — that reaches the day-cap margin, merging only
+as many *pairs* of preferred-size blocks into double-size ones as actually
+needed:
+
+- 4 hours needing to drop from 4 blocks to 3 becomes `[2, 1, 1]` (one merge)
+  rather than `[2, 2]` (every block merged, what the uniform ladder would
+  have produced).
+- **Doubling** — not a flat "+1" size step — is the only upgrade that
+  exactly preserves total hours when merging two same-size blocks into one
+  (two 2h blocks merged into a 3h block would lose an hour; merged into a 4h
+  block, they don't). So both the base and upgrade sizes come straight from
+  `component_block_rule`'s actual configured `preferredBlockSize` for
+  `Core` — an admin changing that value in Settings' Block Rules changes
+  what this does (e.g. `preferredBlockSize=2` merges pairs into 4h blocks
+  instead of 1h into 2h) without any code change.
+- A leftover remainder block from packing at the base size (present when
+  hours don't divide evenly) is never itself a merge candidate — it's
+  already smaller than a full base-size block.
+- **Deliberately caps out at double the base size, by explicit choice**:
+  unlike the uniform ladder, this never escalates further even when
+  doubling isn't enough. If `baseSize * 2` would already exceed the 4h
+  structural maximum (base size 3 or 4 — nowhere to merge to at all), or
+  even every full-size block merged still isn't bare-feasible,
+  `tryMinimalUpgradeShape` returns null and `decomposeHours` falls straight
+  back to the untouched naive shape, never trying a uniform bigger shape
+  the way every other designation does.
 
 ### Why the margin requirement exists
 
@@ -291,36 +381,70 @@ gap was caught and closed.
   for anyone else's commitments — but it's only ever invoked for a teacher
   with no other commitments in the first place (Stage 4's own trigger
   condition), which is what makes committing to a pin safe there. Shape
-  adaptation (Stage 2) no longer has this gap for the specific case Option C
-  targets — a teacher's *other pending pairings in the same run* — since
-  Stage 0.5's shared calendar makes each pairing see the others' consumption.
-  It still can't see commitments outside this run (a pairing that already
-  has blocks, or a future run's changes), only pending pairings sharing a
-  teacher within the same `generateBlocks()` call.
+  adaptation (Stage 2) no longer has this gap for either the case Option C
+  targeted (a teacher's *other pending pairings in the same run*, via Stage
+  0.5's shared calendar) or the case the effective-calendar fix targeted (a
+  teacher's *pre-existing* assignments from earlier runs or manual edits) —
+  but the movable-load side of the effective calendar is still a margin-day
+  estimate, not an exact accounting, since a movable assignment's actual day
+  is only decided by the solver, after generation is long done.
+- **None of this generation-time reasoning guarantees the solver's actual
+  placement avoids conflicts** — it only shapes blocks more safely. Confirmed
+  live (2026-09-05): a teacher shared across 9 groups for one course, with
+  comfortable aggregate slack (27 of 40 hours used) and margin-safe shapes,
+  still ended up with 2 double-bookings after both a normal and a 30-minute
+  solve with a fresh random seed — the local search settled into a similarly
+  hard state each time rather than escaping it, for a densely-shared-teacher
+  sub-problem this reasoning doesn't (and structurally can't, since it never
+  reasons about placement) prevent.
+- **`PreSolveValidator.validateBlockSpreadCapacity` has an analogous blind
+  spot to the one Option C fixed here, on the validation side, that hasn't
+  itself been fixed**: it checks each (group, course) pair's day-spread
+  requirement against a teacher's raw availability independently, the same
+  way `decomposeHours` used to before Option C — so it can't catch a case
+  where several pairings sharing a teacher are each individually fine but
+  collectively too tight. It hasn't been observed causing a false "clean"
+  result in practice, but the structural gap is the same one this file's own
+  history is about.
 
 ## Where the code lives
 
 - `web/src/main/java/com/example/web/service/BlockGenerationService.java` —
-  orchestration: the main loop (now including Stage 0.5's `PendingPair`
-  grouping/sorting), template/room-requirement handling, room and teacher
-  defaulting, `consumeFromCalendar`/`totalHoursFor` (Stage 0.5), and
-  `tryPinExclusiveTeacherBlocks`.
+  orchestration: the main loop (Stage 0.5's `PendingPair` grouping and
+  largest-hours/semester/id sorting), `buildEffectiveCalendar` and the
+  `TeacherCalendar` record (the effective-calendar section above),
+  template/room-requirement handling, room and teacher defaulting,
+  `consumeFromCalendar`/`totalHoursFor`/`semesterOrMax`, the `CORE_DESIGNATION`
+  branch in `decomposeHours`, and `tryPinExclusiveTeacherBlocks`.
 - `web/src/main/java/com/example/web/service/AvailabilityAwareBlockShaper.java`
   — the pure, DB-free algorithm: `packBlocks`, `fitsWithinDayCap`,
-  `tryAvailabilityAwareShape`, `assignWindows`, `distinctAvailableDayCount`,
-  `largestContiguousWindow`, and the availability-window helpers they're
-  built on. Deliberately free of any Spring/repository dependency so it's
-  testable in complete isolation from the database. Every one of these has
-  two forms: a `TeacherEntity`-based one (builds a fresh, single-use
-  `windowsByDay(teacher)` internally — unchanged pre-Option-C behavior) and
-  a `Map<Integer, List<int[]>>`-based one that operates directly on a
+  `tryAvailabilityAwareShape`, `tryMinimalUpgradeShape` (Core's
+  minimal-upgrade preference above), `assignWindows`,
+  `distinctAvailableDayCount`, `largestContiguousWindow`, and the
+  availability-window helpers they're built on. Deliberately free of any
+  Spring/repository dependency so it's testable in complete isolation from
+  the database. Every one of `windowsByDay`, `distinctAvailableDayCount`,
+  `largestContiguousWindow`, `tryAvailabilityAwareShape`, and `assignWindows`
+  has two forms: a `TeacherEntity`-based one (builds a fresh, single-use
+  calendar internally — unchanged pre-Option-C behavior) and a
+  `Map<Integer, List<int[]>>`-based one that operates directly on a
   caller-supplied, possibly-already-partly-consumed calendar — the form
-  Stage 0.5's shared-calendar grouping relies on.
-  `assignWindows(List, int, Map)` is transactional (deep-copies the map,
-  commits only on full success) since that map can now be shared and reused
-  across several pairings' calls, unlike the old single-use-per-call shape.
+  Stage 0.5's shared-calendar grouping relies on. `windowsByDay` additionally
+  has a `(TeacherEntity, List<int[]> consumedRanges)` overload for carving
+  specific pinned hours out before computing windows at all (the effective
+  calendar's exact-subtraction case). `assignWindows(List, int, Map)` is
+  transactional (deep-copies the map, commits only on full success) since
+  that map can now be shared and reused across several pairings' calls,
+  unlike the old single-use-per-call shape. `tryMinimalUpgradeShape` has only
+  the primitive-argument form (`baseSize`, `maxBlocksPerDay`, `availableDays`,
+  `marginDays`) — it doesn't need a calendar map at all, since it reasons
+  purely about block *counts*, not specific windows.
 - Tests: `AvailabilityAwareBlockShaperTest` (the pure algorithm, every path,
-  including the `Map`-based overloads and the transactional
-  commit/rollback behavior) and `BlockGenerationServiceTest` (both scenarios
-  end-to-end, including all the negative paths in Stage 4, and the shared
-  calendar's cross-pairing effects and largest-hours-first ordering).
+  including the `Map`-based overloads, the transactional commit/rollback
+  behavior, the pinned-hours-carving `windowsByDay` overload, and
+  `tryMinimalUpgradeShape` across several base sizes) and
+  `BlockGenerationServiceTest` (both scenarios end-to-end, including all the
+  negative paths in Stage 4, the shared calendar's cross-pairing effects,
+  largest-hours/semester/id ordering, the effective calendar's pinned
+  subtraction and movable-load margin, and Core's minimal-upgrade behavior
+  including its hard cap).
