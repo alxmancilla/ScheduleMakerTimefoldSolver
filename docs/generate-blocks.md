@@ -11,8 +11,13 @@ being decomposed, its "effective calendar" follow-up (same date, see "Stage
 0.5" below) that extends this to a teacher's *pre-existing* assignments too,
 and Core's minimal-upgrade shape preference (same date, see Stage 2) that
 keeps as many small blocks as possible instead of uniformly resizing
-everything. It's a companion to CLAUDE.md's "Availability-aware block
-generation" summary — this file goes into the full mechanics; CLAUDE.md
+everything. Also documents three later additions (all 2026-09-05): a
+configurable per-component margin override (see Stage 2), an `adjustments`
+list surfacing what actually got reshaped (see Output), and
+`PreSolveValidator.validateSharedTeacherLoad` in the engine module - an
+advisory mirror of Option C's own blind spot, on the validation side (see
+"Stated limitations"). It's a companion to CLAUDE.md's "Availability-aware
+block generation" summary — this file goes into the full mechanics; CLAUDE.md
 keeps the short version and links here.
 
 ## Entry point and scope
@@ -192,10 +197,13 @@ above (never for explicit templates, which specify their own length).
    "no teacher, or none resolvable".)
 4. **Windows resolved** → check whether the naive shape's block count needs
    no more distinct days than the map currently has available, **with at
-   least `AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS` (1) day to spare
-   beyond the bare minimum** (`fitsWithinDayCap`, added 2026-09-05 — see
-   "Why the margin requirement exists" below). If it already has that
-   margin, the naive shape is kept. When the pairing's teacher is shared
+   least the component's required margin to spare beyond the bare
+   minimum** (`fitsWithinDayCap`, added 2026-09-05 — see "Why the margin
+   requirement exists" below). That margin is
+   `component_block_rule.marginDays` when configured for this component
+   (added 2026-09-05, see "Configurable margin" below), otherwise
+   `AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS` (1). If it already has
+   that margin, the naive shape is kept. When the pairing's teacher is shared
    with other pending pairings (Stage 0.5), this map may already be partly
    consumed by an earlier pairing in the same run — the map passed in is
    whatever's left at the time this pairing's turn comes up, not necessarily
@@ -268,6 +276,26 @@ This is a **probabilistic hedge, not a guarantee**. The same night, a third
 pair that had a full spare day of margin was *still* violated by the
 solver's actual search — margin lowers how often the solver gets squeezed
 into a violation, it doesn't prove it can't happen.
+
+### Configurable margin per component (added 2026-09-05)
+
+`AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS` used to be the one
+hardcoded margin value applied to every component. `component_block_rule`
+now has an optional `margin_days` column
+(`database/migrations/add_component_block_rule_margin_days.sql`,
+`ComponentBlockRuleEntity.getMarginDays()`): when a component's rule has this
+set, `decomposeHours` uses it as the base margin instead of the hardcoded
+default (`DEFAULT_MARGIN_DAYS` stays the fallback for `NULL` — no override,
+the default for any existing or newly-created rule). This base margin is
+still combined with the effective calendar's `extraMarginDays` (for existing
+movable load) exactly as before — the configurable part only replaces the
+`DEFAULT_MARGIN_DAYS` half of that sum, not the whole margin calculation.
+Surfaced end-to-end: `ComponentBlockRuleDTO.marginDays` (optional, `@Min(0)
+@Max(4)`, unlike the two required fields alongside it) →
+`ComponentBlockRuleController` → Settings' Block Rules tab (a "Margin Days"
+field alongside preferred size and max/day, defaulting to an explicit
+"Default (1)" option rather than a bare number, so it's visually distinct
+from a real `0` override).
 
 ## Stage 3 — room and teacher defaulting (every generated block, all tiers)
 
@@ -359,6 +387,17 @@ gap was caught and closed.
   pin-attempt failures from Stage 4. Nothing here is fatal — a warning means
   "this one thing was left for the solver or a human," not that generation
   failed.
+- `adjustments` (added 2026-09-05) — a human-readable list, one entry per
+  (group, course) portion whose chosen shape differed from its naive one
+  (`"<group>/<course>: naive shape <naive> adapted to <chosen>"`). Empty
+  means every portion generated this run kept its naive shape unchanged.
+  `decomposeHours` returns a `ShapeDecision` record (chosen shape + the
+  naive shape it started from, via a new `wasAdapted()` method) instead of a
+  bare shape list, and `recordAdjustment` appends an entry whenever the two
+  differ - giving a scheduler visibility into what got reshaped (margin
+  adaptation, or Core's minimal-upgrade preference) without reconstructing
+  it from the database by hand, which happened more than once earlier this
+  same session before this existed.
 
 ## Stated limitations
 
@@ -397,15 +436,23 @@ gap was caught and closed.
   hard state each time rather than escaping it, for a densely-shared-teacher
   sub-problem this reasoning doesn't (and structurally can't, since it never
   reasons about placement) prevent.
-- **`PreSolveValidator.validateBlockSpreadCapacity` has an analogous blind
-  spot to the one Option C fixed here, on the validation side, that hasn't
-  itself been fixed**: it checks each (group, course) pair's day-spread
-  requirement against a teacher's raw availability independently, the same
-  way `decomposeHours` used to before Option C — so it can't catch a case
-  where several pairings sharing a teacher are each individually fine but
-  collectively too tight. It hasn't been observed causing a false "clean"
-  result in practice, but the structural gap is the same one this file's own
-  history is about.
+- **`PreSolveValidator.validateBlockSpreadCapacity` had an analogous blind
+  spot to the one Option C fixed here, on the validation side** — it checks
+  each (group, course) pair's day-spread requirement against a teacher's raw
+  availability independently, the same way `decomposeHours` used to before
+  Option C. **Closed 2026-09-05** by `validateSharedTeacherLoad`, a new
+  ADVISORY (warning, not blocking) check in the engine module: for a teacher
+  shared across 2+ pairings, it greedily simulates whether their movable
+  blocks can all be packed into the teacher's calendar (after exactly
+  subtracting pinned hours), the same way this file's own live investigation
+  (see the bullet above) found could otherwise fail silently. Deliberately a
+  warning rather than a `problem`: unlike every other `PreSolveValidator`
+  check, this is a greedy heuristic, not a proof, so it can have false
+  positives (a smarter placement order than the simulation tried might still
+  succeed) — see `CLAUDE.md`'s Pre-Solve Validation section for the full
+  design reasoning. This lives entirely in the `engine` module (mirrored
+  logic, not shared code, per this codebase's existing engine/web asymmetry)
+  and is independent of everything else in this file.
 
 ## Where the code lives
 
@@ -416,12 +463,34 @@ gap was caught and closed.
   template/room-requirement handling, room and teacher defaulting,
   `consumeFromCalendar`/`totalHoursFor`/`semesterOrMax`, the `CORE_DESIGNATION`
   branch in `decomposeHours`, and `tryPinExclusiveTeacherBlocks`.
+- `common/src/main/java/com/example/common/CalendarPacking.java` (added
+  2026-09-05) — the actual bin-packing algorithm now lives here, not in
+  `web`: `packBlocks`, `fitsWithinDayCap`, `contiguousWindows`,
+  `distinctAvailableDayCount`, `largestContiguousWindow`,
+  `tryAvailabilityAwareShape`, `tryMinimalUpgradeShape`, and `assignWindows`
+  (generic over the day-key type `D`, returning a `Placement<D>` list rather
+  than raw `int[]` pairs, since a plain `int[]` can't hold an arbitrary day
+  type). Extracted after `engine`'s `PreSolveValidator` needed the exact same
+  reasoning for its own `validateSharedTeacherLoad` check and would otherwise
+  have hand-copied the algorithm a second time (with `Integer` day-keys
+  re-typed to `java.time.DayOfWeek`) - exactly the "two implementations to
+  keep in sync" problem the `common` module exists to prevent (see
+  `RoomTypeCompatibility`'s own history). Has its own direct test class,
+  `CalendarPackingTest` (in `common`), including cases using a
+  `String`-keyed calendar to prove the generic methods don't secretly depend
+  on either module's concrete day-key type.
 - `web/src/main/java/com/example/web/service/AvailabilityAwareBlockShaper.java`
-  — the pure, DB-free algorithm: `packBlocks`, `fitsWithinDayCap`,
-  `tryAvailabilityAwareShape`, `tryMinimalUpgradeShape` (Core's
-  minimal-upgrade preference above), `assignWindows`,
-  `distinctAvailableDayCount`, `largestContiguousWindow`, and the
-  availability-window helpers they're built on. Deliberately free of any
+  — now a thin `TeacherEntity`-facing **facade** over `CalendarPacking`, not
+  an independent algorithm implementation. Every method here delegates:
+  `packBlocks`/`fitsWithinDayCap`/`tryAvailabilityAwareShape`/`tryMinimalUpgradeShape`/
+  `distinctAvailableDayCount`/`largestContiguousWindow` call straight through;
+  `assignWindows` converts between this class's `int[]{day, startHour}`
+  return shape (used throughout `BlockGenerationService`, e.g. for actually
+  pinning exclusive-teacher blocks) and `CalendarPacking`'s generic
+  `Placement<Integer>`. What's genuinely web-specific and stays here:
+  `hoursByDay`/`windowsByDay` (building the initial calendar from
+  `TeacherEntity`/`TeacherAvailabilityEntity`, including the pinned-hours-
+  carving overload for the effective calendar). Deliberately free of any
   Spring/repository dependency so it's testable in complete isolation from
   the database. Every one of `windowsByDay`, `distinctAvailableDayCount`,
   `largestContiguousWindow`, `tryAvailabilityAwareShape`, and `assignWindows`
@@ -429,20 +498,10 @@ gap was caught and closed.
   calendar internally — unchanged pre-Option-C behavior) and a
   `Map<Integer, List<int[]>>`-based one that operates directly on a
   caller-supplied, possibly-already-partly-consumed calendar — the form
-  Stage 0.5's shared-calendar grouping relies on. `windowsByDay` additionally
-  has a `(TeacherEntity, List<int[]> consumedRanges)` overload for carving
-  specific pinned hours out before computing windows at all (the effective
-  calendar's exact-subtraction case). `assignWindows(List, int, Map)` is
-  transactional (deep-copies the map, commits only on full success) since
-  that map can now be shared and reused across several pairings' calls,
-  unlike the old single-use-per-call shape. `tryMinimalUpgradeShape` has only
-  the primitive-argument form (`baseSize`, `maxBlocksPerDay`, `availableDays`,
-  `marginDays`) — it doesn't need a calendar map at all, since it reasons
-  purely about block *counts*, not specific windows.
-- Tests: `AvailabilityAwareBlockShaperTest` (the pure algorithm, every path,
-  including the `Map`-based overloads, the transactional commit/rollback
-  behavior, the pinned-hours-carving `windowsByDay` overload, and
-  `tryMinimalUpgradeShape` across several base sizes) and
+  Stage 0.5's shared-calendar grouping relies on.
+- Tests: `AvailabilityAwareBlockShaperTest` (unchanged by the
+  `CalendarPacking` extraction - still exercises every path through the
+  facade, proving the delegation preserves behavior exactly) and
   `BlockGenerationServiceTest` (both scenarios end-to-end, including all the
   negative paths in Stage 4, the shared calendar's cross-pairing effects,
   largest-hours/semester/id ordering, the effective calendar's pinned

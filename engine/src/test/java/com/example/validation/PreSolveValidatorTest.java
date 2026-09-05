@@ -572,4 +572,155 @@ public class PreSolveValidatorTest {
 
         assertTrue(PreSolveValidator.validate(scheduleWith(a)).isValid());
     }
+
+    // ---- Shared teacher load (warning, not blocking - the validation-side
+    // mirror of the shape-adaptation blind spot BlockGenerationService fixed) ----
+
+    @Test
+    public void sharedTeacherLoad_greedyPackingFails_isReportedAsWarningNotProblem() {
+        // 3 groups share one teacher for the same course (maxPerDay=1), each
+        // needing 2 distinct-day 1h blocks - individually fine (2 <= 3
+        // available days), and aggregate hours (6h needed) exactly match the
+        // teacher's total capacity (3 days x 2h = 6h), so neither existing
+        // check fires. But maxPerDay=1 forces each group's 2 blocks onto 2
+        // SEPARATE days, and greedily packing largest-first exhausts
+        // Monday+Tuesday for the first two groups, leaving the third group
+        // only Wednesday - one day short of the 2 it needs.
+        Course course = new Course("C1", "Compartido", "COMP", 1, "BASICAS", "estándar", 2, true);
+        course.setMaxBlocksPerDay(1);
+
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.WEDNESDAY, new HashSet<>(Arrays.asList(7, 8)));
+        Set<String> quals = new HashSet<>(Arrays.asList("Compartido"));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+
+        List<CourseBlockAssignment> blocks = new ArrayList<>();
+        for (int g = 1; g <= 3; g++) {
+            Group group = new Group("G" + g, "Group " + g, new HashSet<>());
+            for (int i = 0; i < 2; i++) {
+                CourseBlockAssignment a = new CourseBlockAssignment("G" + g + "_" + i, group, course, 1);
+                a.setTeacher(teacher);
+                a.setSatisfiesRoomType("estándar");
+                a.setPinned(false);
+                blocks.add(a);
+            }
+        }
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0])));
+
+        assertTrue("neither existing check should fire", r.isValid());
+        assertFalse("the shared-load simulation should flag the risk", r.getWarnings().isEmpty());
+        assertTrue(r.getWarnings().stream().anyMatch(w -> w.contains("T1") && w.contains("couldn't be greedily fit")));
+    }
+
+    @Test
+    public void sharedTeacherLoad_ampleSlack_noWarning() {
+        // Same 3 groups/shapes as above, but a 4th day of slack lets
+        // everything pack cleanly - confirms this isn't a false positive on
+        // every multi-group teacher, only a genuinely tight one.
+        Course course = new Course("C1", "Compartido", "COMP", 1, "BASICAS", "estándar", 2, true);
+        course.setMaxBlocksPerDay(1);
+
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.WEDNESDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.THURSDAY, new HashSet<>(Arrays.asList(7, 8)));
+        Set<String> quals = new HashSet<>(Arrays.asList("Compartido"));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+
+        List<CourseBlockAssignment> blocks = new ArrayList<>();
+        for (int g = 1; g <= 3; g++) {
+            Group group = new Group("G" + g, "Group " + g, new HashSet<>());
+            for (int i = 0; i < 2; i++) {
+                CourseBlockAssignment a = new CourseBlockAssignment("G" + g + "_" + i, group, course, 1);
+                a.setTeacher(teacher);
+                a.setSatisfiesRoomType("estándar");
+                a.setPinned(false);
+                blocks.add(a);
+            }
+        }
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0])));
+
+        assertTrue(r.isValid());
+        assertTrue("with enough slack, the simulation should find a fit", r.getWarnings().isEmpty());
+    }
+
+    @Test
+    public void sharedTeacherLoad_singlePairingTeacher_neverTriggersThisCheck() {
+        // Only one (group, course) pairing for this teacher, even though its
+        // own day-spread is at capacity - validateBlockSpreadCapacity already
+        // covers this exactly; the shared-load simulation has nothing to
+        // share and must stay silent regardless.
+        Course course = new Course("C1", "Solo", "SOLO", 1, "BASICAS", "estándar", 2, true);
+        course.setMaxBlocksPerDay(1);
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7)));
+        Set<String> quals = new HashSet<>(Arrays.asList("Solo"));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+        Group group = new Group("G1", "Group 1", new HashSet<>());
+
+        List<CourseBlockAssignment> blocks = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            CourseBlockAssignment a = new CourseBlockAssignment("G1_" + i, group, course, 1);
+            a.setTeacher(teacher);
+            a.setSatisfiesRoomType("estándar");
+            a.setPinned(false);
+            blocks.add(a);
+        }
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0])));
+
+        assertTrue(r.isValid());
+        assertTrue(r.getWarnings().isEmpty());
+    }
+
+    @Test
+    public void sharedTeacherLoad_pinnedHoursAreSubtractedBeforeSimulatingMovableOnes() {
+        // A PINNED 2h block for one pairing consumes Monday entirely (a fixed
+        // fact); a second, MOVABLE pairing needing 2 distinct 1h/day blocks
+        // is then left with only Tuesday - one day short. Neither existing
+        // check fires (each pairing's own day-spread and the aggregate hours
+        // both fit exactly), so only the pinned-subtraction-aware simulation
+        // catches this.
+        Course courseA = new Course("CA", "Fijo", "FIJ", 1, "BASICAS", "estándar", 2, true);
+        Course courseB = new Course("CB", "Movil", "MOV", 1, "BASICAS", "estándar", 2, true);
+        courseA.setMaxBlocksPerDay(1);
+        courseB.setMaxBlocksPerDay(1);
+
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        avail.put(DayOfWeek.MONDAY, new HashSet<>(Arrays.asList(7, 8)));
+        avail.put(DayOfWeek.TUESDAY, new HashSet<>(Arrays.asList(7, 8)));
+        Set<String> quals = new HashSet<>(Arrays.asList("Fijo", "Movil"));
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+
+        Group groupA = new Group("GA", "Group A", new HashSet<>());
+        CourseBlockAssignment pinned = new CourseBlockAssignment("GA_0", groupA, courseA, 2);
+        pinned.setTeacher(teacher);
+        pinned.setSatisfiesRoomType("estándar");
+        pinned.setTimeslot(new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 2));
+        pinned.setRoom(new Room("AULA 1", "A", "estándar"));
+        pinned.setPinned(true);
+
+        Group groupB = new Group("GB", "Group B", new HashSet<>());
+        List<CourseBlockAssignment> blocks = new ArrayList<>();
+        blocks.add(pinned);
+        for (int i = 0; i < 2; i++) {
+            CourseBlockAssignment a = new CourseBlockAssignment("GB_" + i, groupB, courseB, 1);
+            a.setTeacher(teacher);
+            a.setSatisfiesRoomType("estándar");
+            a.setPinned(false);
+            blocks.add(a);
+        }
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(blocks.toArray(new CourseBlockAssignment[0])));
+
+        assertTrue(r.isValid());
+        assertFalse(r.getWarnings().isEmpty());
+        assertTrue(r.getWarnings().stream().anyMatch(w -> w.contains("GB") && w.contains("Movil")));
+    }
 }

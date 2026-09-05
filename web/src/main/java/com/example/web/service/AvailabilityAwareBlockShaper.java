@@ -1,5 +1,6 @@
 package com.example.web.service;
 
+import com.example.common.CalendarPacking;
 import com.example.web.entity.TeacherAvailabilityEntity;
 import com.example.web.entity.TeacherEntity;
 
@@ -11,9 +12,22 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Pure, DB-free algorithm for shaping a course's blocks around a specific
- * teacher's actual availability, used by {@link BlockGenerationService} for a
+ * {@link TeacherEntity}-facing facade over {@link CalendarPacking}'s
+ * day-by-day packing algorithm, used by {@link BlockGenerationService} for a
  * (group, course) pair with no explicit course_block_template.
+ *
+ * <p>The actual bin-packing algorithm (packing hours into blocks, checking a
+ * block count against a day cap, greedily placing blocks into a calendar)
+ * lives in {@code common}'s {@link CalendarPacking} - shared with the engine
+ * module's {@code PreSolveValidator}, which needs the identical reasoning
+ * over its own {@code Teacher} domain object (keyed by
+ * {@code java.time.DayOfWeek} rather than the plain {@code Integer} this
+ * class uses). Before this consolidation (2026-09-05), the two modules each
+ * hand-maintained their own copy of the same algorithm - this class now
+ * exists purely as web's day-key representation (plain {@code Integer}, from
+ * {@link TeacherAvailabilityEntity}) plus its {@link TeacherEntity}-specific
+ * calendar-building glue ({@link #hoursByDay}, {@link #windowsByDay}),
+ * delegating every actual packing decision to {@code CalendarPacking}.
  *
  * Two capabilities, used for two distinct situations:
  *
@@ -73,7 +87,7 @@ import java.util.TreeSet;
 final class AvailabilityAwareBlockShaper {
 
     /** DB check_block_length constraint: a block is 1-4 hours. */
-    static final int MAX_BLOCK_LENGTH = 4;
+    static final int MAX_BLOCK_LENGTH = CalendarPacking.MAX_BLOCK_LENGTH;
 
     /**
      * How many spare distinct days a shape should leave beyond the bare
@@ -84,46 +98,27 @@ final class AvailabilityAwareBlockShaper {
      * probabilistic hedge, not a guarantee: it lowers how often that happens,
      * it doesn't prove it can't.
      */
-    static final int DEFAULT_MARGIN_DAYS = 1;
+    static final int DEFAULT_MARGIN_DAYS = CalendarPacking.DEFAULT_MARGIN_DAYS;
 
     private AvailabilityAwareBlockShaper() {
     }
 
     /**
      * Packs {@code hours} into blocks of exactly {@code blockSize}, with a
-     * smaller trailing remainder block if it doesn't divide evenly - the same
-     * greedy packing BlockGenerationService's decomposeHours always used,
-     * extracted so both the teacher-blind and availability-aware paths share
-     * one implementation.
+     * smaller trailing remainder block if it doesn't divide evenly. See
+     * {@link CalendarPacking#packBlocks}.
      */
     static List<Integer> packBlocks(int hours, int blockSize) {
-        List<Integer> lengths = new ArrayList<>();
-        int remaining = hours;
-        while (remaining > 0) {
-            if (remaining >= blockSize) {
-                lengths.add(blockSize);
-                remaining -= blockSize;
-            } else {
-                lengths.add(remaining);
-                remaining = 0;
-            }
-        }
-        return lengths;
+        return CalendarPacking.packBlocks(hours, blockSize);
     }
 
     /**
      * True if this many blocks, capped at maxBlocksPerDay/day, fit within
-     * availableDays with at least marginDays to spare. Pass 0 for the bare
-     * "is this even possible at all" check; a positive margin additionally
-     * requires headroom beyond the minimum, so the solver isn't left with
-     * zero room to absorb any other scheduling pressure that day.
+     * availableDays with at least marginDays to spare. See
+     * {@link CalendarPacking#fitsWithinDayCap}.
      */
     static boolean fitsWithinDayCap(int blockCount, int maxBlocksPerDay, int availableDays, int marginDays) {
-        if (maxBlocksPerDay <= 0) {
-            return false;
-        }
-        int neededDays = (blockCount + maxBlocksPerDay - 1) / maxBlocksPerDay; // ceil division
-        return neededDays + marginDays <= availableDays;
+        return CalendarPacking.fitsWithinDayCap(blockCount, maxBlocksPerDay, availableDays, marginDays);
     }
 
     /**
@@ -159,26 +154,13 @@ final class AvailabilityAwareBlockShaper {
      * already partially consumed by another (group, course) pairing sharing
      * the same teacher earlier in the same generation run (see
      * BlockGenerationService's per-teacher shared-calendar grouping). Purely
-     * read-only: never mutates {@code windows}.
+     * read-only: never mutates {@code windows}. See
+     * {@link CalendarPacking#tryAvailabilityAwareShape}.
      */
     static List<Integer> tryAvailabilityAwareShape(int hours, int preferredBlockSize, int maxBlocksPerDay,
             Map<Integer, List<int[]>> windows, int marginDays) {
-        int availableDays = distinctAvailableDayCount(windows);
-        if (availableDays == 0) {
-            return null;
-        }
-        int upperBound = Math.min(MAX_BLOCK_LENGTH, largestContiguousWindow(windows));
-        List<Integer> bareFeasible = null;
-        for (int blockSize = preferredBlockSize; blockSize <= upperBound; blockSize++) {
-            List<Integer> candidate = packBlocks(hours, blockSize);
-            if (fitsWithinDayCap(candidate.size(), maxBlocksPerDay, availableDays, marginDays)) {
-                return candidate;
-            }
-            if (bareFeasible == null && fitsWithinDayCap(candidate.size(), maxBlocksPerDay, availableDays, 0)) {
-                bareFeasible = candidate;
-            }
-        }
-        return bareFeasible;
+        return CalendarPacking.tryAvailabilityAwareShape(hours, preferredBlockSize, maxBlocksPerDay, windows,
+                marginDays);
     }
 
     /**
@@ -188,78 +170,14 @@ final class AvailabilityAwareBlockShaper {
      * {@link #tryAvailabilityAwareShape} does - e.g. 4 hours at
      * {@code baseSize} 1, needing to drop from 4 blocks to 3, becomes
      * {@code [2, 1, 1]} (one merge) rather than {@code [2, 2]} (every block
-     * merged), whenever the smaller merge is enough. Doubling is the only
-     * upgrade size that exactly preserves total hours when merging exactly
-     * two same-size blocks into one - unlike a flat "+1" size step, which
-     * would silently lose or gain hours for any {@code baseSize} other than
-     * 1 - so this is what generalizes cleanly to whatever
-     * {@code component_block_rule.preferredBlockSize} is actually
-     * configured, not just the 1h/2h case.
-     *
-     * <p>Any leftover remainder block from {@link #packBlocks(int, int)
-     * packBlocks(hours, baseSize)} (present when hours doesn't divide evenly
-     * by baseSize) is left untouched by merging - it's already smaller than
-     * a full baseSize block, so folding it into a merge wouldn't preserve
-     * the "prefer small blocks" intent as cleanly as merging two full-size
-     * blocks does.
-     *
-     * <p>Searches merge counts from 0 (the naive shape - already known to
-     * have failed the caller's own margin check) up to the maximum possible
-     * (every full-size block paired up), preferring the fewest merges that
-     * reaches {@code marginDays}, falling back to the fewest merges that's
-     * at least bare-feasible (margin 0) if none reaches margin.
-     *
-     * <p>Deliberately caps out at double {@code baseSize} by design: unlike
-     * {@link #tryAvailabilityAwareShape}, which escalates uniformly up to
-     * the 4h structural maximum, this never considers a block larger than
-     * {@code baseSize * 2}. Returns null immediately - without trying
-     * anything - when {@code baseSize * 2} would already exceed
-     * {@link #MAX_BLOCK_LENGTH} (there's nowhere to merge to at all, e.g.
-     * baseSize 3 or 4), or when even every full-size block merged isn't
-     * bare-feasible; the caller should fall back to the untouched naive
-     * shape in either case, exactly as when {@link #tryAvailabilityAwareShape}
-     * exhausts its own size range.
-     *
-     * @return the shape, preferring one with margin but settling for bare
-     *         feasibility if margin is unreachable at any merge count; null
-     *         if merging isn't structurally possible at all, or even every
-     *         full-size block merged isn't bare-feasible
+     * merged), whenever the smaller merge is enough. See
+     * {@link CalendarPacking#tryMinimalUpgradeShape} for the full mechanics
+     * (doubling as the only hours-preserving upgrade, the deliberate hard
+     * cap at double the base size, remainder-block handling).
      */
     static List<Integer> tryMinimalUpgradeShape(int hours, int baseSize, int maxBlocksPerDay, int availableDays,
             int marginDays) {
-        int upgradeSize = baseSize * 2;
-        if (upgradeSize > MAX_BLOCK_LENGTH) {
-            return null;
-        }
-        int fullBlocks = hours / baseSize;
-        int remainder = hours % baseSize;
-        int maxMerges = fullBlocks / 2;
-        List<Integer> bareFeasible = null;
-        for (int merges = 0; merges <= maxMerges; merges++) {
-            int blockCount = (fullBlocks - merges) + (remainder > 0 ? 1 : 0);
-            if (fitsWithinDayCap(blockCount, maxBlocksPerDay, availableDays, marginDays)) {
-                return buildMixedShape(baseSize, upgradeSize, merges, fullBlocks - 2 * merges, remainder);
-            }
-            if (bareFeasible == null && fitsWithinDayCap(blockCount, maxBlocksPerDay, availableDays, 0)) {
-                bareFeasible = buildMixedShape(baseSize, upgradeSize, merges, fullBlocks - 2 * merges, remainder);
-            }
-        }
-        return bareFeasible;
-    }
-
-    private static List<Integer> buildMixedShape(int baseSize, int upgradeSize, int upgradeCount, int baseCount,
-            int remainder) {
-        List<Integer> shape = new ArrayList<>(upgradeCount + baseCount + (remainder > 0 ? 1 : 0));
-        for (int i = 0; i < upgradeCount; i++) {
-            shape.add(upgradeSize);
-        }
-        for (int i = 0; i < baseCount; i++) {
-            shape.add(baseSize);
-        }
-        if (remainder > 0) {
-            shape.add(remainder);
-        }
-        return shape;
+        return CalendarPacking.tryMinimalUpgradeShape(hours, baseSize, maxBlocksPerDay, availableDays, marginDays);
     }
 
     /**
@@ -284,62 +202,24 @@ final class AvailabilityAwareBlockShaper {
      * from (and mutating) an already-built, externally-owned windows map -
      * the caller may reuse the same map across several calls for pairings
      * that share one teacher, so each subsequent call sees exactly what
-     * earlier ones already claimed.
-     *
-     * <p>Transactional: {@code windows} is only mutated when every block
-     * length places successfully. A failure partway through leaves it
-     * completely untouched, not partially consumed - essential once a map
-     * can outlive a single call, since a caller sharing it across several
-     * pairings must be able to trust a failed attempt didn't silently eat
-     * into what the next pairing sees.
+     * earlier ones already claimed. Transactional - see
+     * {@link CalendarPacking#assignWindows}. Converts between this class's
+     * {@code int[]{day, startHour}} return shape and {@code CalendarPacking}'s
+     * generic {@link CalendarPacking.Placement} so every existing caller
+     * (and test) keeps working unchanged.
      */
     static List<int[]> assignWindows(List<Integer> blockLengths, int maxBlocksPerDay,
             Map<Integer, List<int[]>> windows) {
-        Map<Integer, List<int[]>> trial = deepCopyWindows(windows);
-        Map<Integer, Integer> blocksPlacedToday = new TreeMap<>();
-        List<int[]> result = new ArrayList<>();
-        for (int length : blockLengths) {
-            int[] placement = placeOne(trial, blocksPlacedToday, maxBlocksPerDay, length);
-            if (placement == null) {
-                return null; // windows untouched
-            }
-            result.add(placement);
+        List<CalendarPacking.Placement<Integer>> placements = CalendarPacking.assignWindows(blockLengths,
+                maxBlocksPerDay, windows);
+        if (placements == null) {
+            return null;
         }
-        windows.clear();
-        windows.putAll(trial);
+        List<int[]> result = new ArrayList<>(placements.size());
+        for (CalendarPacking.Placement<Integer> placement : placements) {
+            result.add(new int[] { placement.day(), placement.startHour() });
+        }
         return result;
-    }
-
-    private static Map<Integer, List<int[]>> deepCopyWindows(Map<Integer, List<int[]>> src) {
-        Map<Integer, List<int[]>> copy = new TreeMap<>();
-        for (Map.Entry<Integer, List<int[]>> entry : src.entrySet()) {
-            List<int[]> windowsCopy = new ArrayList<>();
-            for (int[] w : entry.getValue()) {
-                windowsCopy.add(new int[] { w[0], w[1] });
-            }
-            copy.put(entry.getKey(), windowsCopy);
-        }
-        return copy;
-    }
-
-    private static int[] placeOne(Map<Integer, List<int[]>> windows, Map<Integer, Integer> blocksPlacedToday,
-            int maxBlocksPerDay, int length) {
-        for (Map.Entry<Integer, List<int[]>> dayEntry : windows.entrySet()) {
-            int day = dayEntry.getKey();
-            if (blocksPlacedToday.getOrDefault(day, 0) >= maxBlocksPerDay) {
-                continue;
-            }
-            for (int[] window : dayEntry.getValue()) {
-                if (window[1] >= length) {
-                    int startHour = window[0];
-                    window[0] += length;
-                    window[1] -= length;
-                    blocksPlacedToday.merge(day, 1, Integer::sum);
-                    return new int[] { day, startHour };
-                }
-            }
-        }
-        return null;
     }
 
     /** This teacher's available hours per day, e.g. day 1 -> {7, 8, 9, 11, 12}. */
@@ -372,8 +252,8 @@ final class AvailabilityAwareBlockShaper {
      * exact day/hour), so a brand-new pairing for that teacher reasons
      * against what's actually left rather than their full raw week. Removing
      * an hour from the middle of a contiguous run naturally splits it into
-     * two windows once {@link #contiguousWindows} re-scans what remains, so
-     * no separate window-splitting logic is needed here.
+     * two windows once {@link CalendarPacking#contiguousWindows} re-scans
+     * what remains, so no separate window-splitting logic is needed here.
      *
      * @param consumedRanges each {@code [dayOfWeek, startHour, length]} to
      *                        remove before computing windows; a day this
@@ -393,33 +273,9 @@ final class AvailabilityAwareBlockShaper {
         }
         Map<Integer, List<int[]>> result = new TreeMap<>();
         for (Map.Entry<Integer, SortedSet<Integer>> entry : hours.entrySet()) {
-            result.put(entry.getKey(), contiguousWindows(entry.getValue()));
+            result.put(entry.getKey(), CalendarPacking.contiguousWindows(entry.getValue()));
         }
         return result;
-    }
-
-    private static List<int[]> contiguousWindows(SortedSet<Integer> hours) {
-        List<int[]> windows = new ArrayList<>();
-        Integer start = null;
-        Integer prev = null;
-        for (int h : hours) {
-            if (start == null) {
-                start = h;
-                prev = h;
-                continue;
-            }
-            if (h == prev + 1) {
-                prev = h;
-                continue;
-            }
-            windows.add(new int[] { start, prev - start + 1 });
-            start = h;
-            prev = h;
-        }
-        if (start != null) {
-            windows.add(new int[] { start, prev - start + 1 });
-        }
-        return windows;
     }
 
     static int distinctAvailableDayCount(TeacherEntity teacher) {
@@ -430,19 +286,11 @@ final class AvailabilityAwareBlockShaper {
      * Days that still have at least one window with hours actually left in
      * it - a day whose windows have all been consumed down to zero (by
      * earlier pairings sharing this calendar) no longer counts as available,
-     * exactly as if the teacher had never had that day free at all.
+     * exactly as if the teacher had never had that day free at all. See
+     * {@link CalendarPacking#distinctAvailableDayCount}.
      */
     static int distinctAvailableDayCount(Map<Integer, List<int[]>> windows) {
-        int count = 0;
-        for (List<int[]> dayWindows : windows.values()) {
-            for (int[] w : dayWindows) {
-                if (w[1] > 0) {
-                    count++;
-                    break;
-                }
-            }
-        }
-        return count;
+        return CalendarPacking.distinctAvailableDayCount(windows);
     }
 
     static int largestContiguousWindow(TeacherEntity teacher) {
@@ -450,12 +298,6 @@ final class AvailabilityAwareBlockShaper {
     }
 
     static int largestContiguousWindow(Map<Integer, List<int[]>> windows) {
-        int max = 0;
-        for (List<int[]> dayWindows : windows.values()) {
-            for (int[] w : dayWindows) {
-                max = Math.max(max, w[1]);
-            }
-        }
-        return max;
+        return CalendarPacking.largestContiguousWindow(windows);
     }
 }

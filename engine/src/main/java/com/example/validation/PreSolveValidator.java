@@ -1,5 +1,6 @@
 package com.example.validation;
 
+import com.example.common.CalendarPacking;
 import com.example.common.SchoolCalendarConstants;
 import com.example.domain.BlockScheduleMath;
 import com.example.domain.BlockTimeslot;
@@ -10,11 +11,15 @@ import com.example.domain.Room;
 import com.example.domain.SchoolSchedule;
 import com.example.domain.Teacher;
 
+import java.time.DayOfWeek;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -73,8 +78,9 @@ public final class PreSolveValidator {
      */
     public static ValidationResult validate(SchoolSchedule schedule) {
         List<String> problems = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
         if (schedule == null || schedule.getCourseBlockAssignments() == null) {
-            return new ValidationResult(problems);
+            return new ValidationResult(problems, warnings);
         }
 
         List<CourseBlockAssignment> pinned = new ArrayList<>();
@@ -94,8 +100,9 @@ public final class PreSolveValidator {
         validateRoomFixedCapacity(schedule.getCourseBlockAssignments(), problems);
         validateBlockSpreadCapacity(schedule.getCourseBlockAssignments(), problems);
         validateNonEmptyTimeslotRanges(schedule.getCourseBlockAssignments(), problems);
+        validateSharedTeacherLoad(schedule.getCourseBlockAssignments(), warnings);
 
-        return new ValidationResult(problems);
+        return new ValidationResult(problems, warnings);
     }
 
     /**
@@ -285,6 +292,164 @@ public final class PreSolveValidator {
                         availableDays));
             }
         }
+    }
+
+    /**
+     * ADVISORY (warning, not blocking): when a teacher has 2+ distinct
+     * (group, course) pairings, simulates whether all of their MOVABLE
+     * blocks (already-shaped lengths, decided at generation time) can be
+     * greedily packed into the teacher's actual per-day hour windows -
+     * after subtracting hours already committed to that teacher's PINNED
+     * assignments - without any pairing exceeding its own
+     * {@link BlockScheduleMath#maxBlocksPerDay} cap or the teacher being
+     * double-booked.
+     *
+     * <p>
+     * This is the validation-side mirror of the exact blind spot
+     * {@code BlockGenerationService}'s shape adaptation used to have (fixed
+     * 2026-09-05, see docs/generate-blocks.md's "Option C" and "Effective
+     * calendar" sections): {@link #validateBlockSpreadCapacity} above checks
+     * each (group, course) pair's day requirement against the teacher's FULL
+     * raw day count in isolation, never accounting for what the teacher's
+     * OTHER pairings also need. A teacher shared across many groups for one
+     * course - confirmed live (2026-09-05): 9 groups, comfortable aggregate
+     * hours - can still leave the solver unable to avoid a double-booking,
+     * even though every pairing looks individually fine and the aggregate
+     * hours check ({@link #validateCapacity}) passes too.
+     * </p>
+     * <p>
+     * Deliberately a WARNING, not a blocking problem, unlike every other
+     * check in this validator: this is a GREEDY simulation
+     * (largest-remaining-movable-hours-first, mirroring
+     * {@code BlockGenerationService}'s own bin-packing heuristic), not a
+     * mathematical proof - a greedy failure means "this particular
+     * placement order didn't work," not "no arrangement can ever work."
+     * Flagging it as a hard problem would risk blocking solves that are
+     * actually perfectly feasible via a smarter placement order than this
+     * simulation tried - exactly the "advisory rather than provably fatal"
+     * case {@link ValidationResult}'s own javadoc reserves {@code warnings}
+     * for.
+     * </p>
+     */
+    private static void validateSharedTeacherLoad(List<CourseBlockAssignment> assignments, List<String> warnings) {
+        // Group by (group, course) first, exactly like validateBlockSpreadCapacity, so only
+        // pairings unambiguously taught by one teacher are ever considered.
+        Map<List<Object>, List<CourseBlockAssignment>> byGroupAndCourse = new LinkedHashMap<>();
+        for (CourseBlockAssignment a : assignments) {
+            if (a.getGroup() == null || a.getCourse() == null) {
+                continue;
+            }
+            byGroupAndCourse.computeIfAbsent(List.of(a.getGroup(), a.getCourse()), k -> new ArrayList<>()).add(a);
+        }
+
+        Map<Teacher, List<Map.Entry<List<Object>, List<CourseBlockAssignment>>>> pairingsByTeacher =
+                new LinkedHashMap<>();
+        for (Map.Entry<List<Object>, List<CourseBlockAssignment>> entry : byGroupAndCourse.entrySet()) {
+            List<CourseBlockAssignment> blocks = entry.getValue();
+            Teacher teacher = blocks.get(0).getTeacher();
+            if (teacher == null || blocks.stream().anyMatch(a -> !teacher.equals(a.getTeacher()))) {
+                continue; // ambiguous/no single teacher - skip, same reasoning as validateBlockSpreadCapacity
+            }
+            pairingsByTeacher.computeIfAbsent(teacher, k -> new ArrayList<>()).add(entry);
+        }
+
+        for (Map.Entry<Teacher, List<Map.Entry<List<Object>, List<CourseBlockAssignment>>>> teacherEntry
+                : pairingsByTeacher.entrySet()) {
+            Teacher teacher = teacherEntry.getKey();
+            List<Map.Entry<List<Object>, List<CourseBlockAssignment>>> pairings = teacherEntry.getValue();
+            if (pairings.size() < 2) {
+                continue; // single pairing: nothing to share; validateBlockSpreadCapacity already covers this exactly
+            }
+
+            // Every one of this teacher's PINNED hours, across every pairing, is a fixed fact -
+            // subtract them from the calendar before simulating anything movable.
+            List<CourseBlockAssignment> allTeacherBlocks = new ArrayList<>();
+            for (Map.Entry<List<Object>, List<CourseBlockAssignment>> pairing : pairings) {
+                allTeacherBlocks.addAll(pairing.getValue());
+            }
+            Map<DayOfWeek, List<int[]>> windows = windowsMinusPinned(teacher, allTeacherBlocks);
+
+            List<Map.Entry<List<Object>, List<CourseBlockAssignment>>> ordered = pairings.stream()
+                    .sorted(Comparator.comparingInt(
+                            (Map.Entry<List<Object>, List<CourseBlockAssignment>> e) -> movableHours(e.getValue()))
+                            .reversed())
+                    .toList();
+
+            for (Map.Entry<List<Object>, List<CourseBlockAssignment>> pairing : ordered) {
+                List<CourseBlockAssignment> movable = pairing.getValue().stream()
+                        .filter(a -> !a.isPinned())
+                        .toList();
+                if (movable.isEmpty()) {
+                    continue; // this pairing is already fully pinned - no placement decision left
+                }
+                Group group = (Group) pairing.getKey().get(0);
+                Course course = (Course) pairing.getKey().get(1);
+                int maxPerDay = BlockScheduleMath.maxBlocksPerDay(course);
+                List<Integer> lengths = movable.stream().map(CourseBlockAssignment::getBlockLength).toList();
+
+                if (!greedyAssign(windows, maxPerDay, lengths)) {
+                    warnings.add(String.format(
+                            "Teacher '%s' teaches %d different (group, course) pairings sharing this calendar; "
+                                    + "group '%s' course '%s' (%d movable block(s)) couldn't be greedily fit in "
+                                    + "once the other pairings' likely hours are accounted for. Each pairing looks "
+                                    + "fine checked alone, but placing all of them together may not be - the "
+                                    + "solver could end up leaving a conflict here. This is a heuristic warning, "
+                                    + "not a proof: a smarter placement order might still succeed.",
+                            teacher.getId(), pairings.size(), group.getId(), course.getName(), movable.size()));
+                }
+            }
+        }
+    }
+
+    /** Sum of block lengths across this pairing's MOVABLE (non-pinned) blocks only. */
+    private static int movableHours(List<CourseBlockAssignment> pairingBlocks) {
+        return pairingBlocks.stream().filter(a -> !a.isPinned()).mapToInt(CourseBlockAssignment::getBlockLength).sum();
+    }
+
+    /**
+     * This teacher's contiguous available hour-windows per day, with any
+     * hours already claimed by one of {@code teacherBlocks}' PINNED entries
+     * removed first - the engine-side mirror of the web module's
+     * {@code AvailabilityAwareBlockShaper.windowsByDay(TeacherEntity, List)}.
+     */
+    private static Map<DayOfWeek, List<int[]>> windowsMinusPinned(Teacher teacher,
+            List<CourseBlockAssignment> teacherBlocks) {
+        Map<DayOfWeek, SortedSet<Integer>> hours = new TreeMap<>();
+        for (Map.Entry<DayOfWeek, Set<Integer>> e : teacher.getAvailabilityPerDay().entrySet()) {
+            hours.put(e.getKey(), new TreeSet<>(e.getValue()));
+        }
+        for (CourseBlockAssignment a : teacherBlocks) {
+            if (!a.isPinned() || a.getTimeslot() == null) {
+                continue;
+            }
+            BlockTimeslot slot = a.getTimeslot();
+            SortedSet<Integer> dayHours = hours.get(slot.getDayOfWeek());
+            if (dayHours == null) {
+                continue;
+            }
+            for (int h = slot.getStartHour(); h < slot.getStartHour() + slot.getLengthHours(); h++) {
+                dayHours.remove(h);
+            }
+        }
+        Map<DayOfWeek, List<int[]>> windows = new TreeMap<>();
+        for (Map.Entry<DayOfWeek, SortedSet<Integer>> e : hours.entrySet()) {
+            windows.put(e.getKey(), CalendarPacking.contiguousWindows(e.getValue()));
+        }
+        return windows;
+    }
+
+    /**
+     * Greedily places each length into {@code windows}, respecting
+     * maxPerDay, mutating windows only on full success (transactional - a
+     * failed attempt must leave the calendar untouched for whichever
+     * pairing is tried next). Delegates to {@link CalendarPacking#assignWindows}
+     * (shared with the web module's {@code AvailabilityAwareBlockShaper},
+     * which needs the identical reasoning over its own {@code Integer}-keyed
+     * calendar) and discards the actual placements - this check only needs
+     * to know whether every length placed successfully, never where.
+     */
+    private static boolean greedyAssign(Map<DayOfWeek, List<int[]>> windows, int maxPerDay, List<Integer> lengths) {
+        return CalendarPacking.assignWindows(lengths, maxPerDay, windows) != null;
     }
 
     /**
