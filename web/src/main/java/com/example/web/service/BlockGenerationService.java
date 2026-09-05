@@ -498,17 +498,24 @@ public class BlockGenerationService {
      * leftover hours that don't divide evenly.
      *
      * When a teacher is already resolved, that naive shape is checked against
-     * their actual availability first: if it would need more distinct days
-     * than they have (the exact "days, not hours" problem
-     * PreSolveValidator.validateBlockSpreadCapacity otherwise only catches
-     * after generation), AvailabilityAwareBlockShaper is asked for a shape
-     * (fewer, longer blocks) that does fit, without ever pinning a specific
+     * their actual availability first: if it wouldn't leave at least
+     * {@link AvailabilityAwareBlockShaper#DEFAULT_MARGIN_DAYS} spare distinct
+     * days beyond the minimum needed (a shape that's only just barely
+     * possible leaves the solver zero room to absorb any other scheduling
+     * pressure that day - confirmed live 2026-09-05: two pairs generated with
+     * exactly zero slack both went on to violate maxBlocksPerDay once
+     * solved), AvailabilityAwareBlockShaper is asked for a shape (fewer,
+     * longer blocks) that does have margin, without ever pinning a specific
      * day - the solver still freely places each block among the teacher's
-     * available days, exactly as for any other generated block. Falls back
-     * to the naive shape when there's no teacher yet, no availability data to
-     * reason from, or no size up to the 4h structural max makes it fit - a
-     * genuinely infeasible pairing PreSolveValidator will still report,
-     * exactly as it does today.
+     * available days, exactly as for any other generated block. This is a
+     * probabilistic hedge, not a guarantee: it lowers how often the solver
+     * gets squeezed into a violation, it doesn't prove it can't happen (a
+     * third pair that night had a full spare day and still got violated).
+     * Falls back to the naive shape when there's no teacher yet or no
+     * availability data to reason from; falls back to a merely bare-feasible
+     * (zero-margin) shape rather than the untouched naive one when margin
+     * isn't reachable at any block size - a genuinely infeasible pairing
+     * PreSolveValidator will still report, exactly as it does today.
      */
     private List<Integer> decomposeHours(int hours, String component, TeacherEntity teacher) {
         ComponentBlockRuleEntity rule = componentBlockRuleRepository.findById(component).orElse(null);
@@ -521,12 +528,12 @@ public class BlockGenerationService {
         int availableDays = AvailabilityAwareBlockShaper.distinctAvailableDayCount(teacher);
         int maxBlocksPerDay = rule != null && rule.getMaxBlocksPerDay() != null ? rule.getMaxBlocksPerDay()
                 : DEFAULT_MAX_BLOCKS_PER_DAY;
-        if (availableDays == 0
-                || AvailabilityAwareBlockShaper.fitsWithinDayCap(naive.size(), maxBlocksPerDay, availableDays)) {
+        if (availableDays == 0 || AvailabilityAwareBlockShaper.fitsWithinDayCap(naive.size(), maxBlocksPerDay,
+                availableDays, AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS)) {
             return naive;
         }
         List<Integer> adapted = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(hours, preferredSize,
-                maxBlocksPerDay, teacher);
+                maxBlocksPerDay, teacher, AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS);
         return adapted != null ? adapted : naive;
     }
 

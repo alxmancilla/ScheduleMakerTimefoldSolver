@@ -41,19 +41,27 @@ public class AvailabilityAwareBlockShaperTest {
     @Test
     public void fitsWithinDayCap_exactFit() {
         // 4 blocks at 2/day needs 2 days
-        org.junit.Assert.assertTrue(AvailabilityAwareBlockShaper.fitsWithinDayCap(4, 2, 2));
+        org.junit.Assert.assertTrue(AvailabilityAwareBlockShaper.fitsWithinDayCap(4, 2, 2, 0));
     }
 
     @Test
     public void fitsWithinDayCap_needsCeiling() {
         // 5 blocks at 2/day needs 3 days, not 2
-        org.junit.Assert.assertFalse(AvailabilityAwareBlockShaper.fitsWithinDayCap(5, 2, 2));
-        org.junit.Assert.assertTrue(AvailabilityAwareBlockShaper.fitsWithinDayCap(5, 2, 3));
+        org.junit.Assert.assertFalse(AvailabilityAwareBlockShaper.fitsWithinDayCap(5, 2, 2, 0));
+        org.junit.Assert.assertTrue(AvailabilityAwareBlockShaper.fitsWithinDayCap(5, 2, 3, 0));
     }
 
     @Test
     public void fitsWithinDayCap_zeroOrNegativeCap_isFalse() {
-        org.junit.Assert.assertFalse(AvailabilityAwareBlockShaper.fitsWithinDayCap(1, 0, 5));
+        org.junit.Assert.assertFalse(AvailabilityAwareBlockShaper.fitsWithinDayCap(1, 0, 5, 0));
+    }
+
+    @Test
+    public void fitsWithinDayCap_margin_requiresSpareDaysBeyondTheMinimum() {
+        // 2 blocks at 1/day needs exactly 2 days.
+        org.junit.Assert.assertTrue(AvailabilityAwareBlockShaper.fitsWithinDayCap(2, 1, 2, 0)); // bare fit
+        org.junit.Assert.assertFalse(AvailabilityAwareBlockShaper.fitsWithinDayCap(2, 1, 2, 1)); // no spare day
+        org.junit.Assert.assertTrue(AvailabilityAwareBlockShaper.fitsWithinDayCap(2, 1, 3, 1)); // one spare day
     }
 
     // ---- distinctAvailableDayCount / largestContiguousWindow ----
@@ -83,15 +91,46 @@ public class AvailabilityAwareBlockShaperTest {
     @Test
     public void tryAvailabilityAwareShape_findsLongerShapeThatFits() {
         // 5 hours, Core-style preferredSize=1, maxBlocksPerDay=1 -> naive needs 5 days.
-        // Teacher only has 2 days, each with a 4h contiguous window.
+        // Teacher only has 2 days, each with a 4h contiguous window - no spare day
+        // exists at any size, so margin 0 (bare feasibility only) is used here.
         TeacherEntity teacher = teacherWithHours(new int[][] {
                 { 1, 7 }, { 1, 8 }, { 1, 9 }, { 1, 10 },
                 { 2, 7 }, { 2, 8 }, { 2, 9 }, { 2, 10 },
         });
 
-        List<Integer> shape = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher);
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher, 0);
 
         // Size 3 is the first that fits: packBlocks(5,3) = [3,2], 2 blocks at 1/day = 2 days.
+        assertEquals(List.of(3, 2), shape);
+    }
+
+    @Test
+    public void tryAvailabilityAwareShape_margin_prefersASizeWithASpareDay() {
+        // Same 5 hours/preferredSize 1/maxPerDay 1, but this teacher has a 3rd
+        // available day - size 3 ([3,2], 2 days) now has one day to spare out of 3.
+        TeacherEntity teacher = teacherWithHours(new int[][] {
+                { 1, 7 }, { 1, 8 }, { 1, 9 }, { 1, 10 },
+                { 2, 7 }, { 2, 8 }, { 2, 9 }, { 2, 10 },
+                { 3, 7 }, { 3, 8 }, { 3, 9 }, { 3, 10 },
+        });
+
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher, 1);
+
+        assertEquals(List.of(3, 2), shape);
+    }
+
+    @Test
+    public void tryAvailabilityAwareShape_marginUnreachable_gracefullyFallsBackToBareFeasible() {
+        // Same as the no-spare-day case above, but asked for margin 1 instead of 0 -
+        // no size can ever free up a 3rd day this teacher doesn't have, so this
+        // should settle for the same bare-feasible [3,2] rather than returning null.
+        TeacherEntity teacher = teacherWithHours(new int[][] {
+                { 1, 7 }, { 1, 8 }, { 1, 9 }, { 1, 10 },
+                { 2, 7 }, { 2, 8 }, { 2, 9 }, { 2, 10 },
+        });
+
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher, 1);
+
         assertEquals(List.of(3, 2), shape);
     }
 
@@ -99,20 +138,20 @@ public class AvailabilityAwareBlockShaperTest {
     public void tryAvailabilityAwareShape_noSizeFits_returnsNull() {
         // Teacher only ever available 1 day, 1 hour - nothing can make this fit.
         TeacherEntity teacher = teacherWithHours(new int[][] { { 1, 7 } });
-        assertNull(AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher));
+        assertNull(AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher, 0));
     }
 
     @Test
     public void tryAvailabilityAwareShape_windowSmallerThanPreferredSize_returnsNull() {
         // Largest window (1h) is below the preferred size (2h) - nothing to even try.
         TeacherEntity teacher = teacherWithHours(new int[][] { { 1, 7 }, { 2, 8 }, { 3, 9 } });
-        assertNull(AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(6, 2, 1, teacher));
+        assertNull(AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(6, 2, 1, teacher, 0));
     }
 
     @Test
     public void tryAvailabilityAwareShape_noAvailabilityAtAll_returnsNull() {
         TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
-        assertNull(AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher));
+        assertNull(AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(5, 1, 1, teacher, 0));
     }
 
     // ---- assignWindows ----

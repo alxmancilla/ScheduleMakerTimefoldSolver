@@ -52,6 +52,17 @@ final class AvailabilityAwareBlockShaper {
     /** DB check_block_length constraint: a block is 1-4 hours. */
     static final int MAX_BLOCK_LENGTH = 4;
 
+    /**
+     * How many spare distinct days a shape should leave beyond the bare
+     * minimum needed, when a size achieving that margin exists at all. A
+     * teacher with exactly enough days and not one more has zero room for
+     * any other scheduling pressure that day (the group already busy, a room
+     * conflict) to be absorbed - the solver has to fail somewhere. This is a
+     * probabilistic hedge, not a guarantee: it lowers how often that happens,
+     * it doesn't prove it can't.
+     */
+    static final int DEFAULT_MARGIN_DAYS = 1;
+
     private AvailabilityAwareBlockShaper() {
     }
 
@@ -77,42 +88,60 @@ final class AvailabilityAwareBlockShaper {
         return lengths;
     }
 
-    /** True if this many blocks, capped at maxBlocksPerDay/day, fit within availableDays. */
-    static boolean fitsWithinDayCap(int blockCount, int maxBlocksPerDay, int availableDays) {
+    /**
+     * True if this many blocks, capped at maxBlocksPerDay/day, fit within
+     * availableDays with at least marginDays to spare. Pass 0 for the bare
+     * "is this even possible at all" check; a positive margin additionally
+     * requires headroom beyond the minimum, so the solver isn't left with
+     * zero room to absorb any other scheduling pressure that day.
+     */
+    static boolean fitsWithinDayCap(int blockCount, int maxBlocksPerDay, int availableDays, int marginDays) {
         if (maxBlocksPerDay <= 0) {
             return false;
         }
         int neededDays = (blockCount + maxBlocksPerDay - 1) / maxBlocksPerDay; // ceil division
-        return neededDays <= availableDays;
+        return neededDays + marginDays <= availableDays;
     }
 
     /**
      * Tries block sizes from {@code preferredBlockSize} up to
      * min(MAX_BLOCK_LENGTH, this teacher's largest single contiguous
      * available window - a block longer than that could never be placed for
-     * them regardless of day count), returning the packing for the first
-     * (smallest) size whose resulting block count fits within
-     * maxBlocksPerDay across the teacher's distinct available days.
+     * them regardless of day count). Prefers the first (smallest) size whose
+     * resulting block count fits within maxBlocksPerDay across the teacher's
+     * distinct available days <em>with marginDays to spare</em> - a shape
+     * that's only just barely possible leaves the solver no room to absorb
+     * any other scheduling pressure that day. When no size reaches that
+     * margin, falls back to the first size that's at least bare-feasible
+     * (margin 0) rather than giving up outright - a course already needing
+     * every available day has nowhere left to find margin from, but "just
+     * feasible" is still strictly better than the untouched naive shape.
      *
-     * @return the adapted shape, or null if no size in that range fits - the
+     * @return the adapted shape, preferring one with margin but settling for
+     *         bare feasibility if margin is unreachable at any size; null
+     *         only if no size in that range is even bare-feasible - the
      *         caller should fall back to the teacher-blind shape in that
      *         case (a genuinely infeasible pairing PreSolveValidator will
      *         still report, exactly as it does today)
      */
     static List<Integer> tryAvailabilityAwareShape(int hours, int preferredBlockSize, int maxBlocksPerDay,
-            TeacherEntity teacher) {
+            TeacherEntity teacher, int marginDays) {
         int availableDays = distinctAvailableDayCount(teacher);
         if (availableDays == 0) {
             return null;
         }
         int upperBound = Math.min(MAX_BLOCK_LENGTH, largestContiguousWindow(teacher));
+        List<Integer> bareFeasible = null;
         for (int blockSize = preferredBlockSize; blockSize <= upperBound; blockSize++) {
             List<Integer> candidate = packBlocks(hours, blockSize);
-            if (fitsWithinDayCap(candidate.size(), maxBlocksPerDay, availableDays)) {
+            if (fitsWithinDayCap(candidate.size(), maxBlocksPerDay, availableDays, marginDays)) {
                 return candidate;
             }
+            if (bareFeasible == null && fitsWithinDayCap(candidate.size(), maxBlocksPerDay, availableDays, 0)) {
+                bareFeasible = candidate;
+            }
         }
-        return null;
+        return bareFeasible;
     }
 
     /**
