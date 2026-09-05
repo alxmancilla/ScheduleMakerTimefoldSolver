@@ -10,9 +10,11 @@ import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.entity.BlockTimeslotEntity;
+import com.example.web.entity.SemesterHourLimitEntity;
 import com.example.web.repository.BlockTimeslotRepository;
 import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
+import com.example.web.repository.SemesterHourLimitRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.CourseRoomRequirementRepository;
@@ -63,6 +65,8 @@ public class BlockGenerationServiceTest {
     private GroupRoomRangeRepository groupRoomRangeRepository;
     @Mock
     private BlockTimeslotRepository blockTimeslotRepository;
+    @Mock
+    private SemesterHourLimitRepository semesterHourLimitRepository;
 
     @InjectMocks
     private BlockGenerationService service;
@@ -82,6 +86,8 @@ public class BlockGenerationServiceTest {
         when(groupRoomRangeRepository.findByGroupIdAndRoomType(anyString(), anyString())).thenReturn(List.of());
         when(assignmentRepository.findByTeacherId(anyString())).thenReturn(List.of());
         when(assignmentRepository.findByGroupId(anyString())).thenReturn(List.of());
+        when(assignmentRepository.findByRoomName(anyString())).thenReturn(List.of());
+        when(semesterHourLimitRepository.findById(org.mockito.ArgumentMatchers.anyInt())).thenReturn(Optional.empty());
     }
 
     private CourseEntity course(String id, String name, int hours, String designation, String roomReq) {
@@ -686,6 +692,96 @@ public class BlockGenerationServiceTest {
         verify(assignmentRepository, times(1)).save(captor.capture()); // no second (pinning) save
         assertEquals(Boolean.FALSE, captor.getValue().getPinned());
         assertEquals(null, captor.getValue().getBlockTimeslotId());
+    }
+
+    @Test
+    public void exclusiveTeacherButViolatesSemesterHourLimit_leftUnpinnedWithWarning() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Circuits").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        CourseEntity course = course("C1", "Circuits", 2, "TEM", "estándar");
+        course.setSemester(5);
+        when(courseRepository.findByName("Circuits")).thenReturn(Optional.of(course));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+        // Semester 5 has a HARD limit of 14:00; the computed slot (13-15) ends after it.
+        when(semesterHourLimitRepository.findById(5))
+                .thenReturn(Optional.of(new SemesterHourLimitEntity(5, 14, "HARD")));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        teacher.addAvailability(1, 13);
+        teacher.addAvailability(1, 14);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        BlockTimeslotEntity timeslot = new BlockTimeslotEntity();
+        timeslot.setId("TS_MON_13_2");
+        timeslot.setDayOfWeek(1);
+        timeslot.setStartHour(13);
+        timeslot.setLengthHours(2);
+        when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 13, 2))
+                .thenReturn(Optional.of(timeslot));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("HARD hour limit"));
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Boolean.FALSE, captor.getValue().getPinned());
+    }
+
+    @Test
+    public void exclusiveTeacherButRoomAlreadyPinnedElsewhere_leftUnpinnedWithWarning() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        BlockTimeslotEntity candidate = new BlockTimeslotEntity();
+        candidate.setId("TS_MON_7_2");
+        candidate.setDayOfWeek(1);
+        candidate.setStartHour(7);
+        candidate.setLengthHours(2);
+        when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 7, 2))
+                .thenReturn(Optional.of(candidate));
+
+        // A completely unrelated group already has ROOM1 pinned Monday 7-9 for a
+        // different course/teacher - this group's own pinned-conflict check
+        // wouldn't catch this, since it only looks at G1's own pinned data.
+        CourseBlockAssignmentEntity otherGroupsPinned = new CourseBlockAssignmentEntity();
+        otherGroupsPinned.setId("OTHER_G_0");
+        otherGroupsPinned.setPinned(true);
+        otherGroupsPinned.setRoomName("ROOM1");
+        otherGroupsPinned.setBlockTimeslotId("TS_EXISTING");
+        when(assignmentRepository.findByRoomName("ROOM1")).thenReturn(List.of(otherGroupsPinned));
+        BlockTimeslotEntity existingSlot = new BlockTimeslotEntity();
+        existingSlot.setId("TS_EXISTING");
+        existingSlot.setDayOfWeek(1);
+        existingSlot.setStartHour(7);
+        existingSlot.setLengthHours(2);
+        when(blockTimeslotRepository.findById("TS_EXISTING")).thenReturn(Optional.of(existingSlot));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("already pinned to another assignment"));
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Boolean.FALSE, captor.getValue().getPinned());
     }
 
     @Test

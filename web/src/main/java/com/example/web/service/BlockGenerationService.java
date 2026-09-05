@@ -18,7 +18,9 @@ import com.example.web.repository.CourseRepository;
 import com.example.web.entity.GroupRoomRangeEntity;
 import com.example.web.repository.CourseRoomRequirementRepository;
 import com.example.web.repository.GroupRoomRangeRepository;
+import com.example.web.entity.SemesterHourLimitEntity;
 import com.example.web.repository.RoomRepository;
+import com.example.web.repository.SemesterHourLimitRepository;
 import com.example.web.repository.StudentGroupRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.common.RoomTypeCompatibility;
@@ -124,6 +126,8 @@ public class BlockGenerationService {
     private GroupRoomRangeRepository groupRoomRangeRepository;
     @Autowired
     private BlockTimeslotRepository blockTimeslotRepository;
+    @Autowired
+    private SemesterHourLimitRepository semesterHourLimitRepository;
 
     @Transactional
     public GenerationResult generateBlocks() {
@@ -243,11 +247,17 @@ public class BlockGenerationService {
      * left for the solver to make. Greedily assigns each block a concrete
      * timeslot from the teacher's actual contiguous availability
      * (AvailabilityAwareBlockShaper.assignWindows) and pins it, but only when
-     * every block resolves a matching BlockTimeslot, a single deterministic
-     * room (already computed by saveBlock via defaultRoomFor), and doesn't
-     * collide with anything this group already has pinned elsewhere -
-     * all-or-nothing, since a partial pin here would mean an assumption was
-     * wrong, not something to patch over block by block.
+     * every block also resolves a matching BlockTimeslot, a single
+     * deterministic room (already computed by saveBlock via defaultRoomFor),
+     * a HARD semester_hour_limit isn't violated, and it doesn't collide with
+     * anything already pinned - this group's own pinned data, or any other
+     * assignment (any group) already pinned to the same room - all-or-nothing,
+     * since a partial pin here would mean an assumption was wrong, not
+     * something to patch over block by block. These are, deliberately, the
+     * same facts PreSolveValidator's pinned-data-integrity checks re-verify
+     * for any pinned row: since a pin skips the solver's own constraint
+     * checking entirely, this is the only thing standing between a pin and a
+     * silent, permanent violation.
      */
     private void tryPinExclusiveTeacherBlocks(StudentGroupEntity group, CourseEntity course, TeacherEntity teacher,
             List<CourseBlockAssignmentEntity> blocks, List<String> warnings) {
@@ -280,9 +290,20 @@ public class BlockGenerationService {
                         + "schedule is otherwise fully determined, but no single room could be resolved; left unpinned.");
                 return;
             }
+            if (violatesSemesterHourLimit(course, timeslot)) {
+                warnings.add(block.getId() + ": the computed slot ends after semester " + course.getSemester()
+                        + "'s HARD hour limit; left unpinned - pinned rows aren't re-checked against this limit by "
+                        + "the solver, so a pin here would be a silent, permanent violation.");
+                return;
+            }
             if (overlapsGroupsPinnedData(group, timeslot)) {
                 warnings.add(block.getId() + ": the computed slot conflicts with '" + group.getId()
                         + "'s existing pinned data; left unpinned.");
+                return;
+            }
+            if (overlapsAnyPinnedRoomBooking(block.getRoomName(), timeslot)) {
+                warnings.add(block.getId() + ": room '" + block.getRoomName()
+                        + "' is already pinned to another assignment at the computed slot; left unpinned.");
                 return;
             }
             resolvedTimeslots.add(timeslot);
@@ -294,6 +315,39 @@ public class BlockGenerationService {
             block.setPinned(true);
             assignmentRepository.save(block);
         }
+    }
+
+    /**
+     * True when this course has a HARD-severity semester_hour_limit configured
+     * for its semester and candidate ends after it - mirrors
+     * BlockScheduleMath.violatesHardSemesterHourLimit() (engine module, not
+     * reusable here directly since web doesn't depend on engine) exactly,
+     * since this is the one hard constraint PreSolveValidator checks for
+     * pinned rows that a freshly-computed pin isn't otherwise guaranteed to
+     * satisfy - unlike teacher availability or block-length-matches-timeslot,
+     * nothing else about how this slot was computed rules it out.
+     */
+    private boolean violatesSemesterHourLimit(CourseEntity course, BlockTimeslotEntity candidate) {
+        SemesterHourLimitEntity limit = semesterHourLimitRepository.findById(course.getSemester()).orElse(null);
+        if (limit == null || !"HARD".equals(limit.getSeverity())) {
+            return false;
+        }
+        return candidate.getStartHour() + candidate.getLengthHours() > limit.getLatestEndHour();
+    }
+
+    /** True if candidate's room is already pinned to a different assignment at an overlapping time, anywhere. */
+    private boolean overlapsAnyPinnedRoomBooking(String roomName, BlockTimeslotEntity candidate) {
+        for (CourseBlockAssignmentEntity existing : assignmentRepository.findByRoomName(roomName)) {
+            if (!Boolean.TRUE.equals(existing.getPinned()) || existing.getBlockTimeslotId() == null) {
+                continue;
+            }
+            BlockTimeslotEntity existingSlot = blockTimeslotRepository.findById(existing.getBlockTimeslotId())
+                    .orElse(null);
+            if (existingSlot != null && overlaps(candidate, existingSlot)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** True if candidate overlaps any timeslot this group already has pinned. */
