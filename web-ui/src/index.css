@@ -355,7 +355,15 @@ table tr:hover {
   margin-bottom: 15px;
 }
 
-.form-group label {
+/*
+ * .form-group-label is for a heading over a GROUP of controls (e.g. the
+ * teacher availability day x hour grid), where there's no single input for a
+ * <label> to point at - those use role="group" + aria-labelledby on the
+ * container instead. Styled identically to a real field label so the two are
+ * visually indistinguishable.
+ */
+.form-group label,
+.form-group .form-group-label {
   display: block;
   margin-bottom: 5px;
   font-weight: 500;
@@ -377,6 +385,52 @@ table tr:hover {
 .form-group textarea:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+/*
+ * Keyboard focus must stay visible (WCAG 2.4.7). The rule above deliberately
+ * drops the native outline in favour of a border-color change, which is fine
+ * as a mouse-click cue but is NOT a sufficient focus indicator on its own -
+ * it's a ~1px color shift that can fall under the 3:1 non-text contrast bar
+ * (WCAG 1.4.11) and disappears entirely for anyone who can't distinguish the
+ * two border colors. :focus-visible re-adds a real ring for keyboard/AT
+ * users only, so mouse users still don't get a ring they didn't ask for.
+ */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * Must repeat the .form-group scope explicitly: the outline:none rule above
+ * is (0,2,1) specificity, which beats the plain `input:focus-visible` (0,1,1)
+ * selector above and would otherwise suppress the ring on exactly the forms
+ * this is meant to fix. Same specificity as that rule, declared later, so it
+ * wins on source order.
+ */
+.form-group input:focus-visible,
+.form-group select:focus-visible,
+.form-group textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * On the dark header the primary blue ring only clears ~3.4:1 against the
+ * navy background; white is unambiguous there.
+ */
+.header a:focus-visible,
+.header button:focus-visible,
+.nav-toggle:focus-visible,
+.nav-dropdown-toggle:focus-visible {
+  outline-color: var(--color-surface);
 }
 
 .loading {
@@ -545,5 +599,11 @@ table tr:hover {
 .search-box input:focus {
   outline: none;
   border-color: var(--color-primary);
+}
+
+/* Same reasoning as the .form-group focus-visible rule above. */
+.search-box input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 

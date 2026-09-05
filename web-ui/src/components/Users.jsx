@@ -183,10 +183,10 @@ function Users() {
           <h3>{editingUser ? `${t('users.editUserPrefix')}${editingUser.username}` : t('users.newUser')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>{t('users.fields.username')}</label>
+              <label htmlFor="user-username">{t('users.fields.username')}</label>
               <input
                 type="text"
-                name="username"
+                id="user-username" name="username"
                 value={form.username}
                 onChange={handleField}
                 required
@@ -196,10 +196,10 @@ function Users() {
             </div>
             {!editingUser && (
               <div className="form-group">
-                <label>{t('users.fields.password')}</label>
+                <label htmlFor="user-password">{t('users.fields.password')}</label>
                 <input
                   type="password"
-                  name="password"
+                  id="user-password" name="password"
                   value={form.password}
                   onChange={handleField}
                   required
@@ -209,8 +209,8 @@ function Users() {
               </div>
             )}
             <div className="form-group">
-              <label>{t('users.fields.role')}</label>
-              <select name="role" value={form.role} onChange={handleField}>
+              <label htmlFor="user-role">{t('users.fields.role')}</label>
+              <select id="user-role" name="role" value={form.role} onChange={handleField}>
                 {ROLES.map((r) => (
                   <option key={r} value={r}>{r}</option>
                 ))}
@@ -219,8 +219,8 @@ function Users() {
             </div>
             {form.role === 'TEACHER' && (
               <div className="form-group">
-                <label>{t('users.fields.linkedTeacher')}</label>
-                <select name="teacherId" value={form.teacherId} onChange={handleField}>
+                <label htmlFor="user-teacher">{t('users.fields.linkedTeacher')}</label>
+                <select id="user-teacher" name="teacherId" value={form.teacherId} onChange={handleField}>
                   <option value="">{t('common.noneOption')}</option>
                   {teachers.map((tch) => (
                     <option key={tch.id} value={tch.id}>{tch.id} - {tch.name} {tch.lastName}</option>
@@ -245,8 +245,8 @@ function Users() {
                   {fieldErrors.enabled && <div className="error" role="alert">{fieldErrors.enabled}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('users.fields.preferredLanguage')}</label>
-                  <select name="preferredLanguage" value={form.preferredLanguage} onChange={handleField}>
+                  <label htmlFor="user-language">{t('users.fields.preferredLanguage')}</label>
+                  <select id="user-language" name="preferredLanguage" value={form.preferredLanguage} onChange={handleField}>
                     {LANGUAGES.map((l) => (
                       <option key={l.value} value={l.value}>{l.label}</option>
                     ))}
@@ -307,8 +307,9 @@ function Users() {
                   <tr>
                     <td colSpan={7}>
                       <form onSubmit={handleSubmitReset} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <label style={{ margin: 0 }}>{t('users.resetPasswordFor', { username: u.username })}</label>
+                        <label style={{ margin: 0 }} htmlFor={`reset-password-${u.username}`}>{t('users.resetPasswordFor', { username: u.username })}</label>
                         <input
+                          id={`reset-password-${u.username}`}
                           type="password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}

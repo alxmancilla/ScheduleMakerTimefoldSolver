@@ -245,6 +245,9 @@ Edit `engine/src/main/java/com/example/solver/SchoolSolverConfig.java`
 **To change pre-solve validation (the blocking checks that run before every solve)**:
 Edit `engine/src/main/java/com/example/validation/PreSolveValidator.java` — see "Pre-Solve Validation" above. Keep new checks to proven facts (not heuristics); an advisory-only check belongs in `ValidationResult`'s `warnings` list instead of `problems`.
 
+**To change block-shaping logic (`common.CalendarPacking` and its two facades)**:
+Note on testing: the existing tests are example-based — a hand-picked input plus a hand-computed expected shape (`[2, 1, 1]`, etc.). That style is fragile here, because the test author derives the expected value with the same mental arithmetic the code implements: two such expected values were written wrong on 2026-09-05 and were caught by running the code, not by the test's design. When adding coverage for a shaping change, prefer an **invariant** that holds for any input over another hand-traced example — a returned shape's elements must sum to exactly `hours`; a successful `assignWindows` must never exceed `maxBlocksPerDay` on a day and must reduce the calendar's remaining capacity by exactly `sum(blockLengths)`; `fitsWithinDayCap` must be monotonic in `marginDays`. Those catch an arithmetic slip without depending on the author's own math being right. Plain JUnit4 with a fixed-seed `Random` loop is enough — no property-testing library needed at this scale.
+
 **To change domain model**:
 - Ensure no-arg constructors remain for Timefold compatibility
 - Update constraint provider if new fields affect constraints

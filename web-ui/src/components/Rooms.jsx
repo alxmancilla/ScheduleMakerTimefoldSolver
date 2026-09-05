@@ -138,24 +138,24 @@ function Rooms() {
           <h3>{editingRoom ? t('rooms.editRoom') : t('rooms.newRoom')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>{t('rooms.fields.name')}</label>
-              <input type="text" name="name" defaultValue={editingRoom?.name || ''} required disabled={!!editingRoom} />
+              <label htmlFor="room-name">{t('rooms.fields.name')}</label>
+              <input type="text" id="room-name" name="name" defaultValue={editingRoom?.name || ''} required disabled={!!editingRoom} />
             </div>
             <div className="form-group">
-              <label>{t('rooms.fields.building')}</label>
-              <input type="text" name="building" defaultValue={editingRoom?.building || ''} required />
+              <label htmlFor="room-building">{t('rooms.fields.building')}</label>
+              <input type="text" id="room-building" name="building" defaultValue={editingRoom?.building || ''} required />
             </div>
             <div className="form-group">
-              <label>{t('rooms.fields.type')}</label>
-              <select name="type" defaultValue={editingRoom?.type || 'Standard'}>
+              <label htmlFor="room-type">{t('rooms.fields.type')}</label>
+              <select id="room-type" name="type" defaultValue={editingRoom?.type || 'Standard'}>
                 {ROOM_TYPES.map((type) => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label>{t('rooms.fields.capacity')}</label>
-              <input type="number" name="capacity" min={1} defaultValue={editingRoom?.capacity ?? ''} placeholder={t('rooms.capacityPlaceholder')} />
+              <label htmlFor="room-capacity">{t('rooms.fields.capacity')}</label>
+              <input type="number" id="room-capacity" name="capacity" min={1} defaultValue={editingRoom?.capacity ?? ''} placeholder={t('rooms.capacityPlaceholder')} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary">{t('common.save')}</button>

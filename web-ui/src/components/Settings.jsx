@@ -795,8 +795,8 @@ function Settings() {
         {termError && <div className="error" role="alert">{termError}</div>}
         <form onSubmit={handleSaveTerm} style={{ display: 'flex', gap: '10px', marginTop: '10px', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ marginBottom: 0, flex: 1, maxWidth: '320px' }}>
-            <label>{t('settings.term.fields.label')}</label>
-            <input
+            <label htmlFor="term-label">{t('settings.term.fields.label')}</label>
+            <input id="term-label"
               type="text"
               value={termInput}
               onChange={(e) => setTermInput(e.target.value)}
@@ -1080,11 +1080,11 @@ function Settings() {
           <h3>{editingBlockRuleComponent ? t('settings.blockRules.editRule') : t('settings.blockRules.newRule')}</h3>
           <form onSubmit={handleSubmitBlockRule}>
             <div className="form-group">
-              <label>{t('settings.blockRules.fields.component')}</label>
+              <label htmlFor="block-rule-component">{t('settings.blockRules.fields.component')}</label>
               {editingBlockRuleComponent ? (
-                <input type="text" value={blockRuleForm.component} disabled />
+                <input id="block-rule-component" type="text" value={blockRuleForm.component} disabled />
               ) : (
-                <select
+                <select id="block-rule-component"
                   value={blockRuleForm.component}
                   onChange={(e) => setBlockRuleForm({ ...blockRuleForm, component: e.target.value })}
                   required
@@ -1096,8 +1096,8 @@ function Settings() {
               )}
             </div>
             <div className="form-group">
-              <label>{t('settings.blockRules.fields.preferredBlockSize')}</label>
-              <select
+              <label htmlFor="block-rule-preferred-size">{t('settings.blockRules.fields.preferredBlockSize')}</label>
+              <select id="block-rule-preferred-size"
                 value={blockRuleForm.preferredBlockSize}
                 onChange={(e) => setBlockRuleForm({ ...blockRuleForm, preferredBlockSize: parseInt(e.target.value, 10) })}
               >
@@ -1110,8 +1110,8 @@ function Settings() {
               </div>
             </div>
             <div className="form-group">
-              <label>{t('settings.blockRules.fields.maxBlocksPerDay')}</label>
-              <select
+              <label htmlFor="block-rule-max-per-day">{t('settings.blockRules.fields.maxBlocksPerDay')}</label>
+              <select id="block-rule-max-per-day"
                 value={blockRuleForm.maxBlocksPerDay}
                 onChange={(e) => setBlockRuleForm({ ...blockRuleForm, maxBlocksPerDay: parseInt(e.target.value, 10) })}
               >
@@ -1124,8 +1124,8 @@ function Settings() {
               </div>
             </div>
             <div className="form-group">
-              <label>{t('settings.blockRules.fields.marginDays')}</label>
-              <select
+              <label htmlFor="block-rule-margin-days">{t('settings.blockRules.fields.marginDays')}</label>
+              <select id="block-rule-margin-days"
                 value={blockRuleForm.marginDays}
                 onChange={(e) => setBlockRuleForm({
                   ...blockRuleForm,
@@ -1325,8 +1325,8 @@ function Settings() {
           <h3>{editingSemester !== null ? t('settings.semesterHourLimits.editLimit') : t('settings.semesterHourLimits.newLimit')}</h3>
           <form onSubmit={handleSubmitSemesterHourLimit}>
             <div className="form-group">
-              <label>{t('settings.semesterHourLimits.fields.semester')}</label>
-              <input
+              <label htmlFor="semester-limit-semester">{t('settings.semesterHourLimits.fields.semester')}</label>
+              <input id="semester-limit-semester"
                 type="number"
                 min={1}
                 max={12}
@@ -1337,8 +1337,8 @@ function Settings() {
               />
             </div>
             <div className="form-group">
-              <label>{t('settings.semesterHourLimits.fields.latestEndHour')}</label>
-              <select
+              <label htmlFor="semester-limit-end-hour">{t('settings.semesterHourLimits.fields.latestEndHour')}</label>
+              <select id="semester-limit-end-hour"
                 value={semesterHourLimitForm.latestEndHour}
                 onChange={(e) => setSemesterHourLimitForm({ ...semesterHourLimitForm, latestEndHour: parseInt(e.target.value, 10) })}
               >
@@ -1348,8 +1348,8 @@ function Settings() {
               </select>
             </div>
             <div className="form-group">
-              <label>{t('settings.semesterHourLimits.fields.severity')}</label>
-              <select
+              <label htmlFor="semester-limit-severity">{t('settings.semesterHourLimits.fields.severity')}</label>
+              <select id="semester-limit-severity"
                 value={semesterHourLimitForm.severity}
                 onChange={(e) => setSemesterHourLimitForm({ ...semesterHourLimitForm, severity: e.target.value })}
               >
@@ -1429,11 +1429,11 @@ function Settings() {
           <h3>{editingCalendarExceptionDate ? t('settings.calendar.editException') : t('settings.calendar.newException')}</h3>
           <form onSubmit={handleSubmitCalendarException}>
             <div className="form-group">
-              <label>{t('settings.calendar.fields.date')}</label>
+              <label htmlFor="calendar-exception-date">{t('settings.calendar.fields.date')}</label>
               {editingCalendarExceptionDate ? (
-                <input type="text" value={calendarExceptionForm.date} disabled />
+                <input id="calendar-exception-date" type="text" value={calendarExceptionForm.date} disabled />
               ) : (
-                <input
+                <input id="calendar-exception-date"
                   type="date"
                   value={calendarExceptionForm.date}
                   onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, date: e.target.value })}
@@ -1442,8 +1442,8 @@ function Settings() {
               )}
             </div>
             <div className="form-group">
-              <label>{t('settings.calendar.fields.type')}</label>
-              <select
+              <label htmlFor="calendar-exception-type">{t('settings.calendar.fields.type')}</label>
+              <select id="calendar-exception-type"
                 value={calendarExceptionForm.type}
                 onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, type: e.target.value })}
               >
@@ -1453,8 +1453,8 @@ function Settings() {
               </select>
             </div>
             <div className="form-group">
-              <label>{t('settings.calendar.fields.label')}</label>
-              <input
+              <label htmlFor="calendar-exception-label">{t('settings.calendar.fields.label')}</label>
+              <input id="calendar-exception-label"
                 type="text"
                 value={calendarExceptionForm.label}
                 onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, label: e.target.value })}
@@ -1463,8 +1463,8 @@ function Settings() {
             </div>
             {calendarExceptionForm.type === 'HALF_DAY' && (
               <div className="form-group">
-                <label>{t('settings.calendar.fields.endHour')}</label>
-                <select
+                <label htmlFor="calendar-exception-end-hour">{t('settings.calendar.fields.endHour')}</label>
+                <select id="calendar-exception-end-hour"
                   value={calendarExceptionForm.endHour}
                   onChange={(e) => setCalendarExceptionForm({ ...calendarExceptionForm, endHour: parseInt(e.target.value, 10) })}
                 >
@@ -1538,8 +1538,8 @@ function Settings() {
           <h3>{editingTimeslot ? t('settings.timeslots.editTimeslot') : t('settings.timeslots.newTimeslot')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>{t('settings.timeslots.fields.day')}</label>
-              <select name="dayOfWeek" value={form.dayOfWeek} onChange={handleField}>
+              <label htmlFor="timeslot-day">{t('settings.timeslots.fields.day')}</label>
+              <select id="timeslot-day" name="dayOfWeek" value={form.dayOfWeek} onChange={handleField}>
                 {DAY_LABELS.map((day) => (
                   <option key={day.value} value={day.value}>{t(`common.days.${day.key}`)}</option>
                 ))}
@@ -1547,8 +1547,8 @@ function Settings() {
               {fieldErrors.dayOfWeek && <div className="error" role="alert">{fieldErrors.dayOfWeek}</div>}
             </div>
             <div className="form-group">
-              <label>{t('settings.timeslots.fields.startHour')}</label>
-              <select name="startHour" value={form.startHour} onChange={handleField}>
+              <label htmlFor="timeslot-start-hour">{t('settings.timeslots.fields.startHour')}</label>
+              <select id="timeslot-start-hour" name="startHour" value={form.startHour} onChange={handleField}>
                 {START_HOURS.map((h) => (
                   <option key={h} value={h}>{formatHour(h)}</option>
                 ))}
@@ -1556,8 +1556,8 @@ function Settings() {
               {fieldErrors.startHour && <div className="error" role="alert">{fieldErrors.startHour}</div>}
             </div>
             <div className="form-group">
-              <label>{t('settings.timeslots.fields.length')}</label>
-              <select name="lengthHours" value={form.lengthHours} onChange={handleField}>
+              <label htmlFor="timeslot-length">{t('settings.timeslots.fields.length')}</label>
+              <select id="timeslot-length" name="lengthHours" value={form.lengthHours} onChange={handleField}>
                 {LENGTHS.map((l) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
@@ -1565,8 +1565,17 @@ function Settings() {
               {fieldErrors.lengthHours && <div className="error" role="alert">{fieldErrors.lengthHours}</div>}
             </div>
             <div className="form-group">
-              <label>{t('settings.timeslots.fields.endsAt')}</label>
-              <span style={{ color: exceedsDayBounds ? 'var(--color-danger-dark)' : undefined }}>
+              {/*
+                * "Ends at" captions a computed read-only value, not a form
+                * control, so a <label> would have nothing to point at -
+                * aria-labelledby on the value gives it the same accessible
+                * name without claiming to be a field label.
+                */}
+              <span className="form-group-label" id="timeslot-ends-at-label">{t('settings.timeslots.fields.endsAt')}</span>
+              <span
+                aria-labelledby="timeslot-ends-at-label"
+                style={{ color: exceedsDayBounds ? 'var(--color-danger-dark)' : undefined }}
+              >
                 {formatHour(endHour)}{exceedsDayBounds ? t('settings.timeslots.exceedsDayBounds') : ''}
               </span>
               {fieldErrors.withinDayBounds && <div className="error" role="alert">{fieldErrors.withinDayBounds}</div>}

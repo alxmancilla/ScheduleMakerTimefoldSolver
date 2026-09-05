@@ -409,9 +409,9 @@ function Assignments() {
           <form onSubmit={handleSubmit}>
             {fieldErrors.id && <div className="error" role="alert">{fieldErrors.id}</div>}
             <div className="form-group">
-              <label>{t('assignments.fields.group')}</label>
+              <label htmlFor="assignment-group">{t('assignments.fields.group')}</label>
               <select
-                name="groupId"
+                id="assignment-group" name="groupId"
                 value={groupId}
                 onChange={(e) => {
                   const newGroupId = e.target.value;
@@ -455,9 +455,9 @@ function Assignments() {
               {fieldErrors.groupId && <div className="error" role="alert">{fieldErrors.groupId}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.course')}</label>
+              <label htmlFor="assignment-course">{t('assignments.fields.course')}</label>
               <select
-                name="courseId"
+                id="assignment-course" name="courseId"
                 value={courseId}
                 onChange={(e) => {
                   const newCourseId = e.target.value;
@@ -489,8 +489,8 @@ function Assignments() {
               {fieldErrors.courseId && <div className="error" role="alert">{fieldErrors.courseId}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.blockLength')}</label>
-              <select name="blockLength" defaultValue={editingAssignment?.blockLength || 1}>
+              <label htmlFor="assignment-block-length">{t('assignments.fields.blockLength')}</label>
+              <select id="assignment-block-length" name="blockLength" defaultValue={editingAssignment?.blockLength || 1}>
                 {BLOCK_LENGTHS.map((l) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
@@ -498,8 +498,8 @@ function Assignments() {
               {fieldErrors.blockLength && <div className="error" role="alert">{fieldErrors.blockLength}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.teacher')}</label>
-              <select name="teacherId" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+              <label htmlFor="assignment-teacher">{t('assignments.fields.teacher')}</label>
+              <select id="assignment-teacher" name="teacherId" value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
                 <option value="">{t('common.noneOption')}</option>
                 {teachersForCourse(courseId).map((tc) => (
                   <option key={tc.id} value={tc.id}>{tc.id} - {tc.name} {tc.lastName}</option>
@@ -513,8 +513,8 @@ function Assignments() {
               {fieldErrors.teacherId && <div className="error" role="alert">{fieldErrors.teacherId}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.blockTimeslot')}</label>
-              <select name="blockTimeslotId" defaultValue={editingAssignment?.blockTimeslotId || ''}>
+              <label htmlFor="assignment-timeslot">{t('assignments.fields.blockTimeslot')}</label>
+              <select id="assignment-timeslot" name="blockTimeslotId" defaultValue={editingAssignment?.blockTimeslotId || ''}>
                 <option value="">{t('common.noneOption')}</option>
                 {timeslots.map((ts) => (
                   <option key={ts.id} value={ts.id}>{timeslotLabel(ts)}</option>
@@ -523,9 +523,9 @@ function Assignments() {
               {fieldErrors.blockTimeslotId && <div className="error" role="alert">{fieldErrors.blockTimeslotId}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.preferredRoom')}</label>
+              <label htmlFor="assignment-preferred-room">{t('assignments.fields.preferredRoom')}</label>
               <select
-                name="preferredRoomHint"
+                id="assignment-preferred-room" name="preferredRoomHint"
                 value={preferredRoomHint}
                 onChange={(e) => setPreferredRoomHint(e.target.value)}
               >
@@ -540,9 +540,9 @@ function Assignments() {
               {fieldErrors.preferredRoomHint && <div className="error" role="alert">{fieldErrors.preferredRoomHint}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.satisfiesRoomType')}</label>
+              <label htmlFor="assignment-room-type">{t('assignments.fields.satisfiesRoomType')}</label>
               <select
-                name="satisfiesRoomType"
+                id="assignment-room-type" name="satisfiesRoomType"
                 value={satisfiesRoomType}
                 onChange={(e) => applySatisfiesRoomType(e.target.value)}
               >
@@ -557,8 +557,8 @@ function Assignments() {
               {fieldErrors.satisfiesRoomType && <div className="error" role="alert">{fieldErrors.satisfiesRoomType}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.room')}</label>
-              <select name="roomName" value={roomName} onChange={(e) => setRoomName(e.target.value)}>
+              <label htmlFor="assignment-room">{t('assignments.fields.room')}</label>
+              <select id="assignment-room" name="roomName" value={roomName} onChange={(e) => setRoomName(e.target.value)}>
                 <option value="">{t('common.noneOption')}</option>
                 {roomsMatchingType(satisfiesRoomType).map((r) => (
                   <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
@@ -572,8 +572,8 @@ function Assignments() {
               {fieldErrors.roomName && <div className="error" role="alert">{fieldErrors.roomName}</div>}
             </div>
             <div className="form-group">
-              <label>{t('assignments.fields.pin')}</label>
-              <select name="pinned" defaultValue={editingAssignment?.pinned?.toString() || 'false'}>
+              <label htmlFor="assignment-pinned">{t('assignments.fields.pin')}</label>
+              <select id="assignment-pinned" name="pinned" defaultValue={editingAssignment?.pinned?.toString() || 'false'}>
                 <option value="false">{t('common.no')}</option>
                 <option value="true">{t('common.yes')}</option>
               </select>

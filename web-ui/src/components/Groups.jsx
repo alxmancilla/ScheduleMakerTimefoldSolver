@@ -378,16 +378,16 @@ function Groups() {
           <h3>{editingGroup ? t('groups.editGroup') : t('groups.newGroup')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>{t('groups.fields.id')}</label>
-              <input type="text" name="id" defaultValue={editingGroup?.id || ''} required disabled={!!editingGroup} />
+              <label htmlFor="group-id">{t('groups.fields.id')}</label>
+              <input type="text" id="group-id" name="id" defaultValue={editingGroup?.id || ''} required disabled={!!editingGroup} />
             </div>
             <div className="form-group">
-              <label>{t('groups.fields.name')}</label>
-              <input type="text" name="name" defaultValue={editingGroup?.name || ''} required />
+              <label htmlFor="group-name">{t('groups.fields.name')}</label>
+              <input type="text" id="group-name" name="name" defaultValue={editingGroup?.name || ''} required />
             </div>
             <div className="form-group">
-              <label>{t('groups.fields.studentCount')}</label>
-              <input type="number" name="studentCount" min={1} defaultValue={editingGroup?.studentCount ?? ''} placeholder={t('groups.studentCountPlaceholder')} />
+              <label htmlFor="group-student-count">{t('groups.fields.studentCount')}</label>
+              <input type="number" id="group-student-count" name="studentCount" min={1} defaultValue={editingGroup?.studentCount ?? ''} placeholder={t('groups.studentCountPlaceholder')} />
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary">{t('common.save')}</button>
@@ -534,16 +534,16 @@ function Groups() {
             <form onSubmit={handleSubmitRange} style={{ marginTop: '12px' }}>
               <h4>{editingRange ? t('groups.roomRanges.editRange') : t('groups.roomRanges.newRange')}</h4>
               <div className="form-group">
-                <label>{t('groups.roomRanges.fields.roomType')}</label>
-                <select name="roomType" value={rangeForm.roomType} onChange={handleRangeField}>
+                <label htmlFor="group-range-room-type">{t('groups.roomRanges.fields.roomType')}</label>
+                <select id="group-range-room-type" name="roomType" value={rangeForm.roomType} onChange={handleRangeField}>
                   {ROOM_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>
               <div className="form-group">
-                <label>{t('groups.roomRanges.fields.roomName')}</label>
-                <select name="roomName" value={rangeForm.roomName} onChange={handleRangeField} required>
+                <label htmlFor="group-range-room-name">{t('groups.roomRanges.fields.roomName')}</label>
+                <select id="group-range-room-name" name="roomName" value={rangeForm.roomName} onChange={handleRangeField} required>
                   <option value="">{t('common.noneOption')}</option>
                   {rooms.map((r) => (
                     <option key={r.name} value={r.name}>{r.name} ({r.type})</option>

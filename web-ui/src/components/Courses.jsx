@@ -468,10 +468,10 @@ function Courses() {
               <h3>{editingCourse ? t('courses.editCourse') : t('courses.newCourse')}</h3>
               <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label>{t('courses.fields.id')}</label>
+                  <label htmlFor="course-id">{t('courses.fields.id')}</label>
                   <input
                     type="text"
-                    name="id"
+                    id="course-id" name="id"
                     defaultValue={editingCourse?.id || ''}
                     maxLength={5}
                     required
@@ -480,15 +480,15 @@ function Courses() {
                   {fieldErrors.id && <div className="error" role="alert">{fieldErrors.id}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.name')}</label>
-                  <input type="text" name="name" defaultValue={editingCourse?.name || ''} required />
+                  <label htmlFor="course-name">{t('courses.fields.name')}</label>
+                  <input type="text" id="course-name" name="name" defaultValue={editingCourse?.name || ''} required />
                   {fieldErrors.name && <div className="error" role="alert">{fieldErrors.name}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.abbreviation')}</label>
+                  <label htmlFor="course-abbreviation">{t('courses.fields.abbreviation')}</label>
                   <input
                     type="text"
-                    name="abbreviation"
+                    id="course-abbreviation" name="abbreviation"
                     defaultValue={editingCourse?.abbreviation || ''}
                     maxLength={100}
                     required
@@ -496,8 +496,8 @@ function Courses() {
                   {fieldErrors.abbreviation && <div className="error" role="alert">{fieldErrors.abbreviation}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.semester')}</label>
-                  <select name="semester" defaultValue={editingCourse?.semester || 1}>
+                  <label htmlFor="course-semester">{t('courses.fields.semester')}</label>
+                  <select id="course-semester" name="semester" defaultValue={editingCourse?.semester || 1}>
                     {SEMESTERS.map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
@@ -505,9 +505,9 @@ function Courses() {
                   {fieldErrors.semester && <div className="error" role="alert">{fieldErrors.semester}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.designation')}</label>
+                  <label htmlFor="course-designation">{t('courses.fields.designation')}</label>
                   <select
-                    name="designation"
+                    id="course-designation" name="designation"
                     defaultValue={editingCourse?.designation || ''}
                     required
                   >
@@ -519,8 +519,8 @@ function Courses() {
                   {fieldErrors.designation && <div className="error" role="alert">{fieldErrors.designation}</div>}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.roomRequirement')}</label>
-                  <select name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'Standard'}>
+                  <label htmlFor="course-room-requirement">{t('courses.fields.roomRequirement')}</label>
+                  <select id="course-room-requirement" name="roomRequirement" defaultValue={editingCourse?.roomRequirement || 'Standard'}>
                     {ROOM_TYPES.map((type) => (
                       <option key={type} value={type}>{type}</option>
                     ))}
@@ -532,12 +532,12 @@ function Courses() {
                   )}
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.requiredHoursPerWeek')}</label>
-                  <input type="number" name="requiredHoursPerWeek" defaultValue={editingCourse?.requiredHoursPerWeek || 1} required />
+                  <label htmlFor="course-required-hours">{t('courses.fields.requiredHoursPerWeek')}</label>
+                  <input type="number" id="course-required-hours" name="requiredHoursPerWeek" defaultValue={editingCourse?.requiredHoursPerWeek || 1} required />
                 </div>
                 <div className="form-group">
-                  <label>{t('courses.fields.active')}</label>
-                  <select name="active" defaultValue={editingCourse?.active?.toString() || 'true'}>
+                  <label htmlFor="course-active">{t('courses.fields.active')}</label>
+                  <select id="course-active" name="active" defaultValue={editingCourse?.active?.toString() || 'true'}>
                     <option value="true">{t('common.yes')}</option>
                     <option value="false">{t('common.no')}</option>
                   </select>
@@ -569,18 +569,18 @@ function Courses() {
             <form onSubmit={handleSubmitRequirement} style={{ marginTop: '12px' }}>
               <h4>{editingRequirement ? t('courses.roomRequirements.editRequirement') : t('courses.roomRequirements.newRequirement')}</h4>
               <div className="form-group">
-                <label>{t('courses.roomRequirements.fields.roomType')}</label>
-                <select name="roomType" value={requirementForm.roomType} onChange={handleRequirementField}>
+                <label htmlFor="course-req-room-type">{t('courses.roomRequirements.fields.roomType')}</label>
+                <select id="course-req-room-type" name="roomType" value={requirementForm.roomType} onChange={handleRequirementField}>
                   {ROOM_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>
               <div className="form-group">
-                <label>{t('courses.roomRequirements.fields.hoursRequired')}</label>
+                <label htmlFor="course-req-hours">{t('courses.roomRequirements.fields.hoursRequired')}</label>
                 <input
                   type="number"
-                  name="hoursRequired"
+                  id="course-req-hours" name="hoursRequired"
                   min={1}
                   value={requirementForm.hoursRequired}
                   onChange={handleRequirementField}
@@ -588,18 +588,18 @@ function Courses() {
                 />
               </div>
               <div className="form-group">
-                <label>{t('courses.roomRequirements.fields.priority')}</label>
+                <label htmlFor="course-req-priority">{t('courses.roomRequirements.fields.priority')}</label>
                 <input
                   type="number"
-                  name="priority"
+                  id="course-req-priority" name="priority"
                   min={1}
                   value={requirementForm.priority}
                   onChange={handleRequirementField}
                 />
               </div>
               <div className="form-group">
-                <label>{t('courses.roomRequirements.fields.preferredRoom')}</label>
-                <select name="defaultPreferredRoom" value={requirementForm.defaultPreferredRoom} onChange={handleRequirementField}>
+                <label htmlFor="course-req-preferred-room">{t('courses.roomRequirements.fields.preferredRoom')}</label>
+                <select id="course-req-preferred-room" name="defaultPreferredRoom" value={requirementForm.defaultPreferredRoom} onChange={handleRequirementField}>
                   <option value="">{t('common.noneOption')}</option>
                   {rooms.map((r) => (
                     <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
@@ -671,8 +671,8 @@ function Courses() {
             <form onSubmit={handleSubmitTemplate} style={{ marginTop: '12px' }}>
               <h4>{editingTemplate ? t('courses.blockTemplates.editTemplate') : t('courses.blockTemplates.newTemplate')}</h4>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.group')}</label>
-                <select name="groupId" value={templateForm.groupId} onChange={handleTemplateField}>
+                <label htmlFor="course-tpl-group">{t('courses.blockTemplates.fields.group')}</label>
+                <select id="course-tpl-group" name="groupId" value={templateForm.groupId} onChange={handleTemplateField}>
                   <option value="">{t('courses.blockTemplates.allGroups')}</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>{g.id} - {g.name}</option>
@@ -680,10 +680,10 @@ function Courses() {
                 </select>
               </div>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.blockIndex')}</label>
+                <label htmlFor="course-tpl-block-index">{t('courses.blockTemplates.fields.blockIndex')}</label>
                 <input
                   type="number"
-                  name="blockIndex"
+                  id="course-tpl-block-index" name="blockIndex"
                   min={0}
                   value={templateForm.blockIndex}
                   onChange={handleTemplateField}
@@ -691,10 +691,10 @@ function Courses() {
                 />
               </div>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.blockLength')}</label>
+                <label htmlFor="course-tpl-block-length">{t('courses.blockTemplates.fields.blockLength')}</label>
                 <input
                   type="number"
-                  name="blockLength"
+                  id="course-tpl-block-length" name="blockLength"
                   min={1}
                   max={4}
                   value={templateForm.blockLength}
@@ -703,8 +703,8 @@ function Courses() {
                 />
               </div>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.roomType')}</label>
-                <select name="roomType" value={templateForm.roomType} onChange={handleTemplateField}>
+                <label htmlFor="course-tpl-room-type">{t('courses.blockTemplates.fields.roomType')}</label>
+                <select id="course-tpl-room-type" name="roomType" value={templateForm.roomType} onChange={handleTemplateField}>
                   <option value="">{t('common.noneOption')}</option>
                   {ROOM_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
@@ -712,8 +712,8 @@ function Courses() {
                 </select>
               </div>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.preferredRoom')}</label>
-                <select name="preferredRoomName" value={templateForm.preferredRoomName} onChange={handleTemplateField}>
+                <label htmlFor="course-tpl-preferred-room">{t('courses.blockTemplates.fields.preferredRoom')}</label>
+                <select id="course-tpl-preferred-room" name="preferredRoomName" value={templateForm.preferredRoomName} onChange={handleTemplateField}>
                   <option value="">{t('common.noneOption')}</option>
                   {rooms.map((r) => (
                     <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
@@ -721,8 +721,8 @@ function Courses() {
                 </select>
               </div>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.preferredDay')}</label>
-                <select name="preferredDay" value={templateForm.preferredDay} onChange={handleTemplateField}>
+                <label htmlFor="course-tpl-preferred-day">{t('courses.blockTemplates.fields.preferredDay')}</label>
+                <select id="course-tpl-preferred-day" name="preferredDay" value={templateForm.preferredDay} onChange={handleTemplateField}>
                   <option value="">{t('common.noneOption')}</option>
                   {Object.entries(DAY_KEYS).map(([value, key]) => (
                     <option key={value} value={value}>{t(`common.days.${key}`)}</option>
@@ -730,8 +730,8 @@ function Courses() {
                 </select>
               </div>
               <div className="form-group">
-                <label>{t('courses.blockTemplates.fields.preferredTimeslot')}</label>
-                <select name="preferredTimeslotId" value={templateForm.preferredTimeslotId} onChange={handleTemplateField}>
+                <label htmlFor="course-tpl-timeslot">{t('courses.blockTemplates.fields.preferredTimeslot')}</label>
+                <select id="course-tpl-timeslot" name="preferredTimeslotId" value={templateForm.preferredTimeslotId} onChange={handleTemplateField}>
                   <option value="">{t('common.noneOption')}</option>
                   {timeslots.map((ts) => (
                     <option key={ts.id} value={ts.id}>{timeslotLabel(ts)}</option>

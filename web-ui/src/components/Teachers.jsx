@@ -305,10 +305,10 @@ function Teachers() {
           <h3>{editingTeacher ? t('teachers.editTeacher') : t('teachers.newTeacher')}</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>{t('teachers.fields.id')}</label>
+              <label htmlFor="teacher-id">{t('teachers.fields.id')}</label>
               <input
                 type="text"
-                name="id"
+                id="teacher-id" name="id"
                 value={form.id}
                 onChange={handleField}
                 required
@@ -317,20 +317,20 @@ function Teachers() {
               {fieldErrors.id && <div className="error" role="alert">{fieldErrors.id}</div>}
             </div>
             <div className="form-group">
-              <label>{t('teachers.fields.name')}</label>
-              <input type="text" name="name" value={form.name} onChange={handleField} required />
+              <label htmlFor="teacher-name">{t('teachers.fields.name')}</label>
+              <input type="text" id="teacher-name" name="name" value={form.name} onChange={handleField} required />
               {fieldErrors.name && <div className="error" role="alert">{fieldErrors.name}</div>}
             </div>
             <div className="form-group">
-              <label>{t('teachers.fields.lastName')}</label>
-              <input type="text" name="lastName" value={form.lastName} onChange={handleField} required />
+              <label htmlFor="teacher-last-name">{t('teachers.fields.lastName')}</label>
+              <input type="text" id="teacher-last-name" name="lastName" value={form.lastName} onChange={handleField} required />
               {fieldErrors.lastName && <div className="error" role="alert">{fieldErrors.lastName}</div>}
             </div>
             <div className="form-group">
-              <label>{t('teachers.fields.maxHoursPerWeek')}</label>
+              <label htmlFor="teacher-max-hours">{t('teachers.fields.maxHoursPerWeek')}</label>
               <input
                 type="number"
-                name="maxHoursPerWeek"
+                id="teacher-max-hours" name="maxHoursPerWeek"
                 value={form.maxHoursPerWeek}
                 onChange={handleField}
                 required
@@ -338,8 +338,8 @@ function Teachers() {
               {fieldErrors.maxHoursPerWeek && <div className="error" role="alert">{fieldErrors.maxHoursPerWeek}</div>}
             </div>
             <div className="form-group">
-              <label>{t('teachers.fields.requiredRoom')}</label>
-              <select name="requiredRoomName" value={form.requiredRoomName} onChange={handleField}>
+              <label htmlFor="teacher-required-room">{t('teachers.fields.requiredRoom')}</label>
+              <select id="teacher-required-room" name="requiredRoomName" value={form.requiredRoomName} onChange={handleField}>
                 <option value="">{t('common.noneOption')}</option>
                 {rooms.map((room) => (
                   <option key={room.name} value={room.name}>{room.name}</option>
@@ -352,10 +352,11 @@ function Teachers() {
             </div>
 
             <div className="form-group">
-              <label>{t('teachers.fields.qualifications')}</label>
+              <label htmlFor="teacher-qualifications">{t('teachers.fields.qualifications')}</label>
               <div ref={qualBoxRef} style={{ position: 'relative', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <input
+                    id="teacher-qualifications"
                     type="text"
                     value={qualInput}
                     onChange={(e) => {
@@ -450,8 +451,15 @@ function Teachers() {
               </div>
             </div>
 
-            <div className="form-group">
-              <label>{t('teachers.fields.availability')}</label>
+            {/*
+              * Availability heads a whole grid of controls (bulk buttons plus a
+              * day x hour checkbox table), not one input, so it's a group
+              * heading rather than a field label - role="group" +
+              * aria-labelledby is the correct association here; htmlFor would
+              * have nothing single to point at.
+              */}
+            <div className="form-group" role="group" aria-labelledby="teacher-availability-label">
+              <span className="form-group-label" id="teacher-availability-label">{t('teachers.fields.availability')}</span>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
                 <button type="button" className="btn btn-secondary" onClick={checkAllAvailability}>
                   {t('teachers.checkAll')}
