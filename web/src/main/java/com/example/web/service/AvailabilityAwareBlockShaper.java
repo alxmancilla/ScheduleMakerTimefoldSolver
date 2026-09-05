@@ -27,6 +27,9 @@ import java.util.TreeSet;
  * structural maximum, stopping at the first size that fits. This never
  * assigns a specific day; the solver still freely places each block among
  * the teacher's available days, exactly as for any other generated block.
+ * {@link #tryMinimalUpgradeShape} is an alternative to this for components
+ * that specifically want to keep as many small (1h) blocks as possible -
+ * see its own javadoc.
  *
  * <p><b>Window assignment</b> ({@link #assignWindows}): only used when a
  * teacher's entire teaching load is this one (group, course) pair (checked
@@ -176,6 +179,87 @@ final class AvailabilityAwareBlockShaper {
             }
         }
         return bareFeasible;
+    }
+
+    /**
+     * Tries to reach a safe day count by "merging" the FEWEST possible pairs
+     * of the component's configured preferred-size blocks into a single
+     * double-size block, instead of uniformly resizing every block the way
+     * {@link #tryAvailabilityAwareShape} does - e.g. 4 hours at
+     * {@code baseSize} 1, needing to drop from 4 blocks to 3, becomes
+     * {@code [2, 1, 1]} (one merge) rather than {@code [2, 2]} (every block
+     * merged), whenever the smaller merge is enough. Doubling is the only
+     * upgrade size that exactly preserves total hours when merging exactly
+     * two same-size blocks into one - unlike a flat "+1" size step, which
+     * would silently lose or gain hours for any {@code baseSize} other than
+     * 1 - so this is what generalizes cleanly to whatever
+     * {@code component_block_rule.preferredBlockSize} is actually
+     * configured, not just the 1h/2h case.
+     *
+     * <p>Any leftover remainder block from {@link #packBlocks(int, int)
+     * packBlocks(hours, baseSize)} (present when hours doesn't divide evenly
+     * by baseSize) is left untouched by merging - it's already smaller than
+     * a full baseSize block, so folding it into a merge wouldn't preserve
+     * the "prefer small blocks" intent as cleanly as merging two full-size
+     * blocks does.
+     *
+     * <p>Searches merge counts from 0 (the naive shape - already known to
+     * have failed the caller's own margin check) up to the maximum possible
+     * (every full-size block paired up), preferring the fewest merges that
+     * reaches {@code marginDays}, falling back to the fewest merges that's
+     * at least bare-feasible (margin 0) if none reaches margin.
+     *
+     * <p>Deliberately caps out at double {@code baseSize} by design: unlike
+     * {@link #tryAvailabilityAwareShape}, which escalates uniformly up to
+     * the 4h structural maximum, this never considers a block larger than
+     * {@code baseSize * 2}. Returns null immediately - without trying
+     * anything - when {@code baseSize * 2} would already exceed
+     * {@link #MAX_BLOCK_LENGTH} (there's nowhere to merge to at all, e.g.
+     * baseSize 3 or 4), or when even every full-size block merged isn't
+     * bare-feasible; the caller should fall back to the untouched naive
+     * shape in either case, exactly as when {@link #tryAvailabilityAwareShape}
+     * exhausts its own size range.
+     *
+     * @return the shape, preferring one with margin but settling for bare
+     *         feasibility if margin is unreachable at any merge count; null
+     *         if merging isn't structurally possible at all, or even every
+     *         full-size block merged isn't bare-feasible
+     */
+    static List<Integer> tryMinimalUpgradeShape(int hours, int baseSize, int maxBlocksPerDay, int availableDays,
+            int marginDays) {
+        int upgradeSize = baseSize * 2;
+        if (upgradeSize > MAX_BLOCK_LENGTH) {
+            return null;
+        }
+        int fullBlocks = hours / baseSize;
+        int remainder = hours % baseSize;
+        int maxMerges = fullBlocks / 2;
+        List<Integer> bareFeasible = null;
+        for (int merges = 0; merges <= maxMerges; merges++) {
+            int blockCount = (fullBlocks - merges) + (remainder > 0 ? 1 : 0);
+            if (fitsWithinDayCap(blockCount, maxBlocksPerDay, availableDays, marginDays)) {
+                return buildMixedShape(baseSize, upgradeSize, merges, fullBlocks - 2 * merges, remainder);
+            }
+            if (bareFeasible == null && fitsWithinDayCap(blockCount, maxBlocksPerDay, availableDays, 0)) {
+                bareFeasible = buildMixedShape(baseSize, upgradeSize, merges, fullBlocks - 2 * merges, remainder);
+            }
+        }
+        return bareFeasible;
+    }
+
+    private static List<Integer> buildMixedShape(int baseSize, int upgradeSize, int upgradeCount, int baseCount,
+            int remainder) {
+        List<Integer> shape = new ArrayList<>(upgradeCount + baseCount + (remainder > 0 ? 1 : 0));
+        for (int i = 0; i < upgradeCount; i++) {
+            shape.add(upgradeSize);
+        }
+        for (int i = 0; i < baseCount; i++) {
+            shape.add(baseSize);
+        }
+        if (remainder > 0) {
+            shape.add(remainder);
+        }
+        return shape;
     }
 
     /**

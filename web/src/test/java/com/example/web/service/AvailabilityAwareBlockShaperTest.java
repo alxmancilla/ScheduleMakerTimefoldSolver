@@ -301,4 +301,83 @@ public class AvailabilityAwareBlockShaperTest {
 
         assertEquals(1, AvailabilityAwareBlockShaper.distinctAvailableDayCount(windows));
     }
+
+    // ---- tryMinimalUpgradeShape ----
+
+    @Test
+    public void tryMinimalUpgradeShape_naiveAlreadyFailedMargin_upgradesOnlyOneBlock() {
+        // baseSize 1: 4 hours needing to drop from 4 blocks to 3 (margin: 3 + 1
+        // <= 4) - merging just one pair (into a single 2h block) is enough; the
+        // rest stay 1h.
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(4, 1, 1, 4, 1);
+        assertEquals(List.of(2, 1, 1), shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_tighterCalendar_upgradesAsManyAsMarginRequires() {
+        // Only 3 available days - reaching margin (needed + 1 <= 3) requires
+        // dropping all the way to 2 blocks, i.e. both pairs merged into 2h.
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(4, 1, 1, 3, 1);
+        assertEquals(List.of(2, 2), shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_marginUnreachable_fallsBackToBareFeasible() {
+        // 5 hours, only 3 available days: no merge count reaches margin (needed
+        // + 1 <= 3), but merging 2 pairs ([2,2,1], 3 blocks) is bare-feasible
+        // (3 <= 3, margin 0).
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(5, 1, 1, 3, 1);
+        assertEquals(List.of(2, 2, 1), shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_evenAllBlocksUpgraded_isNotEnough_returnsNull() {
+        // 5 hours, only 2 available days: even every full pair merged to 2h
+        // ([2,2,1], 3 blocks) needs more days than are available (3 > 2) -
+        // nothing in the 1h/2h range is even bare-feasible.
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(5, 1, 1, 2, 1);
+        assertNull(shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_naiveAlreadyMarginSafe_returnsNaiveUnchanged() {
+        // Included for completeness: the caller only invokes this after the
+        // naive shape has already failed margin, but the method itself is a
+        // pure search and should still behave sensibly if it weren't - the
+        // naive block count (5, zero merges) is the first one tried, and
+        // reaching margin at the very first (least-merged) count it checks is
+        // the "no upgrade needed at all" case.
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(5, 1, 1, 6, 1);
+        assertEquals(List.of(1, 1, 1, 1, 1), shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_baseSizeTwo_mergesIntoDoubleSizeNotFlatIncrement() {
+        // baseSize 2 - the generalization derives the upgrade size (4h) by
+        // doubling, not by adding 1 (which wouldn't preserve total hours for
+        // any base other than 1). 6 hours naive-packs as [2,2,2] (3 blocks,
+        // fails margin: 3 + 1 = 4 <= 3 available is false); dropping to 2
+        // blocks reaches margin (2 + 1 = 3 <= 3) via one merge: two of the 2h
+        // blocks combine into a single 4h block, leaving [4,2].
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(6, 2, 1, 3, 1);
+        assertEquals(List.of(4, 2), shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_baseSizeTwo_leavesAnUnevenRemainderBlockUntouchedByMerging() {
+        // baseSize 2, 5 hours -> naive [2,2,1] (2 full blocks + a 1h remainder,
+        // 3 blocks total, fails margin: 3 + 1 = 4 <= 3 available is false). The
+        // remainder is never a merge candidate; only the two full 2h blocks can
+        // merge, into a single 4h block: [4,1] reaches margin (2 + 1 = 3 <= 3).
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(5, 2, 1, 3, 1);
+        assertEquals(List.of(4, 1), shape);
+    }
+
+    @Test
+    public void tryMinimalUpgradeShape_baseSizeThreeOrMore_cannotMergeAtAll_returnsNullImmediately() {
+        // baseSize 3 would need to double to 6h to merge - past the 4h
+        // structural maximum - so there's nowhere to merge to at all,
+        // regardless of how tight the calendar is.
+        assertNull(AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(6, 3, 1, 1, 1));
+    }
 }

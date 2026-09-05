@@ -130,6 +130,22 @@ public class BlockGenerationService {
     private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
 
     /**
+     * The one designation (course_designation) that prefers as many
+     * preferred-size blocks as possible over uniformly resizing every block
+     * when margin adaptation is needed - see decomposeHours and
+     * AvailabilityAwareBlockShaper#tryMinimalUpgradeShape. WHICH designation
+     * gets this treatment is hardcoded by request (2026-09-05) - only ever
+     * "Core", regardless of what any other component is configured as - but
+     * the actual base/upgrade sizes used for it are NOT hardcoded: they come
+     * straight from component_block_rule's preferredBlockSize for "Core",
+     * doubled for the upgrade size (the only upgrade that exactly preserves
+     * total hours - see tryMinimalUpgradeShape), so an admin changing Core's
+     * configured preferred size changes what this actually does, without any
+     * code change.
+     */
+    private static final String CORE_DESIGNATION = "Core";
+
+    /**
      * Extra margin days required, beyond AvailabilityAwareBlockShaper's own
      * DEFAULT_MARGIN_DAYS, when a teacher already has other pre-existing but
      * still-movable (unplaced) assignments elsewhere. A movable assignment
@@ -717,6 +733,19 @@ public class BlockGenerationService {
      * isn't reachable at any block size - a genuinely infeasible pairing
      * PreSolveValidator will still report, exactly as it does today.
      *
+     * <p>The CORE_DESIGNATION component is a deliberate exception to that
+     * escalation: it favors keeping as many preferred-size blocks as
+     * possible (per request, added 2026-09-05), so instead of uniformly
+     * resizing every block, {@link AvailabilityAwareBlockShaper#tryMinimalUpgradeShape}
+     * merges only the fewest pairs of preferredSize blocks into
+     * double-preferredSize ones needed to reach a safe day count - and,
+     * deliberately, never escalates beyond that doubled size even when
+     * that's not enough (extended 2026-09-05 to derive both sizes from
+     * component_block_rule's actual configured preferredBlockSize for Core,
+     * rather than hardcoded 1h/2h), settling for the untouched naive shape
+     * instead of ever trying a uniform bigger shape the way every other
+     * component does.
+     *
      * @param calendar this teacher's calendar to reason against (see
      *                  buildEffectiveCalendar) - the shared one when 2+
      *                  pairings need generation for this teacher in the same
@@ -740,6 +769,11 @@ public class BlockGenerationService {
                 || AvailabilityAwareBlockShaper.fitsWithinDayCap(naive.size(), maxBlocksPerDay, availableDays,
                         marginDays)) {
             return naive;
+        }
+        if (CORE_DESIGNATION.equals(component)) {
+            List<Integer> mixed = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(hours, preferredSize,
+                    maxBlocksPerDay, availableDays, marginDays);
+            return mixed != null ? mixed : naive;
         }
         List<Integer> adapted = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(hours, preferredSize,
                 maxBlocksPerDay, windows, marginDays);

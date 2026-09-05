@@ -1058,6 +1058,109 @@ public class BlockGenerationServiceTest {
         assertEquals(List.of(1, 1), lengths); // naive shape, comfortable margin (2 needed + 1 <= 3 available)
     }
 
+    // ---- Core designation: prefer minimal upgrades (1h blocks, upgrading
+    // only the fewest needed to 2h), never escalating beyond 2h at all ----
+
+    @Test
+    public void coreDesignation_prefersMinimalUpgradeOverUniformResize() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Core Course").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Core Course"))
+                .thenReturn(Optional.of(course("C1", "Core Course", 4, "Core", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("Core"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("Core", 1, 1)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int day = 1; day <= 4; day++) {
+            teacher.addAvailability(day, 7);
+            teacher.addAvailability(day, 8);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // Naive [1,1,1,1] needs 4 days, but margin (4 needed + 1 = 5) doesn't fit
+        // the 4 available - the old uniform-resize approach would upgrade EVERY
+        // block to 2h ([2,2]). Core's minimal-upgrade approach instead upgrades
+        // only the one block it actually needs to: dropping to 3 blocks reaches
+        // margin exactly (3 + 1 = 4 <= 4).
+        assertEquals(3, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(3)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(2, 1, 1), lengths);
+    }
+
+    @Test
+    public void coreDesignation_neverEscalatesBeyond2h_fallsBackToNaiveInsteadOfUniformBiggerBlocks() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Core Course").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Core Course"))
+                .thenReturn(Optional.of(course("C1", "Core Course", 5, "Core", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("Core"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("Core", 1, 1)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        // Only 2 days, each a 4h contiguous window - a uniform size-3 shape
+        // ([3,2], 2 blocks) would be bare-feasible here, but Core must never try
+        // a block bigger than 2h.
+        for (int h = 7; h <= 10; h++) {
+            teacher.addAvailability(1, h);
+            teacher.addAvailability(2, h);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // Even every block upgraded to 2h ([2,2,1], 3 blocks) isn't bare-feasible
+        // with only 2 available days (3 > 2). Core's hard 2h cap means it gives up
+        // there rather than trying 3h/4h, falling back to the untouched naive
+        // shape instead.
+        assertEquals(5, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(5)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1, 1, 1, 1), lengths);
+    }
+
+    @Test
+    public void nonCoreDesignationWithSamePreferredSize_stillEscalatesBeyond2hWhenNeeded() {
+        // Same 1h-preferred/1-per-day rule as Core, same tight calendar as the
+        // test above - but a DIFFERENT designation name, to prove the 2h hard
+        // cap is tied to the literal "Core" designation, not to any component
+        // configured with preferredBlockSize=1 in general.
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Other Course").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Other Course"))
+                .thenReturn(Optional.of(course("C1", "Other Course", 5, "OtherDesig", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("OtherDesig"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("OtherDesig", 1, 1)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int h = 7; h <= 10; h++) {
+            teacher.addAvailability(1, h);
+            teacher.addAvailability(2, h);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // Unlike Core, this designation escalates uniformly up to size 3:
+        // packBlocks(5,3) = [3,2], 2 blocks at 1/day is bare-feasible with 2
+        // available days.
+        assertEquals(2, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(3, 2), lengths);
+    }
+
     // ---- Effective calendar: a teacher's OWN pre-existing assignments,
     // pinned or movable, are accounted for even for a single pending pairing
     // (not just siblings pending in the same run) ----
