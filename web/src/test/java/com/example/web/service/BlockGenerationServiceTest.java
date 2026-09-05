@@ -1058,6 +1058,141 @@ public class BlockGenerationServiceTest {
         assertEquals(List.of(1, 1), lengths); // naive shape, comfortable margin (2 needed + 1 <= 3 available)
     }
 
+    // ---- Effective calendar: a teacher's OWN pre-existing assignments,
+    // pinned or movable, are accounted for even for a single pending pairing
+    // (not just siblings pending in the same run) ----
+
+    @Test
+    public void existingPinnedAssignmentElsewhere_isSubtractedFromANewPairingsCalendar() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        teacher.addAvailability(2, 7);
+        teacher.addAvailability(2, 8);
+        teacher.addAvailability(3, 7); // this hour is already pinned to something else below
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        // T1 already teaches an unrelated, PINNED block Wednesday (day 3) 7-8
+        // elsewhere - day 3 is this teacher's only availability that day, so once
+        // this pairing's calendar accounts for it, that day should look fully
+        // consumed, not still open.
+        CourseBlockAssignmentEntity existingPinned = new CourseBlockAssignmentEntity();
+        existingPinned.setId("OTHER_G_0");
+        existingPinned.setPinned(true);
+        existingPinned.setBlockTimeslotId("TS_EXISTING");
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(existingPinned));
+        BlockTimeslotEntity existingSlot = new BlockTimeslotEntity();
+        existingSlot.setId("TS_EXISTING");
+        existingSlot.setDayOfWeek(3);
+        existingSlot.setStartHour(7);
+        existingSlot.setLengthHours(1);
+        when(blockTimeslotRepository.findById("TS_EXISTING")).thenReturn(Optional.of(existingSlot));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // Without accounting for the existing pin, 3 available days would let naive
+        // [1,1] keep its margin (2 needed + 1 margin = 3 <= 3) and stay untouched.
+        // With day 3 correctly subtracted, only 2 days are genuinely open, margin
+        // fails (2 + 1 = 3 <= 2 is false), and the shaper adapts to a single 2h
+        // block instead (1 needed + 1 margin = 2 <= 2).
+        assertEquals(1, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Integer.valueOf(2), captor.getValue().getBlockLength());
+    }
+
+    @Test
+    public void existingMovableAssignmentElsewhere_addsExtraMarginDayForANewPairing() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int day = 1; day <= 3; day++) {
+            teacher.addAvailability(day, 7);
+            teacher.addAvailability(day, 8);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        // T1 already has a MOVABLE (unplaced) assignment from some other,
+        // already-populated (group, course) pair - its hours can't be subtracted
+        // from a specific day since it has no placed timeslot yet, but its mere
+        // existence should require one extra margin day for this new pairing.
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(new CourseBlockAssignmentEntity()));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // With 3 full days of 2h each and no other load, naive [1,1] would keep
+        // its margin (2 needed + 1 margin = 3 <= 3) and stay untouched. The extra
+        // margin day from the existing movable load pushes that to 2 + 2 = 4 <= 3,
+        // which fails, so the shaper adapts to a single 2h block instead
+        // (1 needed + 2 margin = 3 <= 3).
+        assertEquals(1, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Integer.valueOf(2), captor.getValue().getBlockLength());
+    }
+
+    @Test
+    public void sharedTeacher_tieBrokenByAscendingSemesterBeforeGroupId() {
+        // Both groups need the same 4h, so hours alone can't break the tie - and
+        // group id order alone would process "AHIGH" first (it sorts before
+        // "ZLOW" alphabetically). The semester tie-break should override that:
+        // "ZLOW" takes the semester-1 course, so it gets first claim on the
+        // calendar's nicer shape despite sorting later by id.
+        StudentGroupEntity ahigh = new StudentGroupEntity("AHIGH", "High Semester, Low Id");
+        ahigh.addCourse("Math B").setDefaultTeacherId("T1");
+        StudentGroupEntity zlow = new StudentGroupEntity("ZLOW", "Low Semester, High Id");
+        zlow.addCourse("Math A").setDefaultTeacherId("T1");
+        // Listed in the "wrong" order too, so a naive iteration-order tie-break
+        // would also (incorrectly) favor AHIGH.
+        when(studentGroupRepository.findAll()).thenReturn(List.of(ahigh, zlow));
+
+        CourseEntity mathHigh = course("C_HIGH", "Math B", 4, "BASICAS", "estándar");
+        mathHigh.setSemester(5);
+        CourseEntity mathLow = course("C_LOW", "Math A", 4, "BASICAS", "estándar");
+        mathLow.setSemester(1);
+        when(courseRepository.findByName("Math B")).thenReturn(Optional.of(mathHigh));
+        when(courseRepository.findByName("Math A")).thenReturn(Optional.of(mathLow));
+        when(assignmentRepository.existsByGroupIdAndCourseId(anyString(), anyString())).thenReturn(false);
+
+        // Same 3-day/2h-per-day calendar and 4h-per-group need as
+        // sharedTeacher_secondPairingSeesTheFirstPairingsConsumption above: the
+        // first pairing processed adapts to [2,2]; by the time the second is
+        // processed, only 1 day (2h) is left, which isn't even bare-feasible for
+        // any adapted size, so it falls all the way back to naive [1,1,1,1].
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int day = 1; day <= 3; day++) {
+            teacher.addAvailability(day, 7);
+            teacher.addAvailability(day, 8);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        service.generateBlocks();
+
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(6)).save(captor.capture());
+        List<CourseBlockAssignmentEntity> saved = captor.getAllValues();
+
+        List<Integer> zlowLengths = saved.stream().filter(b -> b.getGroupId().equals("ZLOW"))
+                .map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(2, 2), zlowLengths); // semester 1 - processed first, gets the nicer shape
+
+        List<Integer> ahighLengths = saved.stream().filter(b -> b.getGroupId().equals("AHIGH"))
+                .map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1, 1, 1), ahighLengths); // semester 5 - processed second, left with the leftovers
+    }
+
     @Test
     public void clearUnpinnedTimeslots_clearsOnlyUnpinnedRowsAndReturnsCount() {
         CourseBlockAssignmentEntity unpinned1 = new CourseBlockAssignmentEntity();

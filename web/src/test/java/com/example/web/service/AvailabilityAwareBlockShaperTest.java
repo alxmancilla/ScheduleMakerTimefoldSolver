@@ -248,4 +248,57 @@ public class AvailabilityAwareBlockShaperTest {
 
         assertEquals(List.of(3), shape); // single 3h block is the only way to fit in one remaining day
     }
+
+    // ---- windowsByDay(teacher, consumedRanges) ----
+
+    @Test
+    public void windowsByDay_withNoConsumedRanges_matchesTheZeroArgForm() {
+        TeacherEntity teacher = teacherWithHours(new int[][] { { 1, 7 }, { 1, 8 }, { 2, 9 } });
+
+        Map<Integer, List<int[]>> withEmptyList = AvailabilityAwareBlockShaper.windowsByDay(teacher, List.of());
+        Map<Integer, List<int[]>> zeroArg = AvailabilityAwareBlockShaper.windowsByDay(teacher);
+
+        assertEquals(zeroArg.keySet(), withEmptyList.keySet());
+        for (int day : zeroArg.keySet()) {
+            assertArrayEquals(zeroArg.get(day).get(0), withEmptyList.get(day).get(0));
+        }
+    }
+
+    @Test
+    public void windowsByDay_consumedRangeInTheMiddle_splitsTheWindowInTwo() {
+        // Day 1: 7,8,9,10,11 (one 5h window). Consuming hour 9 alone should
+        // split it into {7,8} and {10,11} - exactly what a pinned assignment
+        // sitting in the middle of an otherwise-open day would do.
+        TeacherEntity teacher = teacherWithHours(
+                new int[][] { { 1, 7 }, { 1, 8 }, { 1, 9 }, { 1, 10 }, { 1, 11 } });
+
+        Map<Integer, List<int[]>> windows = AvailabilityAwareBlockShaper.windowsByDay(teacher,
+                List.of(new int[] { 1, 9, 1 }));
+
+        List<int[]> dayOneWindows = windows.get(1);
+        assertEquals(2, dayOneWindows.size());
+        assertArrayEquals(new int[] { 7, 2 }, dayOneWindows.get(0));
+        assertArrayEquals(new int[] { 10, 2 }, dayOneWindows.get(1));
+    }
+
+    @Test
+    public void windowsByDay_consumedRangeCoveringWholeDay_leavesThatDayEmpty() {
+        TeacherEntity teacher = teacherWithHours(new int[][] { { 1, 7 } });
+
+        Map<Integer, List<int[]>> windows = AvailabilityAwareBlockShaper.windowsByDay(teacher,
+                List.of(new int[] { 1, 7, 1 }));
+
+        assertEquals(0, AvailabilityAwareBlockShaper.distinctAvailableDayCount(windows));
+    }
+
+    @Test
+    public void windowsByDay_consumedRangeOnADayTheTeacherHasNoAvailability_isIgnored() {
+        TeacherEntity teacher = teacherWithHours(new int[][] { { 1, 7 } });
+
+        // Day 3 isn't in the teacher's availability at all - nothing to remove from.
+        Map<Integer, List<int[]>> windows = AvailabilityAwareBlockShaper.windowsByDay(teacher,
+                List.of(new int[] { 3, 7, 1 }));
+
+        assertEquals(1, AvailabilityAwareBlockShaper.distinctAvailableDayCount(windows));
+    }
 }

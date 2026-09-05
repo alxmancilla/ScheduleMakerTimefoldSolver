@@ -58,6 +58,14 @@ import java.util.TreeSet;
  * that teacher's whole week to themselves. {@link #assignWindows(List, int,
  * Map)} is transactional for exactly this reason - a map that outlives a
  * single call must never end up partially consumed by a failed attempt.
+ *
+ * <p>{@link #windowsByDay(TeacherEntity, List)} additionally lets a caller
+ * carve specific hours out of the teacher's raw declared availability before
+ * any window is computed - used by {@code BlockGenerationService} to seed a
+ * teacher's calendar with hours already committed to a PINNED existing
+ * assignment elsewhere, so a brand-new pairing for a teacher who already has
+ * other work doesn't get shaped against a calendar that pretends that work
+ * doesn't exist.
  */
 final class AvailabilityAwareBlockShaper {
 
@@ -269,8 +277,38 @@ final class AvailabilityAwareBlockShaper {
      * generateBlocks() run - see the class javadoc's "shared calendar" note.
      */
     static Map<Integer, List<int[]>> windowsByDay(TeacherEntity teacher) {
+        return windowsByDay(teacher, List.of());
+    }
+
+    /**
+     * Same as {@link #windowsByDay(TeacherEntity)}, but with specific hours
+     * removed from the teacher's raw declared availability before any window
+     * is computed - used to seed a teacher's calendar with hours genuinely
+     * already committed to a PINNED existing assignment elsewhere (a known,
+     * exact day/hour), so a brand-new pairing for that teacher reasons
+     * against what's actually left rather than their full raw week. Removing
+     * an hour from the middle of a contiguous run naturally splits it into
+     * two windows once {@link #contiguousWindows} re-scans what remains, so
+     * no separate window-splitting logic is needed here.
+     *
+     * @param consumedRanges each {@code [dayOfWeek, startHour, length]} to
+     *                        remove before computing windows; a day this
+     *                        teacher has no availability for at all is
+     *                        silently ignored
+     */
+    static Map<Integer, List<int[]>> windowsByDay(TeacherEntity teacher, List<int[]> consumedRanges) {
+        Map<Integer, SortedSet<Integer>> hours = hoursByDay(teacher);
+        for (int[] range : consumedRanges) {
+            SortedSet<Integer> dayHours = hours.get(range[0]);
+            if (dayHours == null) {
+                continue;
+            }
+            for (int h = range[1]; h < range[1] + range[2]; h++) {
+                dayHours.remove(h);
+            }
+        }
         Map<Integer, List<int[]>> result = new TreeMap<>();
-        for (Map.Entry<Integer, SortedSet<Integer>> entry : hoursByDay(teacher).entrySet()) {
+        for (Map.Entry<Integer, SortedSet<Integer>> entry : hours.entrySet()) {
             result.put(entry.getKey(), contiguousWindows(entry.getValue()));
         }
         return result;
