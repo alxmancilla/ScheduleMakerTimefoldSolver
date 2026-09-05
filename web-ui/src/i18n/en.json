@@ -629,15 +629,19 @@
       "saving": "Saving...",
       "sizeHint": "Blocks are packed greedily at this size, with a smaller trailing block for any leftover hours.",
       "maxBlocksPerDayHint": "The solver will not place more than this many blocks of the same course, for the same group, on one day.",
+      "marginDaysDefault": "Default (1)",
+      "marginDaysHint": "How many spare distinct days a generated shape must leave beyond the bare minimum before it's accepted as safe. Higher is more cautious (favors more, shorter blocks spread across more days); lower accepts tighter shapes. Leave on Default unless this component keeps showing up in violation reports.",
       "fields": {
         "component": "Designation:",
         "preferredBlockSize": "Preferred Block Size (hours):",
-        "maxBlocksPerDay": "Max Blocks Per Day:"
+        "maxBlocksPerDay": "Max Blocks Per Day:",
+        "marginDays": "Margin Days:"
       },
       "table": {
         "component": "Designation",
         "preferredBlockSize": "Preferred Block Size",
-        "maxBlocksPerDay": "Max Blocks/Day"
+        "maxBlocksPerDay": "Max Blocks/Day",
+        "marginDays": "Margin Days"
       }
     },
     "constraintWeights": {

@@ -1091,6 +1091,108 @@ public class BlockGenerationServiceTest {
         verify(assignmentRepository, times(3)).save(captor.capture());
         List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
         assertEquals(List.of(2, 1, 1), lengths);
+
+        // A scheduler reviewing this batch should be able to see the reshape
+        // without reconstructing it from the database by hand.
+        assertEquals(1, result.getAdjustments().size());
+        String adjustment = result.getAdjustments().get(0);
+        assertTrue(adjustment.contains("G1"));
+        assertTrue(adjustment.contains("C1"));
+        assertTrue(adjustment.contains("[1, 1, 1, 1]"));
+        assertTrue(adjustment.contains("[2, 1, 1]"));
+    }
+
+    @Test
+    public void noAdjustment_recordedWhenNaiveShapeIsKeptUnchanged() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(2, 7); // BASICAS needs 2 days at maxBlocksPerDay=1 for 2 blocks - exactly fits
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(2, result.getBlocksCreated());
+        assertTrue("naive shape was kept as-is, so nothing should be reported as adjusted",
+                result.getAdjustments().isEmpty());
+    }
+
+    // ---- Configurable margin per component (component_block_rule.marginDays) ----
+
+    @Test
+    public void configuredMarginDaysOverride_zeroLetsATightShapeBeAcceptedAsSafe() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 3, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        // Override BASICAS's margin to 0 instead of the default 1.
+        ComponentBlockRuleEntity rule = new ComponentBlockRuleEntity("BASICAS", 1, 1);
+        rule.setMarginDays(0);
+        when(componentBlockRuleRepository.findById("BASICAS")).thenReturn(Optional.of(rule));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(2, 7);
+        teacher.addAvailability(3, 7); // exactly 3 days - naive needs exactly 3, no spare
+
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // With the default margin (1), naive [1,1,1] (needs 3 days) would fail
+        // (3 + 1 = 4 > 3 available) and get adapted to something bigger. With
+        // marginDays overridden to 0, 3 + 0 = 3 <= 3 passes, so the naive
+        // shape is accepted as-is - and, since nothing was adapted, no
+        // adjustment is recorded either.
+        assertEquals(3, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(3)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1, 1), lengths);
+        assertTrue(result.getAdjustments().isEmpty());
+    }
+
+    @Test
+    public void configuredMarginDaysOverride_higherThanDefaultForcesEarlierAdaptation() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        // Override BASICAS's margin to 2 instead of the default 1 - stricter,
+        // not looser, proving the override works in both directions.
+        ComponentBlockRuleEntity rule = new ComponentBlockRuleEntity("BASICAS", 1, 1);
+        rule.setMarginDays(2);
+        when(componentBlockRuleRepository.findById("BASICAS")).thenReturn(Optional.of(rule));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8); // one 2h window, so size-2 adaptation has somewhere to go
+        teacher.addAvailability(2, 7);
+        teacher.addAvailability(3, 7); // 3 days total
+
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // With the default margin (1), naive [1,1] (needs 2 days) would pass
+        // comfortably (2 + 1 = 3 <= 3) and stay untouched. With marginDays
+        // overridden to 2, 2 + 2 = 4 <= 3 fails, forcing adaptation to a
+        // single 2h block (1 + 2 = 3 <= 3).
+        assertEquals(1, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Integer.valueOf(2), captor.getValue().getBlockLength());
+        assertEquals(1, result.getAdjustments().size());
     }
 
     @Test

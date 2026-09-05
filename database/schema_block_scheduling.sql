@@ -846,10 +846,12 @@ CREATE TABLE IF NOT EXISTS component_block_rule (
     component VARCHAR(20) PRIMARY KEY,
     preferred_block_size INTEGER NOT NULL,
     max_blocks_per_day INTEGER NOT NULL DEFAULT 2,
+    margin_days INTEGER,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT check_preferred_block_size CHECK (preferred_block_size BETWEEN 1 AND 4),
     CONSTRAINT check_max_blocks_per_day CHECK (max_blocks_per_day BETWEEN 1 AND 4),
+    CONSTRAINT check_margin_days CHECK (margin_days IS NULL OR margin_days BETWEEN 0 AND 4),
     CONSTRAINT fk_component_block_rule_component FOREIGN KEY (component)
         REFERENCES course_designation(name) ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -858,10 +860,11 @@ INSERT INTO component_block_rule (component, preferred_block_size, max_blocks_pe
 VALUES ('Core', 1, 1)
 ON CONFLICT (component) DO NOTHING;
 
-COMMENT ON TABLE component_block_rule IS 'Preferred block size (1-4h) and max blocks per day (1-4) per course component, used by BlockGenerationService and the solver respectively. A component with no row here defaults to size 2 / max 2 per day in code.';
+COMMENT ON TABLE component_block_rule IS 'Preferred block size (1-4h), max blocks per day (1-4), and an optional margin-days override per course component, used by BlockGenerationService and the solver respectively. A component with no row here defaults to size 2 / max 2 per day in code.';
 COMMENT ON COLUMN component_block_rule.component IS 'Matches course.designation (e.g. Core, TEM, TCS).';
 COMMENT ON COLUMN component_block_rule.preferred_block_size IS 'Blocks are packed greedily at this size, with a trailing remainder block if hours don''t divide evenly.';
 COMMENT ON COLUMN component_block_rule.max_blocks_per_day IS 'HARD limit on how many blocks of this component''s courses may land on the same day for the same group.';
+COMMENT ON COLUMN component_block_rule.margin_days IS 'Optional override for how many spare distinct days a generated shape must leave beyond the bare minimum before BlockGenerationService accepts it as safe (see AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS). NULL falls back to that hardcoded default (currently 1).';
 
 -- ============================================================================
 -- CONSTRAINT CONFIG TABLE

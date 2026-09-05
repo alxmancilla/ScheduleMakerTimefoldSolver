@@ -36,6 +36,7 @@ public class ComponentBlockRuleController {
                 .orElseGet(() -> new ComponentBlockRuleEntity(component, null, null));
         rule.setPreferredBlockSize(request.getPreferredBlockSize());
         rule.setMaxBlocksPerDay(request.getMaxBlocksPerDay());
+        rule.setMarginDays(request.getMarginDays());
         return ruleRepository.save(rule);
     }
 

@@ -262,10 +262,11 @@ export const getAuditLog = () => api.get('/admin/audit-log');
 // A component with no rule here falls back to size 2 / max 2 per day
 // server-side.
 export const getComponentBlockRules = () => api.get('/admin/component-block-rules');
-export const setComponentBlockRule = (component, preferredBlockSize, maxBlocksPerDay) =>
+export const setComponentBlockRule = (component, preferredBlockSize, maxBlocksPerDay, marginDays) =>
   api.put(`/admin/component-block-rules/${encodeURIComponent(component)}`, {
     preferredBlockSize,
     maxBlocksPerDay,
+    marginDays,
   });
 export const deleteComponentBlockRule = (component) =>
   api.delete(`/admin/component-block-rules/${encodeURIComponent(component)}`);

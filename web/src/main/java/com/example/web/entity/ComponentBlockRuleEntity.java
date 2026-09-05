@@ -17,6 +17,9 @@ public class ComponentBlockRuleEntity {
     @Column(name = "max_blocks_per_day", nullable = false)
     private Integer maxBlocksPerDay;
 
+    @Column(name = "margin_days")
+    private Integer marginDays;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -65,6 +68,15 @@ public class ComponentBlockRuleEntity {
 
     public void setMaxBlocksPerDay(Integer maxBlocksPerDay) {
         this.maxBlocksPerDay = maxBlocksPerDay;
+    }
+
+    /** Null means "use AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS" - see BlockGenerationService.decomposeHours. */
+    public Integer getMarginDays() {
+        return marginDays;
+    }
+
+    public void setMarginDays(Integer marginDays) {
+        this.marginDays = marginDays;
     }
 
     public LocalDateTime getCreatedAt() {

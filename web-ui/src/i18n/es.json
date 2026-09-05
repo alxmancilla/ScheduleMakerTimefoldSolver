@@ -629,15 +629,19 @@
       "saving": "Guardando...",
       "sizeHint": "Los bloques se empaquetan de forma voraz a este tamaño, con un bloque final más pequeño para las horas restantes.",
       "maxBlocksPerDayHint": "El solucionador no colocará más de este número de bloques del mismo curso, para el mismo grupo, en un solo día.",
+      "marginDaysDefault": "Por defecto (1)",
+      "marginDaysHint": "Cuántos días distintos de margen debe dejar una forma generada más allá del mínimo indispensable antes de aceptarse como segura. Un valor más alto es más cauteloso (favorece más bloques, más cortos, repartidos en más días); uno más bajo acepta formas más ajustadas. Deja el valor por defecto salvo que esta designación siga apareciendo en los reportes de incumplimientos.",
       "fields": {
         "component": "Designación:",
         "preferredBlockSize": "Tamaño de Bloque Preferido (horas):",
-        "maxBlocksPerDay": "Máximo de Bloques por Día:"
+        "maxBlocksPerDay": "Máximo de Bloques por Día:",
+        "marginDays": "Días de Margen:"
       },
       "table": {
         "component": "Designación",
         "preferredBlockSize": "Tamaño de Bloque Preferido",
-        "maxBlocksPerDay": "Máx. Bloques/Día"
+        "maxBlocksPerDay": "Máx. Bloques/Día",
+        "marginDays": "Días de Margen"
       }
     },
     "constraintWeights": {

@@ -184,6 +184,7 @@ public class BlockGenerationService {
         int created = 0;
         int skippedExisting = 0;
         List<String> warnings = new ArrayList<>();
+        List<String> adjustments = new ArrayList<>();
 
         List<StudentGroupEntity> allGroups = studentGroupRepository.findAll();
         Map<String, Integer> groupCourseCountByTeacher = new HashMap<>();
@@ -231,7 +232,7 @@ public class BlockGenerationService {
         for (PendingPair p : pending) {
             if (p.defaultTeacherId() == null) {
                 created += generateBlocksForGroupCourse(p.group(), p.course(), null, groupCourseCountByTeacher, null,
-                        warnings);
+                        warnings, adjustments);
                 continue;
             }
             byTeacher.computeIfAbsent(p.defaultTeacherId(), k -> new ArrayList<>()).add(p);
@@ -264,11 +265,11 @@ public class BlockGenerationService {
             }
             for (PendingPair p : pairs) {
                 created += generateBlocksForGroupCourse(p.group(), p.course(), p.defaultTeacherId(),
-                        groupCourseCountByTeacher, sharedCalendar, warnings);
+                        groupCourseCountByTeacher, sharedCalendar, warnings, adjustments);
             }
         }
 
-        return new GenerationResult(created, skippedExisting, warnings);
+        return new GenerationResult(created, skippedExisting, warnings, adjustments);
     }
 
     /** A (group, course) pair queued for generation, before its teacher grouping is decided. */
@@ -367,10 +368,15 @@ public class BlockGenerationService {
      *                       which case this teacher's effective calendar
      *                       (see buildEffectiveCalendar) is built fresh for
      *                       this call alone.
+     * @param adjustments    collects a human-readable note whenever a
+     *                       portion's chosen shape differs from its naive
+     *                       one (margin adaptation or Core's minimal-upgrade
+     *                       preference actually did something) - see
+     *                       decomposeHours' ShapeDecision.
      */
     private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId,
             Map<String, Integer> groupCourseCountByTeacher, TeacherCalendar sharedCalendar,
-            List<String> warnings) {
+            List<String> warnings, List<String> adjustments) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());
         if (!templates.isEmpty()) {
             for (CourseBlockTemplateEntity template : templates) {
@@ -410,7 +416,9 @@ public class BlockGenerationService {
         int created = 0;
         List<CourseBlockAssignmentEntity> generated = new ArrayList<>();
         if (requirements.isEmpty()) {
-            List<Integer> shape = decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation(), calendar);
+            ShapeDecision decision = decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation(), calendar);
+            recordAdjustment(group, course, decision, adjustments);
+            List<Integer> shape = decision.shape();
             consumeFromCalendar(shape, course.getDesignation(), calendar);
             for (int length : shape) {
                 generated.add(saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null, defaultTeacherId));
@@ -419,7 +427,9 @@ public class BlockGenerationService {
             }
         } else {
             for (CourseRoomRequirementEntity requirement : requirements) {
-                List<Integer> shape = decomposeHours(requirement.getHoursRequired(), course.getDesignation(), calendar);
+                ShapeDecision decision = decomposeHours(requirement.getHoursRequired(), course.getDesignation(), calendar);
+                recordAdjustment(group, course, decision, adjustments);
+                List<Integer> shape = decision.shape();
                 consumeFromCalendar(shape, course.getDesignation(), calendar);
                 for (int length : shape) {
                     generated.add(saveBlock(group, course, blockIndex, length, requirement.getRoomType(),
@@ -714,15 +724,19 @@ public class BlockGenerationService {
      * leftover hours that don't divide evenly.
      *
      * When a teacher is already resolved, that naive shape is checked against
-     * {@code windows} first: if it wouldn't leave at least
-     * {@link AvailabilityAwareBlockShaper#DEFAULT_MARGIN_DAYS} spare distinct
-     * days beyond the minimum needed (a shape that's only just barely
-     * possible leaves the solver zero room to absorb any other scheduling
-     * pressure that day - confirmed live 2026-09-05: two pairs generated with
-     * exactly zero slack both went on to violate maxBlocksPerDay once
-     * solved), AvailabilityAwareBlockShaper is asked for a shape (fewer,
-     * longer blocks) that does have margin, without ever pinning a specific
-     * day - the solver still freely places each block among the teacher's
+     * {@code windows} first: if it wouldn't leave at least the component's
+     * required margin - {@code component_block_rule.marginDays} when
+     * configured, otherwise
+     * {@link AvailabilityAwareBlockShaper#DEFAULT_MARGIN_DAYS} (added
+     * 2026-09-05 so a scheduler can tune this per component instead of one
+     * hardcoded value for the whole school) - spare distinct days beyond the
+     * minimum needed (a shape that's only just barely possible leaves the
+     * solver zero room to absorb any other scheduling pressure that day -
+     * confirmed live 2026-09-05: two pairs generated with exactly zero slack
+     * both went on to violate maxBlocksPerDay once solved),
+     * AvailabilityAwareBlockShaper is asked for a shape (fewer, longer
+     * blocks) that does have margin, without ever pinning a specific day -
+     * the solver still freely places each block among the teacher's
      * available days, exactly as for any other generated block. This is a
      * probabilistic hedge, not a guarantee: it lowers how often the solver
      * gets squeezed into a violation, it doesn't prove it can't happen (a
@@ -751,33 +765,62 @@ public class BlockGenerationService {
      *                  pairings need generation for this teacher in the same
      *                  run, a fresh one otherwise, or null when no teacher is
      *                  resolved yet at all (see generateBlocksForGroupCourse)
+     * @return a {@link ShapeDecision} carrying both the chosen shape and the
+     *         naive one it was (or wasn't) adapted from, so the caller can
+     *         report when adaptation actually did something (see
+     *         recordAdjustment) without recomputing the naive shape itself
      */
-    private List<Integer> decomposeHours(int hours, String component, TeacherCalendar calendar) {
+    private ShapeDecision decomposeHours(int hours, String component, TeacherCalendar calendar) {
         ComponentBlockRuleEntity rule = componentBlockRuleRepository.findById(component).orElse(null);
         int preferredSize = rule != null && rule.getPreferredBlockSize() != null ? rule.getPreferredBlockSize()
                 : DEFAULT_BLOCK_SIZE;
         List<Integer> naive = AvailabilityAwareBlockShaper.packBlocks(hours, preferredSize);
         if (calendar == null) {
-            return naive;
+            return new ShapeDecision(naive, naive);
         }
         Map<Integer, List<int[]>> windows = calendar.windows();
         int availableDays = AvailabilityAwareBlockShaper.distinctAvailableDayCount(windows);
         int maxBlocksPerDay = rule != null && rule.getMaxBlocksPerDay() != null ? rule.getMaxBlocksPerDay()
                 : DEFAULT_MAX_BLOCKS_PER_DAY;
-        int marginDays = AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS + calendar.extraMarginDays();
+        int baseMarginDays = rule != null && rule.getMarginDays() != null ? rule.getMarginDays()
+                : AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS;
+        int marginDays = baseMarginDays + calendar.extraMarginDays();
         if (availableDays == 0
                 || AvailabilityAwareBlockShaper.fitsWithinDayCap(naive.size(), maxBlocksPerDay, availableDays,
                         marginDays)) {
-            return naive;
+            return new ShapeDecision(naive, naive);
         }
         if (CORE_DESIGNATION.equals(component)) {
             List<Integer> mixed = AvailabilityAwareBlockShaper.tryMinimalUpgradeShape(hours, preferredSize,
                     maxBlocksPerDay, availableDays, marginDays);
-            return mixed != null ? mixed : naive;
+            return new ShapeDecision(mixed != null ? mixed : naive, naive);
         }
         List<Integer> adapted = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(hours, preferredSize,
                 maxBlocksPerDay, windows, marginDays);
-        return adapted != null ? adapted : naive;
+        return new ShapeDecision(adapted != null ? adapted : naive, naive);
+    }
+
+    /** The outcome of one {@link #decomposeHours} call: the chosen shape, and the naive shape it started from. */
+    private record ShapeDecision(List<Integer> shape, List<Integer> naiveShape) {
+        boolean wasAdapted() {
+            return !shape.equals(naiveShape);
+        }
+    }
+
+    /**
+     * Appends a human-readable note to {@code adjustments} whenever
+     * {@code decision}'s chosen shape differs from its naive one - a
+     * scheduler reviewing a generation batch otherwise has no visibility
+     * into which pairings got reshaped, or what they were reshaped from,
+     * short of reconstructing it by hand from the database (as happened
+     * more than once before this existed).
+     */
+    private void recordAdjustment(StudentGroupEntity group, CourseEntity course, ShapeDecision decision,
+            List<String> adjustments) {
+        if (decision.wasAdapted()) {
+            adjustments.add(String.format("%s/%s: naive shape %s adapted to %s", group.getId(), course.getId(),
+                    decision.naiveShape(), decision.shape()));
+        }
     }
 
     /** Outcome of a generateBlocks() run. */
@@ -785,11 +828,20 @@ public class BlockGenerationService {
         private final int blocksCreated;
         private final int groupCoursesSkippedExisting;
         private final List<String> warnings;
+        private final List<String> adjustments;
 
+        /** @deprecated kept for callers that don't care about adjustments; prefer the 4-arg constructor. */
+        @Deprecated
         public GenerationResult(int blocksCreated, int groupCoursesSkippedExisting, List<String> warnings) {
+            this(blocksCreated, groupCoursesSkippedExisting, warnings, List.of());
+        }
+
+        public GenerationResult(int blocksCreated, int groupCoursesSkippedExisting, List<String> warnings,
+                List<String> adjustments) {
             this.blocksCreated = blocksCreated;
             this.groupCoursesSkippedExisting = groupCoursesSkippedExisting;
             this.warnings = warnings;
+            this.adjustments = adjustments;
         }
 
         public int getBlocksCreated() {
@@ -802,6 +854,16 @@ public class BlockGenerationService {
 
         public List<String> getWarnings() {
             return warnings;
+        }
+
+        /**
+         * One entry per (group, course) portion whose chosen shape differed
+         * from its naive one - margin adaptation or Core's minimal-upgrade
+         * preference actually changed something. Empty means every portion
+         * generated this run kept its naive shape unchanged.
+         */
+        public List<String> getAdjustments() {
+            return adjustments;
         }
     }
 }

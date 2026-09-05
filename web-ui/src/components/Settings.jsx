@@ -38,7 +38,8 @@ const LATEST_END_HOURS = [8, 9, 10, 11, 12, 13, 14, 15];
 const LENGTHS = [1, 2, 3, 4];
 const EMPTY_FORM = { dayOfWeek: 1, startHour: 7, lengthHours: 1 };
 const BLOCK_SIZES = [1, 2, 3, 4];
-const EMPTY_BLOCK_RULE_FORM = { component: '', preferredBlockSize: 2, maxBlocksPerDay: 2 };
+// marginDays uses '' (not a number) to mean "unset - use the hardcoded default" - distinct from 0, a real override.
+const EMPTY_BLOCK_RULE_FORM = { component: '', preferredBlockSize: 2, maxBlocksPerDay: 2, marginDays: '' };
 const SEVERITY_OPTIONS = ['HARD', 'SOFT'];
 const EMPTY_SEMESTER_HOUR_LIMIT_FORM = { semester: '', latestEndHour: 14, severity: 'HARD' };
 const CALENDAR_EXCEPTION_TYPES = ['HOLIDAY', 'HALF_DAY', 'EXAM_DAY'];
@@ -415,14 +416,19 @@ function Settings() {
 
   const handleAddBlockRule = () => {
     setEditingBlockRuleComponent(null);
-    setBlockRuleForm({ component: unconfiguredComponents[0] || '', preferredBlockSize: 2, maxBlocksPerDay: 2 });
+    setBlockRuleForm({ component: unconfiguredComponents[0] || '', preferredBlockSize: 2, maxBlocksPerDay: 2, marginDays: '' });
     setBlockRulesError(null);
     setShowBlockRuleForm(true);
   };
 
   const handleEditBlockRule = (rule) => {
     setEditingBlockRuleComponent(rule.component);
-    setBlockRuleForm({ component: rule.component, preferredBlockSize: rule.preferredBlockSize, maxBlocksPerDay: rule.maxBlocksPerDay });
+    setBlockRuleForm({
+      component: rule.component,
+      preferredBlockSize: rule.preferredBlockSize,
+      maxBlocksPerDay: rule.maxBlocksPerDay,
+      marginDays: rule.marginDays === null || rule.marginDays === undefined ? '' : rule.marginDays,
+    });
     setBlockRulesError(null);
     setShowBlockRuleForm(true);
   };
@@ -438,7 +444,8 @@ function Settings() {
     setSavingBlockRule(true);
     setBlockRulesError(null);
     try {
-      await setComponentBlockRule(blockRuleForm.component, blockRuleForm.preferredBlockSize, blockRuleForm.maxBlocksPerDay);
+      const marginDays = blockRuleForm.marginDays === '' ? null : blockRuleForm.marginDays;
+      await setComponentBlockRule(blockRuleForm.component, blockRuleForm.preferredBlockSize, blockRuleForm.maxBlocksPerDay, marginDays);
       handleCancelBlockRule();
       loadBlockRules();
       showToast(t('settings.blockRules.savedMessage'));
@@ -1116,6 +1123,24 @@ function Settings() {
                 {t('settings.blockRules.maxBlocksPerDayHint')}
               </div>
             </div>
+            <div className="form-group">
+              <label>{t('settings.blockRules.fields.marginDays')}</label>
+              <select
+                value={blockRuleForm.marginDays}
+                onChange={(e) => setBlockRuleForm({
+                  ...blockRuleForm,
+                  marginDays: e.target.value === '' ? '' : parseInt(e.target.value, 10),
+                })}
+              >
+                <option value="">{t('settings.blockRules.marginDaysDefault')}</option>
+                {[0, 1, 2, 3, 4].map((days) => (
+                  <option key={days} value={days}>{days}</option>
+                ))}
+              </select>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+                {t('settings.blockRules.marginDaysHint')}
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn btn-primary" disabled={savingBlockRule || !blockRuleForm.component}>
                 {savingBlockRule ? t('settings.blockRules.saving') : t('common.save')}
@@ -1136,6 +1161,7 @@ function Settings() {
                 <th>{t('settings.blockRules.table.component')}</th>
                 <th>{t('settings.blockRules.table.preferredBlockSize')}</th>
                 <th>{t('settings.blockRules.table.maxBlocksPerDay')}</th>
+                <th>{t('settings.blockRules.table.marginDays')}</th>
                 <th>{t('common.actions')}</th>
               </tr>
             </thead>
@@ -1145,6 +1171,9 @@ function Settings() {
                   <td>{rule.component}</td>
                   <td>{rule.preferredBlockSize}h</td>
                   <td>{rule.maxBlocksPerDay}</td>
+                  <td>{rule.marginDays === null || rule.marginDays === undefined
+                    ? t('settings.blockRules.marginDaysDefault')
+                    : rule.marginDays}</td>
                   <td>
                     <button className="btn btn-primary" onClick={() => handleEditBlockRule(rule)} style={{ marginRight: '5px' }}>
                       {t('common.edit')}
