@@ -4,6 +4,7 @@ import com.example.web.entity.TeacherEntity;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -183,5 +184,68 @@ public class AvailabilityAwareBlockShaperTest {
     public void assignWindows_cannotFitEverything_returnsNullNotPartial() {
         TeacherEntity teacher = teacherWithHours(new int[][] { { 1, 7 }, { 1, 8 }, { 1, 9 } }); // only 3h total
         assertNull(AvailabilityAwareBlockShaper.assignWindows(List.of(5), 2, teacher));
+    }
+
+    // ---- Map-based overloads (the shared-calendar mechanism) ----
+
+    private Map<Integer, List<int[]>> mapWindows(int[]... dayWindows) {
+        // each entry: {day, startHour, length}
+        Map<Integer, List<int[]>> result = new java.util.TreeMap<>();
+        for (int[] w : dayWindows) {
+            result.computeIfAbsent(w[0], d -> new java.util.ArrayList<>()).add(new int[] { w[1], w[2] });
+        }
+        return result;
+    }
+
+    @Test
+    public void distinctAvailableDayCount_map_ignoresDaysExhaustedToZero() {
+        Map<Integer, List<int[]>> windows = mapWindows(
+                new int[] { 1, 7, 0 }, // day 1's only window is fully consumed
+                new int[] { 2, 7, 3 });
+        assertEquals(1, AvailabilityAwareBlockShaper.distinctAvailableDayCount(windows));
+    }
+
+    @Test
+    public void largestContiguousWindow_map_reflectsRemainingLength() {
+        Map<Integer, List<int[]>> windows = mapWindows(new int[] { 1, 7, 1 }, new int[] { 2, 7, 3 });
+        assertEquals(3, AvailabilityAwareBlockShaper.largestContiguousWindow(windows));
+    }
+
+    @Test
+    public void assignWindows_map_mutatesTheSameMapAcrossCalls() {
+        Map<Integer, List<int[]>> windows = mapWindows(new int[] { 1, 7, 4 });
+
+        List<int[]> first = AvailabilityAwareBlockShaper.assignWindows(List.of(2), 1, windows);
+        assertArrayEquals(new int[] { 1, 7 }, first.get(0));
+        // 2 of the 4 hours are now consumed - a second call sees the same map, shrunk.
+        assertEquals(2, windows.get(1).get(0)[1]);
+
+        List<int[]> second = AvailabilityAwareBlockShaper.assignWindows(List.of(2), 1, windows);
+        assertArrayEquals(new int[] { 1, 9 }, second.get(0));
+        assertEquals(0, windows.get(1).get(0)[1]);
+    }
+
+    @Test
+    public void assignWindows_map_failedAttemptLeavesMapCompletelyUntouched() {
+        Map<Integer, List<int[]>> windows = mapWindows(new int[] { 1, 7, 3 });
+        int[] before = windows.get(1).get(0).clone();
+
+        // First block (2h) fits; second (5h) doesn't - the whole call must fail
+        // and roll back, not leave the first block's consumption applied.
+        List<int[]> result = AvailabilityAwareBlockShaper.assignWindows(List.of(2, 5), 2, windows);
+
+        assertNull(result);
+        assertArrayEquals(before, windows.get(1).get(0));
+    }
+
+    @Test
+    public void tryAvailabilityAwareShape_map_worksAgainstAnAlreadyPartiallyConsumedCalendar() {
+        // Only 1 day realistically left (as if another pairing sharing this
+        // teacher already consumed the rest), with a 3h window.
+        Map<Integer, List<int[]>> windows = mapWindows(new int[] { 3, 7, 3 });
+
+        List<Integer> shape = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(3, 1, 1, windows, 0);
+
+        assertEquals(List.of(3), shape); // single 3h block is the only way to fit in one remaining day
     }
 }

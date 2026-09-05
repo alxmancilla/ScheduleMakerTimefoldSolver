@@ -898,6 +898,166 @@ public class BlockGenerationServiceTest {
         assertEquals(Boolean.FALSE, captor.getValue().getPinned());
     }
 
+    // ---- Shared calendar across pairings sharing one teacher (Option C) ----
+
+    @Test
+    public void sharedTeacher_secondPairingSeesTheFirstPairingsConsumption() {
+        // Teacher has 3 days, each a 2h window (6h total). Both groups need 4h of
+        // the same BASICAS course from this teacher - not enough total slack for
+        // both to get a comfortably-margined shape.
+        StudentGroupEntity groupA = new StudentGroupEntity("GA", "Group A");
+        groupA.addCourse("Mathematics").setDefaultTeacherId("T1");
+        StudentGroupEntity groupB = new StudentGroupEntity("GB", "Group B");
+        groupB.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(groupA, groupB));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 4, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId(anyString(), anyString())).thenReturn(false);
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int day = 1; day <= 3; day++) {
+            teacher.addAvailability(day, 7);
+            teacher.addAvailability(day, 8);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(6, result.getBlocksCreated()); // GA: 2 blocks, GB: 4 blocks
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(6)).save(captor.capture());
+        List<CourseBlockAssignmentEntity> saved = captor.getAllValues();
+
+        // GA processed first against the full, untouched calendar: adapts to
+        // [2, 2] (2 blocks/2 days, 1 day margin - the same-hours tie is broken by
+        // input order, GA first).
+        List<Integer> gaLengths = saved.stream().filter(b -> b.getGroupId().equals("GA"))
+                .map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(2, 2), gaLengths);
+
+        // GB processed second sees only 1 day left (2h) - not enough for any
+        // margin-safe or even bare-feasible longer shape, so it falls all the way
+        // back to the untouched naive shape - a genuinely different, worse outcome
+        // than GB would have gotten computed independently (it would also have
+        // gotten [2, 2] against a fresh, full calendar).
+        List<Integer> gbLengths = saved.stream().filter(b -> b.getGroupId().equals("GB"))
+                .map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1, 1, 1), gbLengths);
+    }
+
+    @Test
+    public void sharedTeacher_pairingsProcessedLargestHoursFirstRegardlessOfInputOrder() {
+        // Same 3-day/2h-window teacher as above, but this time the SMALLER
+        // pairing (2h) is added first and the LARGER one (4h) second - if
+        // largest-hours-first is honored, the 4h pairing still gets first claim
+        // on the calendar (and the favorable margin-safe shape), not the 2h one.
+        StudentGroupEntity smallGroup = new StudentGroupEntity("SMALL", "Small Group");
+        smallGroup.addCourse("Mathematics").setDefaultTeacherId("T1");
+        StudentGroupEntity bigGroup = new StudentGroupEntity("BIG", "Big Group");
+        bigGroup.addCourse("Physics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(smallGroup, bigGroup));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(courseRepository.findByName("Physics"))
+                .thenReturn(Optional.of(course("C2", "Physics", 4, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId(anyString(), anyString())).thenReturn(false);
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int day = 1; day <= 3; day++) {
+            teacher.addAvailability(day, 7);
+            teacher.addAvailability(day, 8);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // BIG gets [2, 2] (2 blocks), SMALL gets [2] (1 block) - 3 total, not
+        // one-per-hour, since both shapes above are already block counts, not
+        // hour counts.
+        assertEquals(3, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(3)).save(captor.capture());
+        List<CourseBlockAssignmentEntity> saved = captor.getAllValues();
+
+        // BIG (4h, added second) must still be processed first: [2, 2], the
+        // margin-safe shape - proving the largest-hours-first ordering, not
+        // input/iteration order, decided who got first claim on the calendar.
+        List<Integer> bigLengths = saved.stream().filter(b -> b.getGroupId().equals("BIG"))
+                .map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(2, 2), bigLengths);
+
+        // SMALL (2h, added first) is left with the calendar's leftovers.
+        List<Integer> smallLengths = saved.stream().filter(b -> b.getGroupId().equals("SMALL"))
+                .map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(2), smallLengths);
+    }
+
+    @Test
+    public void sharedTeacher_withAmpleAvailability_bothPairingsGetTheSameUnaffectedShape() {
+        // A real school week only has 5 distinct days at all, so two 4h/BASICAS
+        // pairings (the "tight" test above) can never both have true margin - by
+        // definition, one pairing's 4-day consumption alone leaves at most 1 day
+        // for anyone else. Genuine "ample, unaffected" slack instead needs a
+        // smaller ask: two groups each needing 2h, from a teacher with 5 days -
+        // even after the first group's 2 blocks consume 2 days, 3 remain, still
+        // comfortably >= the second group's own 2-needed+1-margin = 3.
+        StudentGroupEntity groupA = new StudentGroupEntity("GA", "Group A");
+        groupA.addCourse("Mathematics").setDefaultTeacherId("T1");
+        StudentGroupEntity groupB = new StudentGroupEntity("GB", "Group B");
+        groupB.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(groupA, groupB));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId(anyString(), anyString())).thenReturn(false);
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        for (int day = 1; day <= 5; day++) {
+            teacher.addAvailability(day, 7); // BASICAS is 1h/block - 1h/day is enough
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(4, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(4)).save(captor.capture());
+        List<CourseBlockAssignmentEntity> saved = captor.getAllValues();
+
+        // Both groups keep the naive [1, 1] BASICAS shape - neither one's margin
+        // math is disturbed by the other's consumption, since 5 real days is
+        // comfortably more than either pairing needs even after the first one
+        // claims its share.
+        for (CourseBlockAssignmentEntity block : saved) {
+            assertEquals(Integer.valueOf(1), block.getBlockLength());
+        }
+    }
+
+    @Test
+    public void singleTeacherPairing_neverGetsAnUnnecessarySharedCalendar() {
+        // A teacher appearing in only one pairing should behave exactly as
+        // before this feature - no grouping, no ordering, no shared state.
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(new CourseBlockAssignmentEntity()));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(2, 7);
+        teacher.addAvailability(3, 7);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(2, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1), lengths); // naive shape, comfortable margin (2 needed + 1 <= 3 available)
+    }
+
     @Test
     public void clearUnpinnedTimeslots_clearsOnlyUnpinnedRowsAndReturnsCount() {
         CourseBlockAssignmentEntity unpinned1 = new CourseBlockAssignmentEntity();

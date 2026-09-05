@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -145,6 +146,7 @@ public class BlockGenerationService {
             }
         }
 
+        List<PendingPair> pending = new ArrayList<>();
         for (StudentGroupEntity group : allGroups) {
             for (GroupCourseEntity groupCourse : group.getCourses()) {
                 CourseEntity course = courseRepository.findByName(groupCourse.getCourseName()).orElse(null);
@@ -166,12 +168,69 @@ public class BlockGenerationService {
                     skippedExisting++;
                     continue;
                 }
-                created += generateBlocksForGroupCourse(group, course, groupCourse.getDefaultTeacherId(),
-                        groupCourseCountByTeacher, warnings);
+                pending.add(new PendingPair(group, course, groupCourse.getDefaultTeacherId()));
+            }
+        }
+
+        // Group by teacher so pairings sharing one teacher are generated against a
+        // single, progressively-consumed calendar instead of each independently
+        // assuming they have that teacher's whole week to themselves - see
+        // docs/generate-blocks.md's "shared calendar" section. A teacher appearing
+        // only once (the common case) or not at all falls through with
+        // sharedCalendar == null, which is exactly today's unchanged behavior.
+        Map<String, List<PendingPair>> byTeacher = new LinkedHashMap<>();
+        for (PendingPair p : pending) {
+            if (p.defaultTeacherId() == null) {
+                created += generateBlocksForGroupCourse(p.group(), p.course(), null, groupCourseCountByTeacher, null,
+                        warnings);
+                continue;
+            }
+            byTeacher.computeIfAbsent(p.defaultTeacherId(), k -> new ArrayList<>()).add(p);
+        }
+
+        for (Map.Entry<String, List<PendingPair>> entry : byTeacher.entrySet()) {
+            List<PendingPair> pairs = entry.getValue();
+            Map<Integer, List<int[]>> sharedCalendar = null;
+            if (pairs.size() >= 2) {
+                TeacherEntity teacher = teacherRepository.findById(entry.getKey()).orElse(null);
+                if (teacher != null) {
+                    sharedCalendar = AvailabilityAwareBlockShaper.windowsByDay(teacher);
+                    // Largest-hours-first: a standard bin-packing heuristic so the pairing
+                    // that needs the most from this calendar gets first claim on it, rather
+                    // than whichever pairing this loop happens to reach first (an otherwise
+                    // arbitrary consequence of group/course iteration order).
+                    pairs = pairs.stream()
+                            .sorted(Comparator.comparingInt((PendingPair p) -> totalHoursFor(p.course())).reversed())
+                            .toList();
+                }
+            }
+            for (PendingPair p : pairs) {
+                created += generateBlocksForGroupCourse(p.group(), p.course(), p.defaultTeacherId(),
+                        groupCourseCountByTeacher, sharedCalendar, warnings);
             }
         }
 
         return new GenerationResult(created, skippedExisting, warnings);
+    }
+
+    /** A (group, course) pair queued for generation, before its teacher grouping is decided. */
+    private record PendingPair(StudentGroupEntity group, CourseEntity course, String defaultTeacherId) {
+    }
+
+    /**
+     * The real hours this course needs, used only to order pairings sharing a
+     * teacher (largest first) - not part of the actual decomposition. Dual
+     * room requirements make CourseEntity.requiredHoursPerWeek meaningless
+     * (existing generation logic already ignores it once requirements exist),
+     * so this sums the requirements' own hours instead when any exist.
+     */
+    private int totalHoursFor(CourseEntity course) {
+        List<CourseRoomRequirementEntity> requirements = roomRequirementRepository
+                .findByCourseIdOrderByPriority(course.getId());
+        if (!requirements.isEmpty()) {
+            return requirements.stream().mapToInt(CourseRoomRequirementEntity::getHoursRequired).sum();
+        }
+        return course.getRequiredHoursPerWeek();
     }
 
     /**
@@ -192,9 +251,21 @@ public class BlockGenerationService {
         return unpinned.size();
     }
 
-    /** Decomposes and saves the blocks for one (group, course) pair; returns how many blocks were created. */
+    /**
+     * Decomposes and saves the blocks for one (group, course) pair; returns
+     * how many blocks were created.
+     *
+     * @param sharedCalendar when this teacher has 2+ pairings needing
+     *                       generation in the same run, the one calendar
+     *                       shared and progressively consumed across all of
+     *                       them (see generateBlocks()); null otherwise, in
+     *                       which case a fresh calendar is built from the
+     *                       teacher's raw availability for this call alone -
+     *                       today's original, unchanged behavior.
+     */
     private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId,
-            Map<String, Integer> groupCourseCountByTeacher, List<String> warnings) {
+            Map<String, Integer> groupCourseCountByTeacher, Map<Integer, List<int[]>> sharedCalendar,
+            List<String> warnings) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());
         if (!templates.isEmpty()) {
             for (CourseBlockTemplateEntity template : templates) {
@@ -215,19 +286,33 @@ public class BlockGenerationService {
                 && groupCourseCountByTeacher.getOrDefault(defaultTeacherId, 0) == 1
                 && assignmentRepository.findByTeacherId(defaultTeacherId).isEmpty();
 
+        // The calendar this pair's shape decisions reason against: the shared,
+        // already-partially-consumed one when the caller supplied one, otherwise a
+        // fresh calendar built from this teacher's raw availability. Even a single
+        // (group, course) pair with dual room requirements benefits from this being
+        // built once and consumed across its own portions below - the same teacher
+        // teaches every portion, so portion 2 shouldn't pretend it has whatever
+        // portion 1 already used.
+        Map<Integer, List<int[]>> windows = sharedCalendar != null ? sharedCalendar
+                : (teacher != null ? AvailabilityAwareBlockShaper.windowsByDay(teacher) : null);
+
         List<CourseRoomRequirementEntity> requirements = roomRequirementRepository.findByCourseIdOrderByPriority(course.getId());
         int blockIndex = 0;
         int created = 0;
         List<CourseBlockAssignmentEntity> generated = new ArrayList<>();
         if (requirements.isEmpty()) {
-            for (int length : decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation(), teacher)) {
+            List<Integer> shape = decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation(), windows);
+            consumeFromCalendar(shape, course.getDesignation(), windows);
+            for (int length : shape) {
                 generated.add(saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null, defaultTeacherId));
                 blockIndex++;
                 created++;
             }
         } else {
             for (CourseRoomRequirementEntity requirement : requirements) {
-                for (int length : decomposeHours(requirement.getHoursRequired(), course.getDesignation(), teacher)) {
+                List<Integer> shape = decomposeHours(requirement.getHoursRequired(), course.getDesignation(), windows);
+                consumeFromCalendar(shape, course.getDesignation(), windows);
+                for (int length : shape) {
                     generated.add(saveBlock(group, course, blockIndex, length, requirement.getRoomType(),
                             requirement.getDefaultPreferredRoom(), defaultTeacherId));
                     blockIndex++;
@@ -239,6 +324,27 @@ public class BlockGenerationService {
             tryPinExclusiveTeacherBlocks(group, course, teacher, generated, warnings);
         }
         return created;
+    }
+
+    /**
+     * Consumes this shape's hours from {@code windows} (the shared or
+     * per-call calendar - see generateBlocksForGroupCourse), so whatever's
+     * generated next - another portion of this same pair's dual room
+     * requirement, or another pairing sharing this teacher's calendar - sees
+     * a realistically smaller remaining calendar rather than the teacher's
+     * full, untouched one. A no-op when there's no calendar to consume from
+     * (no teacher resolved) or nothing to consume (an empty shape). If the
+     * chosen shape can't actually be placed against the current window state
+     * - possible since decomposeHours' day-count feasibility check is
+     * coarser than this exact placement - windows is left untouched
+     * (assignWindows is transactional) and this portion is simply not
+     * tracked; a known, minor imprecision, not a correctness hazard.
+     */
+    private void consumeFromCalendar(List<Integer> shape, String designation, Map<Integer, List<int[]>> windows) {
+        if (windows == null || shape.isEmpty()) {
+            return;
+        }
+        AvailabilityAwareBlockShaper.assignWindows(shape, maxBlocksPerDayFor(designation), windows);
     }
 
     /**
@@ -498,7 +604,7 @@ public class BlockGenerationService {
      * leftover hours that don't divide evenly.
      *
      * When a teacher is already resolved, that naive shape is checked against
-     * their actual availability first: if it wouldn't leave at least
+     * {@code windows} first: if it wouldn't leave at least
      * {@link AvailabilityAwareBlockShaper#DEFAULT_MARGIN_DAYS} spare distinct
      * days beyond the minimum needed (a shape that's only just barely
      * possible leaves the solver zero room to absorb any other scheduling
@@ -516,16 +622,22 @@ public class BlockGenerationService {
      * (zero-margin) shape rather than the untouched naive one when margin
      * isn't reachable at any block size - a genuinely infeasible pairing
      * PreSolveValidator will still report, exactly as it does today.
+     *
+     * @param windows this teacher's calendar to reason against - the shared
+     *                 one when 2+ pairings need generation for this teacher
+     *                 in the same run, a fresh one otherwise, or null when no
+     *                 teacher is resolved yet at all (see
+     *                 generateBlocksForGroupCourse)
      */
-    private List<Integer> decomposeHours(int hours, String component, TeacherEntity teacher) {
+    private List<Integer> decomposeHours(int hours, String component, Map<Integer, List<int[]>> windows) {
         ComponentBlockRuleEntity rule = componentBlockRuleRepository.findById(component).orElse(null);
         int preferredSize = rule != null && rule.getPreferredBlockSize() != null ? rule.getPreferredBlockSize()
                 : DEFAULT_BLOCK_SIZE;
         List<Integer> naive = AvailabilityAwareBlockShaper.packBlocks(hours, preferredSize);
-        if (teacher == null) {
+        if (windows == null) {
             return naive;
         }
-        int availableDays = AvailabilityAwareBlockShaper.distinctAvailableDayCount(teacher);
+        int availableDays = AvailabilityAwareBlockShaper.distinctAvailableDayCount(windows);
         int maxBlocksPerDay = rule != null && rule.getMaxBlocksPerDay() != null ? rule.getMaxBlocksPerDay()
                 : DEFAULT_MAX_BLOCKS_PER_DAY;
         if (availableDays == 0 || AvailabilityAwareBlockShaper.fitsWithinDayCap(naive.size(), maxBlocksPerDay,
@@ -533,7 +645,7 @@ public class BlockGenerationService {
             return naive;
         }
         List<Integer> adapted = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(hours, preferredSize,
-                maxBlocksPerDay, teacher, AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS);
+                maxBlocksPerDay, windows, AvailabilityAwareBlockShaper.DEFAULT_MARGIN_DAYS);
         return adapted != null ? adapted : naive;
     }
 

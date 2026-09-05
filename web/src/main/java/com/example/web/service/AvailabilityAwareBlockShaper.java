@@ -46,6 +46,18 @@ import java.util.TreeSet;
  * since it never fixes a day; window assignment is only invoked for a
  * teacher with no other commitments in the first place, which is what makes
  * it safe there too).
+ *
+ * <p>Every method here has a {@link java.util.Map}-based form alongside its
+ * {@link TeacherEntity}-based one. The map is the same shape
+ * {@link #windowsByDay} produces - {@code dayOfWeek -> [startHour,
+ * remainingLength]} pairs - and letting a caller build one once and pass it
+ * through several calls is what makes {@code BlockGenerationService}'s
+ * shared-calendar grouping possible: several (group, course) pairings that
+ * share one teacher can reason against, and progressively consume from, the
+ * <em>same</em> calendar instead of each independently assuming they have
+ * that teacher's whole week to themselves. {@link #assignWindows(List, int,
+ * Map)} is transactional for exactly this reason - a map that outlives a
+ * single call must never end up partially consumed by a failed attempt.
  */
 final class AvailabilityAwareBlockShaper {
 
@@ -126,11 +138,25 @@ final class AvailabilityAwareBlockShaper {
      */
     static List<Integer> tryAvailabilityAwareShape(int hours, int preferredBlockSize, int maxBlocksPerDay,
             TeacherEntity teacher, int marginDays) {
-        int availableDays = distinctAvailableDayCount(teacher);
+        return tryAvailabilityAwareShape(hours, preferredBlockSize, maxBlocksPerDay, windowsByDay(teacher), marginDays);
+    }
+
+    /**
+     * Same as {@link #tryAvailabilityAwareShape(int, int, int, TeacherEntity, int)},
+     * but reasoning against an already-built windows map instead of a raw
+     * teacher - the map may be a teacher's full, untouched calendar, or one
+     * already partially consumed by another (group, course) pairing sharing
+     * the same teacher earlier in the same generation run (see
+     * BlockGenerationService's per-teacher shared-calendar grouping). Purely
+     * read-only: never mutates {@code windows}.
+     */
+    static List<Integer> tryAvailabilityAwareShape(int hours, int preferredBlockSize, int maxBlocksPerDay,
+            Map<Integer, List<int[]>> windows, int marginDays) {
+        int availableDays = distinctAvailableDayCount(windows);
         if (availableDays == 0) {
             return null;
         }
-        int upperBound = Math.min(MAX_BLOCK_LENGTH, largestContiguousWindow(teacher));
+        int upperBound = Math.min(MAX_BLOCK_LENGTH, largestContiguousWindow(windows));
         List<Integer> bareFeasible = null;
         for (int blockSize = preferredBlockSize; blockSize <= upperBound; blockSize++) {
             List<Integer> candidate = packBlocks(hours, blockSize);
@@ -151,23 +177,57 @@ final class AvailabilityAwareBlockShaper {
      * can't be placed, returns null rather than a partial assignment - a
      * teacher whose whole schedule is supposedly fully determined by this
      * course but who still can't fit all of it means an assumption here was
-     * wrong, not a case to patch over.
+     * wrong, not a case to patch over. Builds a fresh, single-use calendar
+     * from the teacher's raw availability every call.
      *
      * @return one {@code [dayOfWeek, startHour]} per input length, in the
      *         same order, or null if any length couldn't be placed
      */
     static List<int[]> assignWindows(List<Integer> blockLengths, int maxBlocksPerDay, TeacherEntity teacher) {
-        Map<Integer, List<int[]>> windows = windowsByDay(teacher);
+        return assignWindows(blockLengths, maxBlocksPerDay, windowsByDay(teacher));
+    }
+
+    /**
+     * Same as {@link #assignWindows(List, int, TeacherEntity)}, but consuming
+     * from (and mutating) an already-built, externally-owned windows map -
+     * the caller may reuse the same map across several calls for pairings
+     * that share one teacher, so each subsequent call sees exactly what
+     * earlier ones already claimed.
+     *
+     * <p>Transactional: {@code windows} is only mutated when every block
+     * length places successfully. A failure partway through leaves it
+     * completely untouched, not partially consumed - essential once a map
+     * can outlive a single call, since a caller sharing it across several
+     * pairings must be able to trust a failed attempt didn't silently eat
+     * into what the next pairing sees.
+     */
+    static List<int[]> assignWindows(List<Integer> blockLengths, int maxBlocksPerDay,
+            Map<Integer, List<int[]>> windows) {
+        Map<Integer, List<int[]>> trial = deepCopyWindows(windows);
         Map<Integer, Integer> blocksPlacedToday = new TreeMap<>();
         List<int[]> result = new ArrayList<>();
         for (int length : blockLengths) {
-            int[] placement = placeOne(windows, blocksPlacedToday, maxBlocksPerDay, length);
+            int[] placement = placeOne(trial, blocksPlacedToday, maxBlocksPerDay, length);
             if (placement == null) {
-                return null;
+                return null; // windows untouched
             }
             result.add(placement);
         }
+        windows.clear();
+        windows.putAll(trial);
         return result;
+    }
+
+    private static Map<Integer, List<int[]>> deepCopyWindows(Map<Integer, List<int[]>> src) {
+        Map<Integer, List<int[]>> copy = new TreeMap<>();
+        for (Map.Entry<Integer, List<int[]>> entry : src.entrySet()) {
+            List<int[]> windowsCopy = new ArrayList<>();
+            for (int[] w : entry.getValue()) {
+                windowsCopy.add(new int[] { w[0], w[1] });
+            }
+            copy.put(entry.getKey(), windowsCopy);
+        }
+        return copy;
     }
 
     private static int[] placeOne(Map<Integer, List<int[]>> windows, Map<Integer, Integer> blocksPlacedToday,
@@ -203,8 +263,12 @@ final class AvailabilityAwareBlockShaper {
      * This teacher's contiguous available windows per day, each as a mutable
      * {@code [startHour, remainingLength]} pair - mutable so assignWindows
      * can consume them in place without needing a second data structure.
+     * Package-private (not private): BlockGenerationService builds one of
+     * these once per teacher to share, and progressively consume, across
+     * every (group, course) pairing that teacher has in a single
+     * generateBlocks() run - see the class javadoc's "shared calendar" note.
      */
-    private static Map<Integer, List<int[]>> windowsByDay(TeacherEntity teacher) {
+    static Map<Integer, List<int[]>> windowsByDay(TeacherEntity teacher) {
         Map<Integer, List<int[]>> result = new TreeMap<>();
         for (Map.Entry<Integer, SortedSet<Integer>> entry : hoursByDay(teacher).entrySet()) {
             result.put(entry.getKey(), contiguousWindows(entry.getValue()));
@@ -237,14 +301,36 @@ final class AvailabilityAwareBlockShaper {
     }
 
     static int distinctAvailableDayCount(TeacherEntity teacher) {
-        return (int) teacher.getAvailability().stream().map(TeacherAvailabilityEntity::getDayOfWeek).distinct()
-                .count();
+        return distinctAvailableDayCount(windowsByDay(teacher));
+    }
+
+    /**
+     * Days that still have at least one window with hours actually left in
+     * it - a day whose windows have all been consumed down to zero (by
+     * earlier pairings sharing this calendar) no longer counts as available,
+     * exactly as if the teacher had never had that day free at all.
+     */
+    static int distinctAvailableDayCount(Map<Integer, List<int[]>> windows) {
+        int count = 0;
+        for (List<int[]> dayWindows : windows.values()) {
+            for (int[] w : dayWindows) {
+                if (w[1] > 0) {
+                    count++;
+                    break;
+                }
+            }
+        }
+        return count;
     }
 
     static int largestContiguousWindow(TeacherEntity teacher) {
+        return largestContiguousWindow(windowsByDay(teacher));
+    }
+
+    static int largestContiguousWindow(Map<Integer, List<int[]>> windows) {
         int max = 0;
-        for (List<int[]> windows : windowsByDay(teacher).values()) {
-            for (int[] w : windows) {
+        for (List<int[]> dayWindows : windows.values()) {
+            for (int[] w : dayWindows) {
                 max = Math.max(max, w[1]);
             }
         }
