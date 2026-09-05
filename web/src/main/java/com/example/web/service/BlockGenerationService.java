@@ -1,5 +1,6 @@
 package com.example.web.service;
 
+import com.example.web.entity.BlockTimeslotEntity;
 import com.example.web.entity.ComponentBlockRuleEntity;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.CourseBlockTemplateEntity;
@@ -9,6 +10,7 @@ import com.example.web.entity.GroupCourseEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
+import com.example.web.repository.BlockTimeslotRepository;
 import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +62,22 @@ import java.util.Map;
  * Within tiers 2/3, each portion's hours are decomposed by greedily packing
  * component_block_rule's preferred block size for the course's component
  * (e.g. Core=1 -> every block is 1h), falling back to DEFAULT_BLOCK_SIZE
- * for any component with no configured rule.
+ * for any component with no configured rule - unless the resolved teacher's
+ * own availability can't fit that shape (see decomposeHours), in which case
+ * AvailabilityAwareBlockShaper is asked for a longer-block shape that does,
+ * without ever pinning a specific day.
+ *
+ * When the resolved teacher's entire teaching load is this one (group,
+ * course) pairing (no other group_course link uses them as default teacher,
+ * and they have no pre-existing assignments at all), there's no real
+ * placement decision left for the solver to make - each block's day/hour is
+ * already forced by being the only room left in their calendar. In that case
+ * (see tryPinExclusiveTeacherBlocks) the generated blocks are given a
+ * concrete timeslot from the teacher's actual contiguous availability and
+ * pinned outright, but only when every block also resolves a single
+ * deterministic room and doesn't collide with anything the group already has
+ * pinned - otherwise they're left exactly as generated, for the solver or a
+ * human to place instead.
  *
  * Room defaulting: whenever a generated block would otherwise have no room
  * (no block-template preferredRoomName, no room-requirement
@@ -84,6 +102,7 @@ import java.util.Map;
 public class BlockGenerationService {
 
     private static final int DEFAULT_BLOCK_SIZE = 2;
+    private static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
 
     @Autowired
     private StudentGroupRepository studentGroupRepository;
@@ -103,6 +122,8 @@ public class BlockGenerationService {
     private TeacherRepository teacherRepository;
     @Autowired
     private GroupRoomRangeRepository groupRoomRangeRepository;
+    @Autowired
+    private BlockTimeslotRepository blockTimeslotRepository;
 
     @Transactional
     public GenerationResult generateBlocks() {
@@ -110,7 +131,17 @@ public class BlockGenerationService {
         int skippedExisting = 0;
         List<String> warnings = new ArrayList<>();
 
-        for (StudentGroupEntity group : studentGroupRepository.findAll()) {
+        List<StudentGroupEntity> allGroups = studentGroupRepository.findAll();
+        Map<String, Integer> groupCourseCountByTeacher = new HashMap<>();
+        for (StudentGroupEntity g : allGroups) {
+            for (GroupCourseEntity gc : g.getCourses()) {
+                if (gc.getDefaultTeacherId() != null) {
+                    groupCourseCountByTeacher.merge(gc.getDefaultTeacherId(), 1, Integer::sum);
+                }
+            }
+        }
+
+        for (StudentGroupEntity group : allGroups) {
             for (GroupCourseEntity groupCourse : group.getCourses()) {
                 CourseEntity course = courseRepository.findByName(groupCourse.getCourseName()).orElse(null);
                 if (course == null) {
@@ -131,7 +162,8 @@ public class BlockGenerationService {
                     skippedExisting++;
                     continue;
                 }
-                created += generateBlocksForGroupCourse(group, course, groupCourse.getDefaultTeacherId(), warnings);
+                created += generateBlocksForGroupCourse(group, course, groupCourse.getDefaultTeacherId(),
+                        groupCourseCountByTeacher, warnings);
             }
         }
 
@@ -158,7 +190,7 @@ public class BlockGenerationService {
 
     /** Decomposes and saves the blocks for one (group, course) pair; returns how many blocks were created. */
     private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId,
-            List<String> warnings) {
+            Map<String, Integer> groupCourseCountByTeacher, List<String> warnings) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());
         if (!templates.isEmpty()) {
             for (CourseBlockTemplateEntity template : templates) {
@@ -167,26 +199,133 @@ public class BlockGenerationService {
             return templates.size();
         }
 
+        TeacherEntity teacher = defaultTeacherId != null ? teacherRepository.findById(defaultTeacherId).orElse(null)
+                : null;
+        // "This teacher's entire load is this one pairing" - checked both against
+        // every group_course row (including pairings that don't have blocks yet, so
+        // a bulk generateBlocks() run sees the true picture, not just what's already
+        // in course_block_assignment) and against any pre-existing assignment of
+        // theirs from outside this generation flow (e.g. hand-created via the
+        // assignments API, never reflected in a group_course default-teacher link).
+        boolean exclusiveTeacher = teacher != null
+                && groupCourseCountByTeacher.getOrDefault(defaultTeacherId, 0) == 1
+                && assignmentRepository.findByTeacherId(defaultTeacherId).isEmpty();
+
         List<CourseRoomRequirementEntity> requirements = roomRequirementRepository.findByCourseIdOrderByPriority(course.getId());
         int blockIndex = 0;
         int created = 0;
+        List<CourseBlockAssignmentEntity> generated = new ArrayList<>();
         if (requirements.isEmpty()) {
-            for (int length : decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation())) {
-                saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null, defaultTeacherId);
+            for (int length : decomposeHours(course.getRequiredHoursPerWeek(), course.getDesignation(), teacher)) {
+                generated.add(saveBlock(group, course, blockIndex, length, course.getRoomRequirement(), null, defaultTeacherId));
                 blockIndex++;
                 created++;
             }
         } else {
             for (CourseRoomRequirementEntity requirement : requirements) {
-                for (int length : decomposeHours(requirement.getHoursRequired(), course.getDesignation())) {
-                    saveBlock(group, course, blockIndex, length, requirement.getRoomType(),
-                            requirement.getDefaultPreferredRoom(), defaultTeacherId);
+                for (int length : decomposeHours(requirement.getHoursRequired(), course.getDesignation(), teacher)) {
+                    generated.add(saveBlock(group, course, blockIndex, length, requirement.getRoomType(),
+                            requirement.getDefaultPreferredRoom(), defaultTeacherId));
                     blockIndex++;
                     created++;
                 }
             }
         }
+        if (exclusiveTeacher && !generated.isEmpty()) {
+            tryPinExclusiveTeacherBlocks(group, course, teacher, generated, warnings);
+        }
         return created;
+    }
+
+    /**
+     * When a teacher's entire teaching load is the blocks just generated, each
+     * block's day/hour is already forced - there's no real placement decision
+     * left for the solver to make. Greedily assigns each block a concrete
+     * timeslot from the teacher's actual contiguous availability
+     * (AvailabilityAwareBlockShaper.assignWindows) and pins it, but only when
+     * every block resolves a matching BlockTimeslot, a single deterministic
+     * room (already computed by saveBlock via defaultRoomFor), and doesn't
+     * collide with anything this group already has pinned elsewhere -
+     * all-or-nothing, since a partial pin here would mean an assumption was
+     * wrong, not something to patch over block by block.
+     */
+    private void tryPinExclusiveTeacherBlocks(StudentGroupEntity group, CourseEntity course, TeacherEntity teacher,
+            List<CourseBlockAssignmentEntity> blocks, List<String> warnings) {
+        int maxBlocksPerDay = maxBlocksPerDayFor(course.getDesignation());
+        List<Integer> lengths = blocks.stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        List<int[]> slots = AvailabilityAwareBlockShaper.assignWindows(lengths, maxBlocksPerDay, teacher);
+        if (slots == null) {
+            warnings.add(group.getId() + "/" + course.getId() + ": teacher '" + teacher.getId()
+                    + "' has no other commitments, but their availability couldn't fit all " + blocks.size()
+                    + " generated block(s) at once; left unpinned for the solver/manual placement.");
+            return;
+        }
+
+        List<BlockTimeslotEntity> resolvedTimeslots = new ArrayList<>();
+        for (int i = 0; i < blocks.size(); i++) {
+            CourseBlockAssignmentEntity block = blocks.get(i);
+            int day = slots.get(i)[0];
+            int startHour = slots.get(i)[1];
+            BlockTimeslotEntity timeslot = blockTimeslotRepository
+                    .findByDayOfWeekAndStartHourAndLengthHours(day, startHour, block.getBlockLength())
+                    .orElse(null);
+            if (timeslot == null) {
+                warnings.add(block.getId() + ": teacher '" + teacher.getId() + "' has no other commitments, but no "
+                        + "timeslot exists for the computed day " + day + "/hour " + startHour + "/length "
+                        + block.getBlockLength() + "; left unpinned.");
+                return;
+            }
+            if (block.getRoomName() == null) {
+                warnings.add(block.getId() + ": teacher '" + teacher.getId() + "' has no other commitments and their "
+                        + "schedule is otherwise fully determined, but no single room could be resolved; left unpinned.");
+                return;
+            }
+            if (overlapsGroupsPinnedData(group, timeslot)) {
+                warnings.add(block.getId() + ": the computed slot conflicts with '" + group.getId()
+                        + "'s existing pinned data; left unpinned.");
+                return;
+            }
+            resolvedTimeslots.add(timeslot);
+        }
+
+        for (int i = 0; i < blocks.size(); i++) {
+            CourseBlockAssignmentEntity block = blocks.get(i);
+            block.setBlockTimeslotId(resolvedTimeslots.get(i).getId());
+            block.setPinned(true);
+            assignmentRepository.save(block);
+        }
+    }
+
+    /** True if candidate overlaps any timeslot this group already has pinned. */
+    private boolean overlapsGroupsPinnedData(StudentGroupEntity group, BlockTimeslotEntity candidate) {
+        for (CourseBlockAssignmentEntity existing : assignmentRepository.findByGroupId(group.getId())) {
+            if (!Boolean.TRUE.equals(existing.getPinned()) || existing.getBlockTimeslotId() == null) {
+                continue;
+            }
+            BlockTimeslotEntity existingSlot = blockTimeslotRepository.findById(existing.getBlockTimeslotId())
+                    .orElse(null);
+            if (existingSlot != null && overlaps(candidate, existingSlot)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean overlaps(BlockTimeslotEntity a, BlockTimeslotEntity b) {
+        if (!a.getDayOfWeek().equals(b.getDayOfWeek())) {
+            return false;
+        }
+        int aStart = a.getStartHour();
+        int aEnd = aStart + a.getLengthHours();
+        int bStart = b.getStartHour();
+        int bEnd = bStart + b.getLengthHours();
+        return aStart < bEnd && bStart < aEnd;
+    }
+
+    private int maxBlocksPerDayFor(String component) {
+        return componentBlockRuleRepository.findById(component)
+                .map(ComponentBlockRuleEntity::getMaxBlocksPerDay)
+                .orElse(DEFAULT_MAX_BLOCKS_PER_DAY);
     }
 
     /**
@@ -238,8 +377,8 @@ public class BlockGenerationService {
         assignmentRepository.save(block);
     }
 
-    private void saveBlock(StudentGroupEntity group, CourseEntity course, int blockIndex, int length,
-            String satisfiesRoomType, String preferredRoomHint, String defaultTeacherId) {
+    private CourseBlockAssignmentEntity saveBlock(StudentGroupEntity group, CourseEntity course, int blockIndex,
+            int length, String satisfiesRoomType, String preferredRoomHint, String defaultTeacherId) {
         CourseBlockAssignmentEntity block = new CourseBlockAssignmentEntity();
         block.setId(group.getId() + "_" + course.getId() + "_" + blockIndex);
         block.setGroupId(group.getId());
@@ -251,7 +390,7 @@ public class BlockGenerationService {
                 : defaultRoomFor(group, satisfiesRoomType, defaultTeacherId));
         block.setTeacherId(defaultTeacherId);
         block.setPinned(false);
-        assignmentRepository.save(block);
+        return assignmentRepository.save(block);
     }
 
     /**
@@ -303,24 +442,38 @@ public class BlockGenerationService {
      * configured preferred size (component_block_rule), or DEFAULT_BLOCK_SIZE
      * if that component has no rule, with a trailing remainder block for any
      * leftover hours that don't divide evenly.
+     *
+     * When a teacher is already resolved, that naive shape is checked against
+     * their actual availability first: if it would need more distinct days
+     * than they have (the exact "days, not hours" problem
+     * PreSolveValidator.validateBlockSpreadCapacity otherwise only catches
+     * after generation), AvailabilityAwareBlockShaper is asked for a shape
+     * (fewer, longer blocks) that does fit, without ever pinning a specific
+     * day - the solver still freely places each block among the teacher's
+     * available days, exactly as for any other generated block. Falls back
+     * to the naive shape when there's no teacher yet, no availability data to
+     * reason from, or no size up to the 4h structural max makes it fit - a
+     * genuinely infeasible pairing PreSolveValidator will still report,
+     * exactly as it does today.
      */
-    private List<Integer> decomposeHours(int hours, String component) {
-        int blockSize = componentBlockRuleRepository.findById(component)
-                .map(ComponentBlockRuleEntity::getPreferredBlockSize)
-                .orElse(DEFAULT_BLOCK_SIZE);
-
-        List<Integer> lengths = new ArrayList<>();
-        int remaining = hours;
-        while (remaining > 0) {
-            if (remaining >= blockSize) {
-                lengths.add(blockSize);
-                remaining -= blockSize;
-            } else {
-                lengths.add(remaining);
-                remaining = 0;
-            }
+    private List<Integer> decomposeHours(int hours, String component, TeacherEntity teacher) {
+        ComponentBlockRuleEntity rule = componentBlockRuleRepository.findById(component).orElse(null);
+        int preferredSize = rule != null && rule.getPreferredBlockSize() != null ? rule.getPreferredBlockSize()
+                : DEFAULT_BLOCK_SIZE;
+        List<Integer> naive = AvailabilityAwareBlockShaper.packBlocks(hours, preferredSize);
+        if (teacher == null) {
+            return naive;
         }
-        return lengths;
+        int availableDays = AvailabilityAwareBlockShaper.distinctAvailableDayCount(teacher);
+        int maxBlocksPerDay = rule != null && rule.getMaxBlocksPerDay() != null ? rule.getMaxBlocksPerDay()
+                : DEFAULT_MAX_BLOCKS_PER_DAY;
+        if (availableDays == 0
+                || AvailabilityAwareBlockShaper.fitsWithinDayCap(naive.size(), maxBlocksPerDay, availableDays)) {
+            return naive;
+        }
+        List<Integer> adapted = AvailabilityAwareBlockShaper.tryAvailabilityAwareShape(hours, preferredSize,
+                maxBlocksPerDay, teacher);
+        return adapted != null ? adapted : naive;
     }
 
     /** Outcome of a generateBlocks() run. */

@@ -9,6 +9,8 @@ import com.example.web.entity.GroupRoomRangeEntity;
 import com.example.web.entity.RoomEntity;
 import com.example.web.entity.StudentGroupEntity;
 import com.example.web.entity.TeacherEntity;
+import com.example.web.entity.BlockTimeslotEntity;
+import com.example.web.repository.BlockTimeslotRepository;
 import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseBlockTemplateRepository;
@@ -59,6 +61,8 @@ public class BlockGenerationServiceTest {
     private TeacherRepository teacherRepository;
     @Mock
     private GroupRoomRangeRepository groupRoomRangeRepository;
+    @Mock
+    private BlockTimeslotRepository blockTimeslotRepository;
 
     @InjectMocks
     private BlockGenerationService service;
@@ -76,6 +80,8 @@ public class BlockGenerationServiceTest {
         when(roomRepository.findById(anyString())).thenReturn(Optional.empty());
         when(teacherRepository.findById(anyString())).thenReturn(Optional.empty());
         when(groupRoomRangeRepository.findByGroupIdAndRoomType(anyString(), anyString())).thenReturn(List.of());
+        when(assignmentRepository.findByTeacherId(anyString())).thenReturn(List.of());
+        when(assignmentRepository.findByGroupId(anyString())).thenReturn(List.of());
     }
 
     private CourseEntity course(String id, String name, int hours, String designation, String roomReq) {
@@ -503,6 +509,297 @@ public class BlockGenerationServiceTest {
         verify(assignmentRepository, times(2)).save(captor.capture());
         List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
         assertEquals(List.of(2, 1), lengths);
+    }
+
+    // ---- Scenario 2: availability-aware shape adaptation ----
+    // All of these explicitly mark the teacher non-exclusive (findByTeacherId
+    // returns an existing row) so shape adaptation is tested in isolation from
+    // Scenario 1's pinning, which is covered separately below.
+
+    @Test
+    public void teacherAvailabilityAlreadyFitsNaiveShape_unchangedBehavior() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(new CourseBlockAssignmentEntity()));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(2, 7); // BASICAS needs 2 days at maxBlocksPerDay=1 for 2 blocks - exactly fits
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(2, result.getBlocksCreated());
+        assertTrue(result.getWarnings().isEmpty());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1), lengths); // naive BASICAS shape, untouched
+    }
+
+    @Test
+    public void teacherAvailabilityDoesNotFitNaiveShape_adaptsToLongerBlocks() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        // 5h, BASICAS (preferredSize=1, maxBlocksPerDay=1) -> naive needs 5 distinct days.
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 5, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(new CourseBlockAssignmentEntity()));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        // Only 2 days, each a 4h contiguous window.
+        for (int h = 7; h <= 10; h++) {
+            teacher.addAvailability(1, h);
+            teacher.addAvailability(2, h);
+        }
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        // Adapted to size 3: packBlocks(5,3) = [3,2], 2 blocks at 1/day fits 2 days.
+        assertEquals(2, result.getBlocksCreated());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(3, 2), lengths);
+    }
+
+    @Test
+    public void defaultTeacherIdSetButTeacherNotFound_fallsBackToNaiveShape() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 5, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        // teacherRepository.findById("T1") falls back to setUp()'s Optional.empty() default.
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(5, result.getBlocksCreated()); // naive BASICAS shape: five 1h blocks
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(5)).save(captor.capture());
+    }
+
+    @Test
+    public void noSizeFitsTeacherAvailability_fallsBackToNaiveShapeWithoutError() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 5, "BASICAS", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(assignmentRepository.findByTeacherId("T1")).thenReturn(List.of(new CourseBlockAssignmentEntity()));
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.addAvailability(1, 7); // a single lonely hour - nothing can make 5h fit
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(5, result.getBlocksCreated()); // unchanged naive shape - this is a genuinely infeasible pairing
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(5)).save(captor.capture());
+        List<Integer> lengths = captor.getAllValues().stream().map(CourseBlockAssignmentEntity::getBlockLength).toList();
+        assertEquals(List.of(1, 1, 1, 1, 1), lengths);
+    }
+
+    // ---- Scenario 1: auto-pin when the teacher's whole load is this one pairing ----
+
+    @Test
+    public void exclusiveTeacherWithResolvableRoom_pinsGeneratedBlocks() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+        // findByTeacherId("T1") stays empty (setUp default) - this is T1's only work.
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1"); // resolves to a single deterministic room
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        BlockTimeslotEntity timeslot = new BlockTimeslotEntity();
+        timeslot.setId("TS_MON_7_2");
+        timeslot.setDayOfWeek(1);
+        timeslot.setStartHour(7);
+        timeslot.setLengthHours(2);
+        when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 7, 2))
+                .thenReturn(Optional.of(timeslot));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertTrue(result.getWarnings().isEmpty());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        // Once from saveBlock, once more from the pinning save.
+        verify(assignmentRepository, times(2)).save(captor.capture());
+        CourseBlockAssignmentEntity finalState = captor.getAllValues().get(captor.getAllValues().size() - 1);
+        assertEquals(Boolean.TRUE, finalState.getPinned());
+        assertEquals("TS_MON_7_2", finalState.getBlockTimeslotId());
+        assertEquals("ROOM1", finalState.getRoomName());
+    }
+
+    @Test
+    public void exclusiveTeacherButAmbiguousRoom_leftUnpinnedWithWarning() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40); // no requiredRoomName
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        // Group's range for "estándar" has 2 rooms - ambiguous, defaultRoomFor() returns null.
+        when(groupRoomRangeRepository.findByGroupIdAndRoomType("G1", "estándar")).thenReturn(List.of(
+                new GroupRoomRangeEntity("G1", "estándar", "ROOM1"),
+                new GroupRoomRangeEntity("G1", "estándar", "ROOM2")));
+
+        BlockTimeslotEntity timeslot = new BlockTimeslotEntity();
+        timeslot.setId("TS_MON_7_2");
+        timeslot.setDayOfWeek(1);
+        timeslot.setStartHour(7);
+        timeslot.setLengthHours(2);
+        when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 7, 2))
+                .thenReturn(Optional.of(timeslot));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("no single room could be resolved"));
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture()); // no second (pinning) save
+        assertEquals(Boolean.FALSE, captor.getValue().getPinned());
+        assertEquals(null, captor.getValue().getBlockTimeslotId());
+    }
+
+    @Test
+    public void nonExclusiveTeacher_neverAttemptsPinningEvenIfAvailabilityWouldAllowIt() {
+        StudentGroupEntity groupA = new StudentGroupEntity("GA", "Group A");
+        groupA.addCourse("Mathematics").setDefaultTeacherId("T1");
+        StudentGroupEntity groupB = new StudentGroupEntity("GB", "Group B");
+        groupB.addCourse("Physics").setDefaultTeacherId("T1"); // same teacher, a second commitment
+        when(studentGroupRepository.findAll()).thenReturn(List.of(groupA, groupB));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(courseRepository.findByName("Physics"))
+                .thenReturn(Optional.of(course("C2", "Physics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId(anyString(), anyString())).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        // Deliberately no blockTimeslotRepository stub: a non-exclusive teacher must
+        // never even attempt pinning, so it should never be consulted at all.
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(2, result.getBlocksCreated());
+        assertTrue(result.getWarnings().isEmpty()); // no pin attempt at all, so no pin-failure warnings either
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(2)).save(captor.capture()); // one save per block, no re-save for pinning
+        for (CourseBlockAssignmentEntity block : captor.getAllValues()) {
+            assertEquals(Boolean.FALSE, block.getPinned());
+        }
+    }
+
+    @Test
+    public void exclusiveTeacherButConflictsWithGroupsExistingPinnedData_leftUnpinned() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        BlockTimeslotEntity candidate = new BlockTimeslotEntity();
+        candidate.setId("TS_MON_7_2");
+        candidate.setDayOfWeek(1);
+        candidate.setStartHour(7);
+        candidate.setLengthHours(2);
+        when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 7, 2))
+                .thenReturn(Optional.of(candidate));
+
+        // The group already has an unrelated course pinned Monday 7-9 (overlaps candidate).
+        CourseBlockAssignmentEntity existingPinned = new CourseBlockAssignmentEntity();
+        existingPinned.setId("G1_OTHER_0");
+        existingPinned.setPinned(true);
+        existingPinned.setBlockTimeslotId("TS_EXISTING");
+        when(assignmentRepository.findByGroupId("G1")).thenReturn(List.of(existingPinned));
+        BlockTimeslotEntity existingSlot = new BlockTimeslotEntity();
+        existingSlot.setId("TS_EXISTING");
+        existingSlot.setDayOfWeek(1);
+        existingSlot.setStartHour(7);
+        existingSlot.setLengthHours(3);
+        when(blockTimeslotRepository.findById("TS_EXISTING")).thenReturn(Optional.of(existingSlot));
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("conflicts with"));
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Boolean.FALSE, captor.getValue().getPinned());
+    }
+
+    @Test
+    public void exclusiveTeacherButNoMatchingTimeslotExists_leftUnpinnedWithWarning() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+        // No matching BlockTimeslotEntity for day 1 / hour 7 / length 2 (unstubbed -> empty).
+
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertEquals(1, result.getWarnings().size());
+        assertTrue(result.getWarnings().get(0).contains("no"));
+        assertTrue(result.getWarnings().get(0).contains("timeslot exists"));
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        assertEquals(Boolean.FALSE, captor.getValue().getPinned());
     }
 
     @Test
