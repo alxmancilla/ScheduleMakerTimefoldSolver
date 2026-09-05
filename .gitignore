@@ -63,6 +63,7 @@ database/migrations/*
 !database/migrations/fix_course_block_assignment_current_room_name.sql
 !database/migrations/add_schedule_run_metadata.sql
 !database/migrations/backfill_group_course_default_teacher.sql
+!database/migrations/drop_schedule_run_result_assignment_cascade.sql
 md_files/
 
 # Build artifacts

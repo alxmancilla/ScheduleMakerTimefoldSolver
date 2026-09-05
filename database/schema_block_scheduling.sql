@@ -964,13 +964,17 @@ CREATE TABLE IF NOT EXISTS schedule_run (
 );
 
 -- Frozen per-(run, assignment) snapshot: both the solved timeslot AND the
--- input fields the solver saw for that assignment at that moment. The
--- group/course/teacher/room columns are a copy, not a live FK - a later
--- rename or deletion of that teacher/room/course/group must not alter or
--- break a historical run's snapshot.
+-- input fields the solver saw for that assignment at that moment. assignment_id
+-- and the group/course/teacher/room columns are all a copy, not a live FK - a
+-- later rename, deletion, or regeneration of that assignment/teacher/room/
+-- course/group must not alter or break a historical run's snapshot (see
+-- drop_schedule_run_result_assignment_cascade.sql - assignment_id originally
+-- kept a live ON DELETE CASCADE FK, which silently destroyed every retained
+-- run's history the first time assignments were bulk-deleted to force a clean
+-- block regeneration).
 CREATE TABLE IF NOT EXISTS schedule_run_result (
     schedule_run_id INTEGER NOT NULL REFERENCES schedule_run(id) ON DELETE CASCADE,
-    assignment_id VARCHAR(100) NOT NULL REFERENCES course_block_assignment(id) ON DELETE CASCADE,
+    assignment_id VARCHAR(100) NOT NULL,
     block_timeslot_id VARCHAR(50) REFERENCES block_timeslot(id),
     group_id VARCHAR(100),
     course_id VARCHAR(100),
@@ -1034,6 +1038,7 @@ COMMENT ON COLUMN schedule_run.finished_at IS 'When the solve actually completed
 COMMENT ON COLUMN schedule_run.engine_git_commit IS 'The engine module''s git commit hash at run time (from scripts/run-engine.sh via git rev-parse HEAD), so a score change can be told apart from a genuine solver-logic change - the same purpose schedule_run_constraint serves for constraint-set changes.';
 COMMENT ON COLUMN schedule_run.termination_reason IS 'Best-effort inferred reason this run stopped (BEST_SCORE_LIMIT / TIME_SPENT_LIMIT / UNIMPROVED_TIME_SPENT_LIMIT) - Timefold''s OR-combined termination (solverConfig.xml) doesn''t report which condition actually fired via its public API, so this is computed from the final score and actual duration vs. the configured limits, not a value Timefold itself returns.';
 COMMENT ON TABLE schedule_run_result IS 'One row per assignment per run: the solved (or still-unassigned) timeslot for that run.';
+COMMENT ON COLUMN schedule_run_result.assignment_id IS 'The assignment this snapshot was for, at save time - a plain label, not a live FK (deliberately, like every other column here): deleting or regenerating that course_block_assignment row later must not delete this historical snapshot.';
 COMMENT ON TABLE schedule_run_constraint IS 'Which constraints (by name) were active for a given schedule_run - lets score-history analysis separate normal solver variance from a genuine constraint-set change between runs.';
 COMMENT ON VIEW course_block_assignment_current IS 'Resolved "current schedule": pinned rows use their own input timeslot/room, everything else uses the most recent schedule_run''s result for both.';
 
