@@ -8,14 +8,12 @@ import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
 
 import java.time.DayOfWeek;
-import java.time.LocalTime;
 import java.util.List;
 
 import com.example.common.SoftConstraintDefaults;
 import com.example.domain.CourseBlockAssignment;
 import com.example.domain.BlockScheduleMath;
 import com.example.domain.Room;
-import com.example.domain.Teacher;
 
 /**
  * Every constraint here uses forEachIncludingUnassigned/ifNotExistsIncludingUnassigned
@@ -97,21 +95,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // by uncommenting, along with its BlockScheduleAnalyzer mirror and
                 // ConstraintConsistencyTest's expected soft constraints/counts.
                 // minimizeTeacherBuildingChanges(constraintFactory), // SOFT (weight 1): minimize teacher travel
-
-                // ========== COMMENTED OUT CONSTRAINTS ==========
-                // Uncomment these if needed:
-                // mustFinishBy2pm(constraintFactory), // SOFT: Prefer non-Core courses in
-                // non-standard rooms to finish by 2pm
-                // limitNonBasicasCoursesToTwoDaysPerGroup(constraintFactory), // SOFT:
-                // concentrate non-Core
-                // groupCoursesInSameRoomByType(constraintFactory), // HARD: same room type
-                // consistency
-                // balanceTeacherWorkload(constraintFactory), // SOFT: balance workload
-                // distribution
-                // preferUsingTeachersWithMoreAvailability(constraintFactory), // SOFT: prefer
-                // high-availability teachers
-                // encourageAlternativeQualifiedTeachers(constraintFactory), // SOFT: distribute
-                // among qualified teachers
         };
     }
 
@@ -429,41 +412,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .asConstraint("Course blocks must be consecutive");
     }
 
-    // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================
-    // The following constraints are for hour-based scheduling and are no longer
-    // used.
-    // They are kept here for reference but should not be called.
-
-    @Deprecated
-    private Constraint sameTeacherForAllCourseHours(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private Constraint groupCourseMustBeConsecutiveOnSameDay(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private Constraint groupCoursesInSameRoomByType(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private boolean overlapsForbiddenWindow(LocalTime start, LocalTime end) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private Constraint preferUsingTeachersWithMoreAvailability(ConstraintFactory factory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private int scarcityPenalty(Teacher teacher) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
     private Constraint groupPreferredRoomConstraint(ConstraintFactory constraintFactory) {
         // SOFT: Prefer assigning a group's blocks to one of its curated
         // acceptable rooms for that block's own satisfiesRoomType (see
@@ -565,21 +513,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 })
                 .penalize(HardSoftScore.ofSoft(1))
                 .asConstraint("Minimize teacher building changes");
-    }
-
-    @Deprecated
-    private Constraint balanceTeacherWorkload(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private Constraint limitNonBasicasCoursesToTwoDaysPerGroup(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
-    }
-
-    @Deprecated
-    private Constraint encourageAlternativeQualifiedTeachers(ConstraintFactory constraintFactory) {
-        throw new UnsupportedOperationException("Hour-based scheduling is no longer supported");
     }
 
     // ==================== BLOCK-BASED CONSTRAINTS ====================
