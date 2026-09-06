@@ -87,7 +87,23 @@ Upgrading an existing database) — this file only orients you within
     lets score-history analysis separate a genuine constraint-set change
     between runs from ordinary solver-run variance. Added 2026-08-24, so runs
     before that date have no rows here
-19. *(via migration)* **`app_user`** — login accounts + role (RBAC)
+19. **`schedule_run_violation`** — one row per *individual* hard/soft
+    violation instance (not just which constraint was active - see #18
+    above) from `BlockScheduleAnalyzer`'s detailed analysis, surfaced in the
+    web Schedule view's collapsible violations panel. Added 2026-09-06, so
+    runs before that date have no rows here
+20. **`constraint_config`** — per-constraint soft-weight overrides (Settings →
+    Constraint Weights), read into a Timefold `ConstraintWeightOverrides` at
+    solve time; a constraint with no row here keeps its hardcoded default
+    from `common.SoftConstraintDefaults`. Also how an admin switches one of
+    the four severity-configurable HARD constraints to SOFT (see
+    `common.ConfigurableHardConstraints`) - the same override mechanism,
+    just applied to a constraint whose *default* happens to be HARD
+21. **`semester_hour_limit`** — a per-semester "blocks must/should finish by
+    this hour" limit (Settings → Semester Hour Limits), read onto every
+    `Course` of that semester by `DataLoader` as `latestEndHour`/
+    `latestEndHourSeverity`; a semester with no row is unrestricted
+22. *(via migration)* **`app_user`** — login accounts + role (RBAC)
 
 ## Data Mapping from the Java Domain Model
 

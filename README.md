@@ -31,10 +31,12 @@ teachers read-only access to their own resulting schedule).
 ## At a Glance
 
 - Block-based scheduling only (multi-hour consecutive blocks, 1-4 hours); hour-based scheduling has been fully removed
-- 12 hard / 8 soft constraints, kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest` — including a hard rest-period rule so teachers and groups can't be scheduled into an unbroken run longer than 4 hours
+- 11 hard / 12 soft constraints (9 soft active, 3 parked), kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`; 4 of the 11 hard constraints (and every active soft one) have an admin-editable weight/severity via Settings → Constraint Weights, backed by `constraint_config`
+- The schedule grid is interactive: a writer can click a block to move it to a different day/hour or toggle pinned, validated live against the same hard constraints (`POST /api/assignments/{id}/validate-move`) before Save is allowed — opt-in, behind a confirm-protected "Enable schedule editing" toggle
+- Every solve's hard/soft constraint violations (not just scores) are persisted (`schedule_run_violation`) and browsable in a collapsible panel on the Schedule page — previously only visible in the downloaded PDF report
 - Calendar exceptions (holidays, exam days, half-days) are tracked from Settings → Calendar — record-keeping v1, not yet read by block generation or the solver (see [Known Limitations](#known-limitations))
 - Dual room requirements and custom block templates are fully manageable from the web UI, not just the database
-- Web app: JWT auth with `READER`/`WRITER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
+- Web app: JWT auth with `READER`/`WRITER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, a mobile-friendly schedule layout, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
 - Solver termination: best score `0hard/0soft`, or 5 minutes, or 2 minutes without improvement (see `solverConfig.xml`)
 
 ## How It Works
@@ -73,36 +75,44 @@ Calendar, but that data doesn't gate block generation or the solver yet — see
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (13 hard defined / 11 active, 11 soft defined / 8 active - the ones
-marked TEMP DISABLED below are currently switched off by request).
+test run (11 hard defined, all active; 12 soft defined, 9 active - the ones
+marked TEMP DISABLED below are currently parked by request, fully
+implemented and one line away from re-enabling). Four of the hard
+constraints below (marked ⚙) can be individually switched to SOFT severity
+by an admin via Settings → Constraint Weights (`constraint_config` table) —
+the three double-booking rules are deliberately excluded from this, since
+they encode outcomes that can't actually happen in reality, not judgment
+calls. Every active soft constraint's weight is likewise admin-editable
+there, not a fixed code literal.
 
 #### Hard Constraints (must be satisfied)
 1. **Block Length Must Match Timeslot Length**
-2. **Teacher Qualification** — teacher must be qualified for the assigned course
-3. **Teacher Availability for Entire Block**
+2. **Teacher Qualification** ⚙ — teacher must be qualified for the assigned course
+3. **Teacher Availability for Entire Block** ⚙
 4. **No Teacher Double-Booking**
 5. **No Room Double-Booking**
 6. **Room Type Must Satisfy Course Requirement** — uses `assignment.satisfiesRoomType`, not `course.roomRequirement` (dual room requirement support)
 7. **Teacher's Required Room Must Be Used** — a block's room must match its teacher's `requiredRoomName` when one is set; not excluded for pinned blocks (a data-integrity check, since a non-pinned block's room is already structurally guaranteed correct)
-8. **First-Semester Blocks Must Finish by 2pm** — a `course.semester == 1` block may never be assigned a timeslot ending after 14:00; not excluded for pinned blocks (same data-integrity precedent as #7 above). A hard guarantee, not a soft preference, since the school's weekly capacity comfortably covers every first-semester group's hours within 7:00-14:00.
+8. **Semester Hour Limits Must Be Respected** — a block whose course's semester has a HARD-severity `semester_hour_limit` row (Settings → Semester Hour Limits, keyed by semester) may never be assigned a timeslot ending after that limit; not excluded for pinned blocks (same data-integrity precedent as #7 above). Generalized from an earlier hardcoded "semester 1 must finish by 2pm" rule into this per-semester, HARD-or-SOFT-configurable one.
 9. **Group Cannot Have Two Courses at Same Time**
-10. **Maximum Blocks Per Course Per Group Per Day** — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
-11. **Course Blocks Must Be Consecutive** — a course's blocks on the same day must be back-to-back
-12. ~~**Teacher Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — no more than 4h back-to-back with zero idle time before a break is required; pinned blocks excluded
-13. ~~**Group Must Have a Break After Consecutive Hours**~~ **TEMP DISABLED** — same rule, for student groups
+10. **Maximum Blocks Per Course Per Group Per Day** ⚙ — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
+11. **Course Blocks Must Be Consecutive** ⚙ — a course's blocks on the same day must be back-to-back
+
+("Teacher Must Have a Break After Consecutive Hours" / "Group Must Have a Break After Consecutive Hours" existed here as TEMP DISABLED and were removed entirely, not just parked.)
 
 #### Soft Constraints (weighted quality preferences)
-1. **Non-Standard Rooms Should Finish by 2pm** (weight 10) — labs/workshops/computer centers
-2. **Prefer First-Semester Blocks to Start Early** (weight 6) — a group's earliest unpinned `course.semester == 1` block each day should start at 7:00; penalty is the deviation in hours. Raised from weight 4 on 2026-08-26 to outweigh teacher-workload balancing.
-3. **Minimize First-Semester Group Idle Gaps** (weight 6/hour, adjacent-pair only) — same logic as #6 below, but only counts a gap when both framing blocks are semester-1 (a higher-semester block in between still correctly breaks adjacency). Raised from weight 4 on 2026-08-26.
-4. **Teacher Exceeds Max Hours Per Week** (weight 5)
-5. **Room Capacity Should Fit Group Size** (weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
-6. ~~**Minimize Group Idle Gaps**~~ (weight 3/hour, adjacent-pair only) — **TEMP DISABLED**, replaced for first-semester groups by #3 above
-7. **Prefer Block's Specified Room** (weight 3) — `preferred_room_hint`
-8. **Minimize Teacher Idle Gaps** (weight 2/hour, availability-aware, adjacent-pair only)
-9. **Prefer Group's Preferred Room** (weight 2) — a room from the group's curated `group_room_range` for the block's room type
-10. ~~**Minimize Teacher Building Changes**~~ (weight 1) — **TEMP DISABLED** (not required anymore)
-11. ~~**Prefer Core 1h Blocks at the Same Time Across Days**~~ (weight 2) — **TEMP DISABLED** — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
+1. **Non-Standard Rooms Should Finish by 2pm** (default weight 10) — labs/workshops/computer centers
+2. **Prefer First-Semester Blocks to Start Early** (default weight 6) — a group's earliest unpinned `course.semester == 1` block each day should start at 7:00; penalty is the deviation in hours
+3. **Minimize First-Semester Group Idle Gaps** (default weight 6/hour, adjacent-pair only) — same logic as #6 below, but only counts a gap when both framing blocks are semester-1 (a higher-semester block in between still correctly breaks adjacency)
+4. **Semester Hour Limits Should Be Respected** (default weight 6) — the SOFT-severity counterpart to hard constraint #8 above: the solver may still place a block past its semester's limit, penalized proportionally to how far past
+5. **Teacher Exceeds Max Hours Per Week** (default weight 5)
+6. **Room Capacity Should Fit Group Size** (default weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
+7. **Prefer Block's Specified Room** (default weight 3) — `preferred_room_hint`
+8. **Minimize Teacher Idle Gaps** (default weight 2/hour, availability-aware, adjacent-pair only)
+9. **Prefer Group's Preferred Room** (default weight 2) — a room from the group's curated `group_room_range` for the block's room type
+10. ~~**Minimize Group Idle Gaps**~~ (weight 3/hour, adjacent-pair only) — **TEMP DISABLED**, replaced for first-semester groups by #3 above
+11. ~~**Minimize Teacher Building Changes**~~ (weight 1) — **TEMP DISABLED** (not required anymore)
+12. ~~**Prefer Core 1h Blocks at the Same Time Across Days**~~ (weight 2) — **TEMP DISABLED** — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
 
 ## Features
 
@@ -110,18 +120,21 @@ marked TEMP DISABLED below are currently switched off by request).
 - Multi-hour consecutive blocks (1-4 hours), with pinning support for locking specific blocks to a teacher/room/timeslot
 - Dual room requirements (a course can split its hours across multiple room types) and custom per-course/per-group block templates — both database-driven and web-UI-manageable
 - Per-component block-sizing and max-blocks-per-day rules (`component_block_rule`), configurable from Settings → Block Rules instead of hardcoded
-- Hard rest-period rule: a teacher or group can't be scheduled into more than 4 unbroken hours without a gap
 - Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's curated room range (per room type, `group_room_range`) are applied automatically wherever a more specific override doesn't already provide one and the choice is unambiguous
 - Optional room-capacity awareness (`room.capacity` vs. `student_group.student_count`)
 - 4 room types: Standard, Mixed (doubles as Standard or Specialized - Workshop), Specialized - Workshop, Specialized - Computer Lab
 - PostgreSQL-backed: schema, reporting views, and data loading scripts
 - Three PDF reports (violations, by-teacher, by-group) via Constraint Streams-based analysis
+- Every solve's hard/soft constraint weight/severity overrides live in `constraint_config`, read by both the solver (`ConstraintWeightOverrides`) and the web UI (Settings → Constraint Weights) from one canonical default list (`common.SoftConstraintDefaults`) — no redeploy needed to retune a weight
+- `PreSolveValidator` runs before every solve (CLI and web-triggered) and also standalone from a "Run Validation" tools page — ten proven-fact checks block the solve outright, an eleventh (shared-teacher-load simulation) is an advisory warning
 
 ### Web app
 - Role-based access control (`READER`/`WRITER`/`ADMIN`/`TEACHER`) over stateless JWT — see [Authentication & Roles](#authentication--roles)
 - Full CRUD for teachers (incl. an optional required-room override), courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management, a per-course-teacher pre-assignment, and a warning when a course has no qualified teacher), and course block assignments
-- Bilingual UI (English/Spanish, `react-i18next`) with a per-user language preference
-- Admin: user management, timeslot management, current-term label, calendar exceptions (holidays/exam days/half-days), write-activity audit log, admin-triggered solver runs and block generation, per-component block rules
+- The Schedule grid is clickable for writers (opt-in, confirm-protected): move a block to a different day/hour or toggle pinned, validated live against hard constraints before Save; a collapsible panel on the same page shows every hard/soft violation persisted for the selected run
+- Bilingual UI (English/Spanish, `react-i18next`) with a per-user language preference, and a mobile-friendly stacked-day-list layout for the schedule views below a phone-width breakpoint
+- Admin: user management, timeslot management, current-term label, calendar exceptions (holidays/exam days/half-days), constraint weights, semester hour limits, database backup/restore, write-activity audit log, admin-triggered solver runs and block generation, per-component block rules
+- Tools (any writer): PDF reports, course coverage and teacher availability at-a-glance views, Excel import/export, and standalone pre-solve validation
 - Excel import/export (`POST`/`GET /api/import/excel`) — the same `.xlsx` layout both ways, for a full export → edit → re-import round trip
 - Teacher self-service: a `TEACHER`-role account sees only its own schedule
 - Search, pagination, toast notifications, and confirm dialogs throughout
@@ -141,7 +154,11 @@ database," used specifically to avoid hand-syncing the same rule twice.
 ├── common/                              # scheduler-common: shared business rules, plain Java,
 │   │                                     # no framework/persistence deps
 │   └── src/main/java/com/example/common/
-│       └── RoomTypeCompatibility.java   # e.g. does room type X satisfy requirement Y
+│       ├── RoomTypeCompatibility.java   # e.g. does room type X satisfy requirement Y
+│       ├── CalendarPacking.java         # day-by-day bin-packing (block shaping/placement)
+│       ├── BlockTimingMath.java         # same-day overlap / chain-break math
+│       ├── SoftConstraintDefaults.java  # canonical soft-constraint name -> default weight list
+│       └── ConfigurableHardConstraints.java  # which HARD constraints an admin may soften
 ├── engine/                              # scheduler-engine: Timefold + JDBC, no Spring
 │   └── src/main/java/com/example/
 │       ├── MainBlockSchedulingApp.java  # Entry point: load -> solve -> save
@@ -216,7 +233,7 @@ mvn test
 ```
 
 `mvn test` (Surefire) is unit tests only, no external dependencies, and should always be green
-(`web`: 382 tests, 0 failures, 0 errors). If you see `web` tests failing in bulk with "Mockito
+(`web`: 487 tests, 0 failures, 0 errors). If you see `web` tests failing in bulk with "Mockito
 cannot mock this class" / "Could not modify all classes" cascading into dozens of unrelated
 "ApplicationContext failure threshold exceeded" errors, that's `spring-boot-dependencies`
 3.2.1's pinned Mockito 5.7.0/byte-buddy 1.14.10 being too old to instrument classes on your JDK —
@@ -355,7 +372,9 @@ sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 - [ ] Student preferences for elective courses
 - [ ] Multi-week scheduling patterns (dated calendar instead of a recurring weekly template)
 - [ ] Calendar system integration (iCal/Google Calendar export)
-- [ ] Real-time constraint violation feedback during manual edits
+- [x] Real-time constraint violation feedback during manual edits — done: the Schedule grid's move/pin editor validates live against hard constraints (`POST /api/assignments/{id}/validate-move`), and a persisted per-run violations panel is browsable on the same page
+- [ ] Extend grid editing beyond move/pin to room/teacher reassignment
+- [ ] Link a persisted violation directly to its grid cell (needs structured, assignment-ID-bearing analyzer output, not just the current human-readable description strings)
 
 ## Contributing
 

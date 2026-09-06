@@ -274,19 +274,25 @@ resolves to exactly one room — a range of 2+ rooms has no single deterministic
 blocks are left for the next solve to decide among the (now on-disk) narrowed range instead.
 
 ### Assignments (`/api/assignments`)
-| Method & Path | Description |
-|---|---|
-| `GET /assignments` | All assignments |
-| `GET /assignments/{id}` | One assignment |
-| `GET /assignments/group/{groupId}` | By group |
-| `GET /assignments/teacher/{teacherId}` | By teacher |
-| `GET /assignments/room/{roomName}` | By room |
-| `GET /assignments/assigned` | Assigned blocks only |
-| `GET /assignments/unassigned` | Unassigned blocks only |
-| `GET /assignments/pinned` | Pinned blocks only |
-| `POST /assignments` | Create |
-| `PUT /assignments/{id}` | Update |
-| `DELETE /assignments/{id}` | Delete |
+Unlike every other resource, writes here require **`ADMIN` specifically** — `WRITER` does not
+get its usual write access (`SecurityConfig`'s one resource-specific exception to the general
+write rule), since course block assignments carry the live/solved schedule. The one exception
+to *that* exception is `validate-move` below, which computes a result but writes nothing.
+
+| Method & Path | Role | Description |
+|---|---|---|
+| `GET /assignments` | `READER`+ | All assignments |
+| `GET /assignments/{id}` | `READER`+ | One assignment |
+| `GET /assignments/group/{groupId}` | `READER`+ | By group |
+| `GET /assignments/teacher/{teacherId}` | `READER`+ | By teacher |
+| `GET /assignments/room/{roomName}` | `READER`+ | By room |
+| `GET /assignments/assigned` | `READER`+ | Assigned blocks only |
+| `GET /assignments/unassigned` | `READER`+ | Unassigned blocks only |
+| `GET /assignments/pinned` | `READER`+ | Pinned blocks only |
+| `POST /assignments` | `ADMIN` | Create |
+| `PUT /assignments/{id}` | `ADMIN` | Update |
+| `DELETE /assignments/{id}` | `ADMIN` | Delete |
+| `POST /assignments/{id}/validate-move` | `READER`+ | Check a candidate `{blockTimeslotId, pinned}` against hard constraints (double-booking, teacher availability, semester hour limit, per-day block cap, same-day consecutiveness) without saving anything — returns `{violations, warnings}`, used by the Schedule grid's move/pin editor before it lets Save proceed. A currently HARD-severity check reports as a blocking `violation`; a check an admin has switched to SOFT via Settings → Constraint Weights reports as a non-blocking `warning` instead. |
 
 `POST`/`PUT` apply one override automatically: if the submitted `teacherId` resolves to a
 teacher with a `requiredRoomName` whose type fits this block's `satisfiesRoomType`, `roomName`
@@ -294,13 +300,20 @@ is forced to it regardless of what was submitted — matching "this teacher alwa
 room" even if a different room (e.g. one from the group's curated range) was sent in the request body.
 
 ### Schedule (`/api/schedule`)
+Every `/view*` endpoint below takes an optional `?runId=` — omitted, it reads through
+`course_block_assignment_current` (pinned rows keep their own timeslot, everything else
+resolves to the most recent solver run); a specific `runId` instead reads that run's own frozen
+`schedule_run_result` snapshot, unaffected by anything edited since.
+
 | Method & Path | Role | Description |
 |---|---|---|
+| `GET /schedule/runs` | `READER`+ | Run history (newest first) — score + time budget per run, for the Schedule page's run picker |
 | `GET /schedule/view` | `READER`+ | Full schedule |
 | `GET /schedule/view/group/{groupId}` | `READER`+ | Schedule for one group |
 | `GET /schedule/view/teacher/{teacherId}` | `READER`+ | Schedule for one teacher |
 | `GET /schedule/view/room/{roomName}` | `READER`+ | Schedule for one room |
 | `GET /schedule/view/me` | any (incl. `TEACHER`) | The logged-in `TEACHER`'s own schedule, resolved server-side via `app_user.teacher_id` |
+| `GET /schedule/violations` | `READER`+ | Persisted hard/soft constraint violations for a run (`schedule_run_violation`, from `BlockScheduleAnalyzer`'s detailed analysis at solve time), pre-split into `{runId, hard, soft}` — each entry `{constraintName, description}`. No `runId` resolves to the most recent run. |
 
 ### Timeslots
 | Method & Path | Role | Description |

@@ -51,8 +51,9 @@ README).
 
 ### Navigation
 
-- Top-level nav ordered by frequency of use: Schedule, Assignments, Reports, a "Setup"
-  dropdown (Teachers/Courses/Rooms/Groups), Import/Export (`WRITER`/`ADMIN`), and an Admin
+- Top-level nav ordered by frequency of use: Schedule, Assignments, a "Setup" dropdown
+  (Teachers/Courses/Rooms/Groups), a "Tools" dropdown (Reports, Course Coverage, Teacher
+  Availability, and — `WRITER`/`ADMIN` only — Import/Export and Run Validation), and an Admin
   dropdown (Settings/Users, `ADMIN` only). Each dropdown shows which child page is active even
   while closed (e.g. "Setup · Rooms").
 - Username, language switcher, and logout are consolidated into a single profile dropdown.
@@ -61,11 +62,22 @@ README).
 
 ### Schedule View
 
-- **Grid view**: calendar-style schedule by day and hour, with group/teacher filters and
-  pinned-assignment highlighting. (The old flat List view was removed — it duplicated the
-  same data with no filtering/sorting advantage.)
-- **My Schedule** (`TEACHER` role): the same grid, scoped server-side to the logged-in
-  teacher via `GET /api/schedule/view/me`.
+- **Grid view**: calendar-style schedule by day and hour, with group/teacher/run filters and
+  pinned-assignment highlighting; below a phone-width breakpoint it switches to a stacked
+  day-by-day list instead (a table this wide isn't readable scrolled horizontally on a phone).
+  (The old flat List view was removed — it duplicated the same data with no filtering/sorting
+  advantage.)
+- **Interactive editing** (`WRITER`/`ADMIN`, opt-in): a confirm-protected "Enable schedule
+  editing" toggle (off by default, resets every visit) makes each block clickable, opening a
+  move/pin editor that validates the candidate change live against hard constraints
+  (`POST /api/assignments/{id}/validate-move`) before Save is allowed — a currently
+  SOFT-configured constraint shows as a non-blocking warning instead. Only available on the
+  live schedule, not a past run.
+- **Violations panel**: a collapsible summary of every hard/soft constraint violation
+  persisted for the selected run (`GET /api/schedule/violations`), grouped by constraint —
+  previously only visible by downloading the PDF report.
+- **My Schedule** (`TEACHER` role): the same grid (read-only, no editing toggle), scoped
+  server-side to the logged-in teacher via `GET /api/schedule/view/me`.
 
 ### Entity Management (CRUD, search, pagination)
 
@@ -97,24 +109,50 @@ README).
 - Group, course, block length, teacher, timeslot, room, pinned status; filter by All /
   Assigned / Unassigned / Pinned
 
-### Reports
+### Tools (any authenticated role; Import/Export and Run Validation need `WRITER`/`ADMIN`)
+
+#### Reports
 - `WRITER`/`ADMIN`-triggered PDF generation, versioned by run (past runs aren't overwritten);
   any authenticated role (except `TEACHER`) can browse and download past runs
 
-### Import / Export
+#### Course Coverage
+- For every group/course pair, how many hours are actually scheduled against how many are
+  required — Complete / Partial / Not Scheduled at a glance
+
+#### Teacher Availability
+- Every teacher's declared weekly availability condensed into one row per teacher (hour
+  ranges per day), instead of paging through each teacher's own record
+
+#### Import / Export
 - **Import**: upload an `.xlsx` workbook to upsert Teachers/Courses/Rooms/Groups/
   Group_Courses (`WRITER`/`ADMIN`)
 - **Export**: download the current data in the exact same layout Import expects, for a full
   export → edit → re-import round trip (any role except `TEACHER`)
 
-### Settings (`ADMIN`)
-- Block Rules: per-course-component preferred block size and max blocks per day
+#### Run Validation (`WRITER`/`ADMIN`)
+- Runs `PreSolveValidator` by itself, independent of actually solving — a fast up-front report
+  on the same ten blocking checks (plus one advisory warning) the solver itself runs before
+  every solve
+
+### Settings (`ADMIN`), 11 tabs
+- **Term**: current-term label (a free-text string like "Fall 2026", shown in the header for
+  every role)
+- **Solver**: admin-triggered solver runs, with optional random-seed control
+- **Compliance Snapshots**: the PDF report auto-generated after each engine run
+- **Generate Blocks**: admin-triggered block generation from course/group data, surfacing any
+  shape adjustments it made
+- **Block Rules**: per-course-component preferred block size, max blocks per day, and margin
   (`component_block_rule`), read by "Generate Blocks" and the solver instead of being
   hardcoded — a component with no rule falls back to a size-2 / max-2-per-day default
-- Timeslot management, grouped by day
-- Current-term label (a free-text string like "Fall 2026", shown in the header for every role)
-- Write-activity audit log viewer (who/what/when for every successful write)
-- Admin-triggered solver run and block generation, with a compliance-snapshot PDF viewer
+- **Constraint Weights**: per-constraint soft-weight overrides, plus switching one of the four
+  severity-configurable HARD constraints to SOFT
+- **Semester Hour Limits**: per-semester "must/should finish by hour X" configuration
+  (HARD or SOFT), replacing an earlier hardcoded semester-1-only rule
+- **Calendar**: calendar exceptions (holidays, exam days, half-days) — record-keeping only,
+  not yet read by block generation or the solver
+- **Timeslots**: timeslot management, grouped by day
+- **Database Backups**: export/import a full database snapshot
+- **Audit Log**: write-activity log viewer (who/what/when for every successful write)
 
 ### Users (`ADMIN`)
 - CRUD for application users and roles (`READER`/`WRITER`/`ADMIN`/`TEACHER`), with a linked-
@@ -163,25 +201,33 @@ needed locally.
 web-ui/
 ├── src/
 │   ├── components/            # One component per tab/route
-│   │   ├── Schedule.jsx       # Schedule viewer (grid view only)
-│   │   ├── MySchedule.jsx     # TEACHER-role self-service schedule view
+│   │   ├── Schedule.jsx       # Schedule viewer (grid + mobile list), interactive editing
+│   │   ├── AssignmentMoveEditor.jsx  # Move/pin editor opened from the Schedule grid
+│   │   ├── MySchedule.jsx     # TEACHER-role self-service schedule view (grid + mobile list)
+│   │   ├── ScheduleEntryCard.jsx     # One schedule block's card, shared by both views above
 │   │   ├── Teachers.jsx       # Teacher management + workload column
 │   │   ├── Courses.jsx        # Course management (Details/Room Requirements/Block Templates tabs)
 │   │   ├── Rooms.jsx          # Room management
-│   │   ├── Groups.jsx         # Student group management + Group-Courses
+│   │   ├── Groups.jsx         # Student group management + Group-Courses + Room Ranges
 │   │   ├── Assignments.jsx    # Course block assignment management
 │   │   ├── Reports.jsx        # PDF report generation/download
+│   │   ├── CourseCoverage.jsx       # Required vs. scheduled hours per group/course
+│   │   ├── TeacherAvailability.jsx  # Every teacher's weekly availability, condensed
+│   │   ├── PreSolveValidation.jsx   # Standalone "Run Validation" tools page
 │   │   ├── Import.jsx         # Excel import + export
-│   │   ├── Settings.jsx       # Admin: block rules, timeslots, term, audit log, solver runs
+│   │   ├── Settings.jsx       # Thin shell rendering the 11 tabs below (always-mounted, hidden via CSS)
+│   │   ├── settings/          # One self-contained component per Settings tab (Term, Solver,
+│   │   │                      # ComplianceSnapshots, GenerateBlocks, BlockRules, ConstraintWeights,
+│   │   │                      # SemesterHourLimits, Calendar, Timeslots, DatabaseBackups, AuditLog)
 │   │   ├── Users.jsx          # Admin: application user CRUD
 │   │   └── Login.jsx          # Login form
 │   ├── auth/                  # AuthContext, ProtectedRoute/AdminRoute/WriteRoute, AdminOnly/WriteOnly
 │   ├── ui/                    # Shared ToastContext, ConfirmContext, Pagination
 │   ├── i18n/                  # en.json / es.json (react-i18next)
 │   ├── api.js                 # API service (Axios)
-│   ├── App.jsx                # Routing + nav (Setup/Admin/Profile dropdowns)
+│   ├── App.jsx                # Routing + nav (Setup/Tools/Admin/Profile dropdowns)
 │   ├── main.jsx                # React entry point
-│   └── index.css              # Global styles
+│   └── index.css              # Global styles + design tokens
 ├── index.html                 # HTML template
 ├── vite.config.js             # Vite configuration (dev proxy, port 3000)
 ├── package.json                # Dependencies
