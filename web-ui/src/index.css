@@ -284,6 +284,61 @@ code {
   overflow-x: auto;
 }
 
+/*
+ * Schedule.jsx / MySchedule.jsx render the same week either as a grid
+ * (desktop-schedule-table, the existing 5-day table) or as a stacked
+ * day-by-day list (mobile-schedule-list) - a 6-column table is unreadable
+ * even scrolled horizontally on a phone, and teachers checking MySchedule
+ * are the account type most likely to be on one. Pure CSS toggle (no JS
+ * viewport state) at a phone-specific breakpoint, tighter than the 860px
+ * one above that only collapses the nav.
+ */
+.mobile-schedule-list {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .desktop-schedule-table {
+    display: none;
+  }
+
+  .mobile-schedule-list {
+    display: block;
+  }
+}
+
+.mobile-schedule-day {
+  margin-bottom: 12px;
+}
+
+.mobile-schedule-day:last-child {
+  margin-bottom: 0;
+}
+
+.mobile-schedule-day h3 {
+  margin-bottom: 10px;
+  color: var(--color-ink);
+}
+
+.mobile-schedule-window {
+  margin-bottom: 8px;
+}
+
+.mobile-schedule-window:last-child {
+  margin-bottom: 0;
+}
+
+/* The "CONFLICT" banner over a double-booked cell/window - shared by both
+   layouts above so a real scheduling conflict reads identically either way. */
+.schedule-conflict-banner {
+  background: var(--color-danger);
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 3px 6px;
+  text-align: center;
+}
+
 .btn {
   padding: 10px 20px;
   border: none;

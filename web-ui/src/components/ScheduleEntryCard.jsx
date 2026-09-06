@@ -22,7 +22,14 @@ import { formatHour } from '../constants';
  */
 function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fillHeight = false, onClick = null }) {
   const { t } = useTranslation();
-  const borderColor = hasConflict ? '#e74c3c' : entry.pinned ? '#ffcccc' : '#b3d9e6';
+  // Derived (color-mix) from the same primary/danger tokens the rest of the
+  // app uses, rather than one-off hex - see Teachers.jsx's own
+  // color-mix(...) usage for the established pattern this follows.
+  const borderColor = hasConflict
+    ? 'var(--color-danger)'
+    : entry.pinned
+      ? 'color-mix(in srgb, var(--color-danger) 45%, white)'
+      : 'color-mix(in srgb, var(--color-primary) 45%, white)';
 
   return (
     <div
@@ -31,7 +38,7 @@ function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fil
       onClick={onClick || undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       style={{
-        backgroundColor: entry.pinned ? '#ffe6e6' : '#e8f4f8',
+        backgroundColor: entry.pinned ? 'var(--color-danger-bg)' : 'var(--color-info-bg)',
         border: `2px solid ${borderColor}`,
         borderRadius: '4px',
         padding: '8px',
@@ -43,13 +50,17 @@ function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fil
       }}
     >
       <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{entry.courseName}</div>
-      <div style={{ fontSize: '11px', color: '#555' }}>{entry.groupName}</div>
-      {showTeacher && <div style={{ fontSize: '11px', color: '#555' }}>{entry.teacherName}</div>}
-      <div style={{ fontSize: '11px', color: '#555' }}>{entry.roomName}</div>
-      <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{entry.groupName}</div>
+      {showTeacher && <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{entry.teacherName}</div>}
+      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{entry.roomName}</div>
+      <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
         {formatHour(entry.startHour)} - {formatHour(entry.startHour + entry.lengthHours)} ({entry.lengthHours}h)
       </div>
-      {entry.pinned && <div style={{ color: '#c00', fontSize: '10px', marginTop: '2px' }}>📌 {t('schedule.pinnedLabel')}</div>}
+      {entry.pinned && (
+        <div style={{ color: 'var(--color-danger-text)', fontSize: '10px', marginTop: '2px' }}>
+          📌 {t('schedule.pinnedLabel')}
+        </div>
+      )}
     </div>
   );
 }

@@ -266,20 +266,20 @@ function Schedule() {
         )}
       </div>
 
-      <div className="card table-wrap">
+      <div className="card table-wrap desktop-schedule-table">
         <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ width: '80px', border: '1px solid #ddd', padding: '8px' }}>{t('schedule.hour')}</th>
+              <th style={{ width: '80px', border: '1px solid var(--color-border)', padding: '8px' }}>{t('schedule.hour')}</th>
               {DAYS.map((day, idx) => (
-                <th key={idx} style={{ border: '1px solid #ddd', padding: '8px' }}>{day}</th>
+                <th key={idx} style={{ border: '1px solid var(--color-border)', padding: '8px' }}>{day}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {HOURS.map(hour => (
               <tr key={hour}>
-                <td style={{ fontWeight: 'bold', border: '1px solid #ddd', padding: '8px' }}>{formatHour(hour)}-{formatHour(hour + 1)}</td>
+                <td style={{ fontWeight: 'bold', border: '1px solid var(--color-border)', padding: '8px' }}>{formatHour(hour)}-{formatHour(hour + 1)}</td>
                 {DAYS.map((day, dayIdx) => {
                   const windows = dayWindows[dayIdx];
                   const cellWindow = windows.find(w => w.startHour === hour);
@@ -289,7 +289,7 @@ function Schedule() {
                   if (!cellWindow) {
                     const isCoveredByEarlierWindow = windows.some(w => w.startHour < hour && hour < w.endHour);
                     return isCoveredByEarlierWindow ? null : (
-                      <td key={dayIdx} style={{ border: '1px solid #ddd', height: '60px' }} />
+                      <td key={dayIdx} style={{ border: '1px solid var(--color-border)', height: '60px' }} />
                     );
                   }
 
@@ -302,18 +302,13 @@ function Schedule() {
                       style={{
                         verticalAlign: 'top',
                         padding: '0',
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--color-border)',
                         height: '60px',
-                        ...(hasConflict ? { backgroundColor: '#fdecea' } : {}),
+                        ...(hasConflict ? { backgroundColor: 'color-mix(in srgb, var(--color-danger) 8%, transparent)' } : {}),
                       }}
                     >
                       {hasConflict && (
-                        <div style={{
-                          background: '#e74c3c', color: 'white', fontSize: '10px', fontWeight: 'bold',
-                          padding: '3px 6px', textAlign: 'center',
-                        }}>
-                          ⚠ {t('schedule.conflictLabel')}
-                        </div>
+                        <div className="schedule-conflict-banner">⚠ {t('schedule.conflictLabel')}</div>
                       )}
                       {cellWindow.entries.map((entry, idx) => (
                         <ScheduleEntryCard
@@ -331,6 +326,42 @@ function Schedule() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/*
+        * Same dayWindows the table above uses, stacked as day-by-day cards
+        * for narrow viewports - see index.css's phone breakpoint. Filters
+        * (group/teacher/run) already apply upstream via filteredEntries, so
+        * this reflects the exact same scoped view as the table.
+        */}
+      <div className="mobile-schedule-list">
+        {DAY_KEYS.map((_, dayIdx) => {
+          const windows = dayWindows[dayIdx];
+          if (windows.length === 0) return null;
+          return (
+            <div className="card mobile-schedule-day" key={dayIdx}>
+              <h3>{DAYS[dayIdx]}</h3>
+              {windows.map((window, wIdx) => {
+                const hasConflict = window.entries.length > 1;
+                return (
+                  <div className="mobile-schedule-window" key={wIdx}>
+                    {hasConflict && (
+                      <div className="schedule-conflict-banner">⚠ {t('schedule.conflictLabel')}</div>
+                    )}
+                    {window.entries.map((entry, eIdx) => (
+                      <ScheduleEntryCard
+                        key={eIdx}
+                        entry={entry}
+                        hasConflict={hasConflict}
+                        onClick={canEditGrid ? () => setEditingEntry(entry) : null}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
 
       {editingEntry && (
