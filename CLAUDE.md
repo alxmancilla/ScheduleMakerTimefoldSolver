@@ -84,7 +84,7 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 
 ### Constraint System (Block-Based Scheduling)
 
-**Hard Constraints** (13 defined in `SchoolConstraintProvider`; 11 currently active - the two break-after-consecutive-hours rules below are TEMP DISABLED):
+**Hard Constraints** (11 defined in `SchoolConstraintProvider`, all currently active):
 1. `blockLengthMustMatchTimeslotLength` - Block length must match timeslot length
 2. `teacherMustBeQualified` - Teacher must have qualification matching course name
 3. `teacherMustBeAvailable` - Teacher must be available for entire block duration (checks per-day availability map)
@@ -96,8 +96,8 @@ The **reporter** module generates three PDF reports from the persisted schedule:
 9. `groupCannotHaveTwoCoursesAtSameTime` - Student group cannot have overlapping blocks
 10. `maxTwoBlocksPerCoursePerGroupPerDay` - Maximum blocks per course per group per day, capped at `course.getMaxBlocksPerDay()` (per-component, via the `component_block_rule` table / Settings > Block Rules), falling back to a code default of 2 for a component with no configured rule. Mirrored in `BlockScheduleAnalyzer`.
 11. `courseBlocksMustBeConsecutive` - All course blocks on same day must be consecutive
-12. ~~`teacherMustHaveBreakAfterConsecutiveHours`~~ **TEMP DISABLED 2026-08-24** (per request) - A teacher scheduled `MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK` (4h) straight, back-to-back with zero idle time, must get a break before continuing. Pinned blocks excluded from the run (legacy pinned data can't block solver convergence). Mirrored in `BlockScheduleAnalyzer`.
-13. ~~`groupMustHaveBreakAfterConsecutiveHours`~~ **TEMP DISABLED 2026-08-24** (per request - groups are limited, don't need a break) - Same rule as above, for student groups instead of teachers.
+
+`teacherMustHaveBreakAfterConsecutiveHours`/`groupMustHaveBreakAfterConsecutiveHours` (a teacher/group scheduled 4h straight with zero idle time must get a break before continuing) existed here as TEMP DISABLED from 2026-08-24, and were removed entirely on 2026-09-06 (per request) - not just their `SchoolConstraintProvider` methods, but also their dead `BlockScheduleAnalyzer` detail computations and the now-unused `BlockScheduleMath.longestConsecutiveRunHours()`/`MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK`.
 
 **Soft Constraints** (12 defined, quality optimization; 9 currently active - `minimizeGroupIdleGaps`, `minimizeTeacherBuildingChanges`, and `preferCoreOneHourBlocksAtSameTimeAcrossDays` below are TEMP DISABLED). Every active constraint's weight shown below is the default for a per-constraint DB value editable via Settings > Constraint Weights (`SoftConstraintDefaults.getDefault(name)`), not a hardcoded literal; the 3 disabled ones are the exception - never migrated off a hardcoded `HardSoftScore.ofSoft(N)` since they're inactive:
 1. `nonStandardRoomsShouldFinishBy2pm` (weight 10) - Non-standard rooms (CC, TEM, TE, AULA 4, LQ, LMICRO) should finish by 14:00. SOFT in the constraint provider **and** reported as SOFT by `BlockScheduleAnalyzer` (both exclude pinned assignments).

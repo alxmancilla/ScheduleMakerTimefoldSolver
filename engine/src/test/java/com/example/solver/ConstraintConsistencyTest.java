@@ -54,9 +54,9 @@ public class ConstraintConsistencyTest {
                                 "Maximum blocks per course per group per day",
                                 "Course blocks must be consecutive"
                                 // "Teacher must have a break after consecutive hours" and
-                                // "Group must have a break after consecutive hours" - both TEMP
-                                // DISABLED 2026-08-24, see SchoolConstraintProvider. Re-add here
-                                // when re-enabled.
+                                // "Group must have a break after consecutive hours" - removed
+                                // 2026-09-06 (per request), not just disabled; see
+                                // SchoolConstraintProvider.
                                 ));
 
                 // Assert they match
@@ -163,7 +163,13 @@ public class ConstraintConsistencyTest {
                 // (still HARD, same count) plus a new SOFT counterpart "Semester hour
                 // limits should be respected (soft)" (see semester_hour_limit /
                 // Course.getLatestEndHourSeverity()) - was 11 hard / 8 soft / 19 total
-                // before.
+                // before. As of 2026-09-06: "Teacher must have a break after
+                // consecutive hours" and "Group must have a break after consecutive
+                // hours" removed entirely (per request) - they were already TEMP
+                // DISABLED and never counted in analyzeHardConstraintViolations'
+                // aggregate map, so this count itself is unchanged; only their
+                // (also-disabled) BlockScheduleAnalyzer detail computations and
+                // SchoolConstraintProvider methods were deleted.
                 assertEquals("Expected 11 HARD constraints", 11, hardCount);
                 assertEquals("Expected 9 SOFT constraints", 9, softCount);
 

@@ -6,7 +6,6 @@ import com.example.common.SchoolCalendarConstants;
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,11 +32,6 @@ public final class BlockScheduleMath {
     // A component with no row in component_block_rule falls back to this,
     // matching the old default cap for non-Core courses.
     public static final int DEFAULT_MAX_BLOCKS_PER_DAY = 2;
-
-    // Half the 8h (7:00-15:00) school day - a teacher/group scheduled this many
-    // consecutive hours with zero idle time between blocks must get a break
-    // before continuing.
-    public static final int MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK = 4;
 
     // The school day's earliest possible start hour (matches the earliest
     // BlockTimeslot start hour, 7:00) - the target
@@ -84,44 +78,6 @@ public final class BlockScheduleMath {
             asPairs.add(new int[] { a.getTimeslot().getStartHour(), a.getTimeslot().getLengthHours() });
         }
         return BlockTimingMath.countChainBreaks(asPairs);
-    }
-
-    /**
-     * The longest run of occupied hours (merging touching or overlapping
-     * blocks into one span) once sorted by start hour, tie-broken by id for a
-     * deterministic total order. A gap of any size - even one hour - starts a
-     * new run. Uses interval-merge (track [runStart, runEnd), extend on
-     * overlap/touch) rather than summing block lengths: mid-search the solver
-     * freely explores states where two blocks for the same teacher/group
-     * overlap (the double-booking constraint hasn't resolved it yet), and
-     * summing lengths would double-count that overlap - which also made the
-     * result depend on which of two equal-start-hour blocks an
-     * otherwise-unstable-for-ties sort visited first, silently violating
-     * Timefold's requirement that a constraint be a pure, order-independent
-     * function of the group's contents. The explicit id tie-break plus
-     * interval-merge fixes both the correctness and the determinism.
-     */
-    public static int longestConsecutiveRunHours(List<CourseBlockAssignment> blocks) {
-        List<CourseBlockAssignment> sorted = new ArrayList<>(blocks);
-        sorted.sort(Comparator
-                .comparingInt((CourseBlockAssignment a) -> a.getTimeslot().getStartHour())
-                .thenComparing(CourseBlockAssignment::getId));
-        int longest = 0;
-        int runStart = -1;
-        int runEnd = -1;
-        for (CourseBlockAssignment assignment : sorted) {
-            BlockTimeslot timeslot = assignment.getTimeslot();
-            int start = timeslot.getStartHour();
-            int end = start + timeslot.getLengthHours();
-            if (runEnd == -1 || start > runEnd) {
-                runStart = start;
-                runEnd = end;
-            } else {
-                runEnd = Math.max(runEnd, end);
-            }
-            longest = Math.max(longest, runEnd - runStart);
-        }
-        return longest;
     }
 
     /**

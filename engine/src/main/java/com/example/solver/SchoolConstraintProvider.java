@@ -26,9 +26,9 @@ import com.example.domain.Teacher;
  * with a null value for ANY genuine planning variable, not just the ones a
  * given constraint actually reads. Confirmed empirically: with plain forEach,
  * a roomless entity vanished even from constraints that never reference room
- * at all (teacherMustBeQualified, groupCannotHaveTwoCoursesAtSameTime,
- * groupMustHaveBreakAfterConsecutiveHours), silently under-counting real
- * violations. The *IncludingUnassigned variants restore normal visibility;
+ * at all (teacherMustBeQualified, groupCannotHaveTwoCoursesAtSameTime),
+ * silently under-counting real violations. The *IncludingUnassigned variants
+ * restore normal visibility;
  * forEachUniquePair's "unique pair, no self-pairs" behavior is replicated
  * manually via forEachIncludingUnassigned(...).join(forEachIncludingUnassigned(...),
  * Joiners.lessThan(getId), ...the constraint's own joiners...).
@@ -65,14 +65,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 maxTwoBlocksPerCoursePerGroupPerDay(constraintFactory), // HARD: Max blocks per course per group per
                                                                         // day (per-component via component_block_rule)
                 courseBlocksMustBeConsecutive(constraintFactory), // HARD: ALL course blocks MUST be consecutive
-                // TEMP DISABLED 2026-08-24 (per request) - re-enable by uncommenting.
-                // Also re-enable its BlockScheduleAnalyzer mirror and bump
-                // ConstraintConsistencyTest's expected counts back to 12 hard / 20 total.
-                // teacherMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
-                // TEMP DISABLED 2026-08-24 (per request - groups are limited, don't need a
-                // break) - re-enable by uncommenting, along with its BlockScheduleAnalyzer
-                // mirror and ConstraintConsistencyTest's expected counts.
-                // groupMustHaveBreakAfterConsecutiveHours(constraintFactory), // HARD: break after N straight hours
 
                 // ========== SOFT Constraints - Quality Optimization ==========
                 // Don't affect feasibility; ordered by weight (highest first) for
@@ -435,50 +427,6 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 .penalize(HardSoftScore.ONE_HARD,
                         (group, course, day, blocks) -> BlockScheduleMath.countChainBreaks(blocks))
                 .asConstraint("Course blocks must be consecutive");
-    }
-
-    // Pinned blocks are excluded from the run (same convention as
-    // nonStandardRoomsShouldFinishBy2pm/groupPreferredRoomConstraint) so
-    // legacy pinned data can't block solver convergence; only movable blocks
-    // are enforced. See BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK
-    // for the threshold itself.
-
-    private Constraint teacherMustHaveBreakAfterConsecutiveHours(ConstraintFactory constraintFactory) {
-        // HARD: A teacher scheduled MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK straight
-        // hours (blocks with zero idle time between them, same day) must get a
-        // break before continuing - minimizeTeacherIdleGaps only minimizes gaps
-        // toward zero, it never required one to exist in the first place.
-        return constraintFactory
-                .forEachIncludingUnassigned(CourseBlockAssignment.class)
-                .filter(a -> !a.isPinned() && a.getTeacher() != null && a.getTimeslot() != null)
-                .groupBy(
-                        CourseBlockAssignment::getTeacher,
-                        a -> a.getTimeslot().getDayOfWeek(),
-                        ConstraintCollectors.toList())
-                .filter((teacher, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
-                        > BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
-                .penalize(HardSoftScore.ONE_HARD,
-                        (teacher, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
-                                - BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
-                .asConstraint("Teacher must have a break after consecutive hours");
-    }
-
-    private Constraint groupMustHaveBreakAfterConsecutiveHours(ConstraintFactory constraintFactory) {
-        // HARD: Same rule as teacherMustHaveBreakAfterConsecutiveHours, for
-        // student groups instead of teachers.
-        return constraintFactory
-                .forEachIncludingUnassigned(CourseBlockAssignment.class)
-                .filter(a -> !a.isPinned() && a.getGroup() != null && a.getTimeslot() != null)
-                .groupBy(
-                        CourseBlockAssignment::getGroup,
-                        a -> a.getTimeslot().getDayOfWeek(),
-                        ConstraintCollectors.toList())
-                .filter((group, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
-                        > BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
-                .penalize(HardSoftScore.ONE_HARD,
-                        (group, day, blocks) -> BlockScheduleMath.longestConsecutiveRunHours(blocks)
-                                - BlockScheduleMath.MAX_CONSECUTIVE_HOURS_WITHOUT_BREAK)
-                .asConstraint("Group must have a break after consecutive hours");
     }
 
     // ==================== DEPRECATED HOUR-BASED CONSTRAINTS ====================
