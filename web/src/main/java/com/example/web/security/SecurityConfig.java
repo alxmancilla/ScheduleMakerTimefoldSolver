@@ -77,6 +77,12 @@ public class SecurityConfig {
                         // otherwise let WRITER write here too.
                         .requestMatchers(HttpMethod.GET, "/api/assignments/**")
                         .hasAnyRole("READER", "WRITER", "ADMIN")
+                        // validate-move computes and returns a result, it doesn't write anything -
+                        // POST only because it takes a request body (a candidate timeslot/pinned
+                        // pair) - so it follows the GET rule above, ahead of the general
+                        // ADMIN-only POST rule for this resource right below.
+                        .requestMatchers(HttpMethod.POST, "/api/assignments/*/validate-move")
+                        .hasAnyRole("READER", "WRITER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/assignments/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/assignments/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/assignments/**").hasRole("ADMIN")

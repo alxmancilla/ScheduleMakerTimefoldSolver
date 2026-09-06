@@ -1,10 +1,12 @@
 package com.example.web.security;
 
 import com.example.web.controller.CourseBlockAssignmentController;
+import com.example.web.dto.AssignmentMoveValidationResponse;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.service.AssignmentExcelService;
+import com.example.web.service.AssignmentMoveValidationService;
 import com.example.web.service.GroupCourseDefaultTeacherSyncService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -12,12 +14,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.Assert.assertNotEquals;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -54,6 +59,9 @@ public class AssignmentsSecurityTest {
 
     @MockBean
     private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
+
+    @MockBean
+    private AssignmentMoveValidationService assignmentMoveValidationService;
 
     // Required by the AuthenticationManager bean declared in SecurityConfig.
     @MockBean
@@ -115,5 +123,31 @@ public class AssignmentsSecurityTest {
                 .andReturn().getResponse().getStatus();
         assertNotEquals(401, statusCode);
         assertNotEquals(403, statusCode);
+    }
+
+    // validate-move is a POST (it takes a request body), but computes a
+    // result rather than writing anything - SecurityConfig carves it out of
+    // the general ADMIN-only write rule above so WRITER (and READER) keep
+    // the same access they have to every other read on this resource.
+    @Test
+    @WithMockUser(roles = "WRITER")
+    public void writer_canPostValidateMove() throws Exception {
+        when(assignmentMoveValidationService.validate(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new AssignmentMoveValidationResponse(java.util.List.of(), java.util.List.of()));
+        mockMvc.perform(post("/api/assignments/block_assignment_1/validate-move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "READER")
+    public void reader_canPostValidateMove() throws Exception {
+        when(assignmentMoveValidationService.validate(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new AssignmentMoveValidationResponse(java.util.List.of(), java.util.List.of()));
+        mockMvc.perform(post("/api/assignments/block_assignment_1/validate-move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                .andExpect(status().isOk());
     }
 }

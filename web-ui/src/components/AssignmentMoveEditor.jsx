@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getAssignment, updateAssignment } from '../api';
+import { getAssignment, updateAssignment, validateAssignmentMove } from '../api';
 import { useToast } from '../ui/ToastContext';
 import { formatHour } from '../constants';
 
 const DAY_KEY_BY_NUMBER = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
+const VALIDATE_DEBOUNCE_MS = 300;
 
 /**
  * Move/pin editor opened by clicking a card in Schedule.jsx's grid (writers
@@ -21,16 +22,20 @@ const DAY_KEY_BY_NUMBER = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
  * the fetched entity (which also carries nested group/course/teacher/room
  * objects the DTO doesn't want).
  *
- * The conflict check below is advisory, not authoritative: `PUT` performs no
- * hard-constraint validation of its own (double-booking etc. are solver
- * constraints, checked at solve time / by PreSolveValidator, not by plain
- * CRUD), so this cross-references the schedule already loaded in memory for
- * the same three double-booking rules (teacher/group/room) and warns - it
- * never blocks the save - exactly like validateSharedTeacherLoad's own
- * warn-don't-block posture for a heuristic that can have false positives
- * (here, entries outside the currently loaded/filtered list aren't checked).
+ * `PUT` itself performs no hard-constraint validation (double-booking etc.
+ * are solver constraints, checked at solve time or by PreSolveValidator, not
+ * by plain CRUD), so every day/hour/pinned change is re-checked here against
+ * `POST /api/assignments/{id}/validate-move` (debounced), which re-derives
+ * the same facts server-side against the full, current database state -
+ * see AssignmentMoveValidationService. Its `violations` are constraints
+ * currently configured HARD - Save is disabled while any are present, the
+ * same posture as PreSolveValidator's blocking problems. Its `warnings` are
+ * the same checks' SOFT-configured counterpart (an admin has switched that
+ * constraint to SOFT via Settings > Constraint Weights, or the target
+ * semester's semester_hour_limit is SOFT-severity) - shown, but never
+ * blocking, since the solver itself wouldn't reject them either.
  */
-function AssignmentMoveEditor({ entry, timeslots, allEntries, onClose, onSaved }) {
+function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
   const { t } = useTranslation();
   const showToast = useToast();
 
@@ -48,6 +53,9 @@ function AssignmentMoveEditor({ entry, timeslots, allEntries, onClose, onSaved }
   const [pinned, setPinned] = useState(entry.pinned);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [validating, setValidating] = useState(false);
+  const [violations, setViolations] = useState([]);
+  const [warnings, setWarnings] = useState([]);
 
   const hoursForDay = useMemo(
     () => matchingTimeslots
@@ -70,34 +78,45 @@ function AssignmentMoveEditor({ entry, timeslots, allEntries, onClose, onSaved }
   const targetTimeslot = matchingTimeslots.find(
     (ts) => ts.dayOfWeek === dayOfWeek && ts.startHour === startHour,
   );
-  const hasMoved = dayOfWeek !== entry.dayOfWeek || startHour !== entry.startHour;
   const pinBlocked = !entry.roomName;
 
-  const conflicts = useMemo(() => {
-    if (!hasMoved) return [];
-    const newStart = startHour;
-    const newEnd = startHour + entry.lengthHours;
-    return allEntries.filter((other) => {
-      if (other.id === entry.id) return false;
-      if (other.dayOfWeek !== dayOfWeek) return false;
-      const otherStart = other.startHour;
-      const otherEnd = other.startHour + other.lengthHours;
-      const overlaps = newStart < otherEnd && otherStart < newEnd;
-      if (!overlaps) return false;
-      return (
-        (entry.teacherId && other.teacherId === entry.teacherId)
-        || other.groupId === entry.groupId
-        || (entry.roomName && other.roomName === entry.roomName)
-      );
-    });
-  }, [allEntries, hasMoved, dayOfWeek, startHour, entry]);
+  // Re-validate (debounced) whenever the candidate move/pin changes. Skipped
+  // entirely while no target timeslot resolves (shouldn't happen - the
+  // selects only offer matching-length timeslots - but guards against a
+  // stale/empty list).
+  useEffect(() => {
+    if (!targetTimeslot) {
+      setViolations([]);
+      setWarnings([]);
+      return undefined;
+    }
+    setValidating(true);
+    const timer = setTimeout(async () => {
+      try {
+        const response = await validateAssignmentMove(entry.id, {
+          blockTimeslotId: targetTimeslot.id,
+          pinned,
+        });
+        setViolations(response.data.violations || []);
+        setWarnings(response.data.warnings || []);
+      } catch (err) {
+        // Fail closed: an unreachable check shouldn't silently let Save through.
+        setViolations([t('schedule.moveEditor.validationFailedPrefix') + err.message]);
+        setWarnings([]);
+      } finally {
+        setValidating(false);
+      }
+    }, VALIDATE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.id, targetTimeslot?.id, pinned]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') onClose();
   };
 
   const handleSave = async () => {
-    if (!targetTimeslot) return;
+    if (!targetTimeslot || violations.length > 0) return;
     setSaving(true);
     setError(null);
     try {
@@ -156,13 +175,34 @@ function AssignmentMoveEditor({ entry, timeslots, allEntries, onClose, onSaved }
           </select>
         </div>
 
-        {conflicts.length > 0 && (
+        {validating && (
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
+            {t('schedule.moveEditor.validating')}
+          </p>
+        )}
+
+        {violations.length > 0 && (
           <div className="error" role="alert" style={{ marginBottom: '12px' }}>
-            {t('schedule.moveEditor.conflictWarning', { count: conflicts.length })}
+            {t('schedule.moveEditor.violationsHeading')}
             <ul style={{ margin: '6px 0 0 18px' }}>
-              {conflicts.map((c) => (
-                <li key={c.id}>{c.courseName} · {c.groupName}{c.teacherName ? ` · ${c.teacherName}` : ''}</li>
-              ))}
+              {violations.map((v, i) => <li key={i}>{v}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {warnings.length > 0 && (
+          <div
+            role="status"
+            style={{
+              marginBottom: '12px', padding: '8px 12px', borderRadius: '4px',
+              background: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+              border: '1px solid var(--color-warning)', color: 'var(--color-text)',
+              fontSize: '13px',
+            }}
+          >
+            {t('schedule.moveEditor.warningsHeading')}
+            <ul style={{ margin: '6px 0 0 18px' }}>
+              {warnings.map((w, i) => <li key={i}>{w}</li>)}
             </ul>
           </div>
         )}
@@ -191,7 +231,12 @@ function AssignmentMoveEditor({ entry, timeslots, allEntries, onClose, onSaved }
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
             {t('common.cancel')}
           </button>
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving || !targetTimeslot}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={saving || validating || !targetTimeslot || violations.length > 0}
+          >
             {saving ? t('schedule.moveEditor.saving') : t('common.save')}
           </button>
         </div>

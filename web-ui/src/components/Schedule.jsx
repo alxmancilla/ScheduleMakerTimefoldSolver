@@ -337,7 +337,6 @@ function Schedule() {
         <AssignmentMoveEditor
           entry={editingEntry}
           timeslots={timeslots}
-          allEntries={schedule.entries}
           onClose={() => setEditingEntry(null)}
           onSaved={() => {
             setEditingEntry(null);

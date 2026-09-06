@@ -7,6 +7,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.service.AssignmentExcelService;
+import com.example.web.service.AssignmentMoveValidationService;
 import com.example.web.service.GroupCourseDefaultTeacherSyncService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Before;
@@ -69,6 +70,9 @@ public class CourseBlockAssignmentControllerTest {
 
     @MockBean
     private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
+
+    @MockBean
+    private AssignmentMoveValidationService assignmentMoveValidationService;
 
     private CourseBlockAssignmentEntity assignment;
 

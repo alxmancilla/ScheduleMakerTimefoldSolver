@@ -804,10 +804,13 @@
       "startHour": "Hora de inicio",
       "pinned": "Fijado",
       "pinBlockedNoRoom": "No se puede fijar: este bloque aún no tiene un aula asignada.",
-      "conflictWarning": "{{count}} posible(s) conflicto(s) en este horario:",
       "saving": "Guardando...",
       "savedMessage": "Asignación actualizada.",
-      "saveFailedPrefix": "Error al guardar: "
+      "saveFailedPrefix": "Error al guardar: ",
+      "validating": "Verificando...",
+      "violationsHeading": "Este cambio no se puede guardar:",
+      "warningsHeading": "Este cambio es posible, pero vale la pena notar:",
+      "validationFailedPrefix": "No se pudo verificar este cambio: "
     },
     "editMode": {
       "toggleLabel": "Habilitar edición del horario",

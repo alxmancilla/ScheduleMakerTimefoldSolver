@@ -804,10 +804,13 @@
       "startHour": "Start hour",
       "pinned": "Pinned",
       "pinBlockedNoRoom": "Can't pin: this block has no room assigned yet.",
-      "conflictWarning": "{{count}} possible conflict(s) at this slot:",
       "saving": "Saving...",
       "savedMessage": "Assignment updated.",
-      "saveFailedPrefix": "Failed to save: "
+      "saveFailedPrefix": "Failed to save: ",
+      "validating": "Checking...",
+      "violationsHeading": "This move can't be saved:",
+      "warningsHeading": "This move is allowed, but worth noting:",
+      "validationFailedPrefix": "Could not check this move: "
     },
     "editMode": {
       "toggleLabel": "Enable schedule editing",

@@ -1,6 +1,8 @@
 package com.example.web.controller;
 
 import com.example.web.dto.AssignmentImportResponse;
+import com.example.web.dto.AssignmentMoveValidationRequest;
+import com.example.web.dto.AssignmentMoveValidationResponse;
 import com.example.web.dto.CourseBlockAssignmentDTO;
 import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.entity.RoomEntity;
@@ -10,6 +12,7 @@ import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
 import com.example.web.service.AssignmentExcelService;
+import com.example.web.service.AssignmentMoveValidationService;
 import com.example.web.service.GroupCourseDefaultTeacherSyncService;
 import com.example.common.RoomTypeCompatibility;
 import jakarta.validation.Valid;
@@ -46,6 +49,9 @@ public class CourseBlockAssignmentController {
     @Autowired
     private GroupCourseDefaultTeacherSyncService groupCourseDefaultTeacherSyncService;
 
+    @Autowired
+    private AssignmentMoveValidationService assignmentMoveValidationService;
+
     @GetMapping
     public List<CourseBlockAssignmentEntity> getAllAssignments() {
         return assignmentRepository.findAll();
@@ -55,6 +61,12 @@ public class CourseBlockAssignmentController {
     public CourseBlockAssignmentEntity getAssignmentById(@PathVariable String id) {
         return assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
+    }
+
+    @PostMapping("/{id}/validate-move")
+    public AssignmentMoveValidationResponse validateMove(@PathVariable String id,
+            @Valid @RequestBody AssignmentMoveValidationRequest request) {
+        return assignmentMoveValidationService.validate(id, request.getBlockTimeslotId(), request.isPinned());
     }
 
     @GetMapping("/group/{groupId}")

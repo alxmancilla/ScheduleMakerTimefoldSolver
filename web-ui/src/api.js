@@ -142,6 +142,10 @@ export const getAssignment = (id) => api.get(`/assignments/${id}`);
 export const createAssignment = (assignment) => api.post('/assignments', assignment);
 export const updateAssignment = (id, assignment) => api.put(`/assignments/${id}`, assignment);
 export const deleteAssignment = (id) => api.delete(`/assignments/${id}`);
+// Checks a candidate move/pin against hard constraints without saving anything
+// - see AssignmentMoveValidationService (backend). { blockTimeslotId, pinned } in,
+// { violations: [...], warnings: [...] } out.
+export const validateAssignmentMove = (id, request) => api.post(`/assignments/${id}/validate-move`, request);
 export const getAssignmentsByGroup = (groupId) => api.get(`/assignments/group/${groupId}`);
 export const getAssignmentsByTeacher = (teacherId) => api.get(`/assignments/teacher/${teacherId}`);
 export const getAssignmentsByRoom = (roomName) => api.get(`/assignments/room/${roomName}`);
