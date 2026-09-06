@@ -1,5 +1,6 @@
 package com.example.web.service;
 
+import com.example.common.BlockTimingMath;
 import com.example.web.entity.BlockTimeslotEntity;
 import com.example.web.entity.ComponentBlockRuleEntity;
 import com.example.web.entity.CourseBlockAssignmentEntity;
@@ -595,11 +596,7 @@ public class BlockGenerationService {
         if (!a.getDayOfWeek().equals(b.getDayOfWeek())) {
             return false;
         }
-        int aStart = a.getStartHour();
-        int aEnd = aStart + a.getLengthHours();
-        int bStart = b.getStartHour();
-        int bEnd = bStart + b.getLengthHours();
-        return aStart < bEnd && bStart < aEnd;
+        return BlockTimingMath.overlaps(a.getStartHour(), a.getLengthHours(), b.getStartHour(), b.getLengthHours());
     }
 
     private int maxBlocksPerDayFor(String component) {

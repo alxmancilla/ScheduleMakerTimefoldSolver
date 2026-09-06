@@ -1,5 +1,6 @@
 package com.example.domain;
 
+import com.example.common.BlockTimingMath;
 import com.example.common.SchoolCalendarConstants;
 
 import java.time.DayOfWeek;
@@ -53,7 +54,9 @@ public final class BlockScheduleMath {
 
     /**
      * True if two block timeslots overlap: same day, and their [start, end)
-     * ranges intersect.
+     * ranges intersect. Delegates the hour-range comparison to
+     * scheduler-common's BlockTimingMath (day equality is engine-specific -
+     * BlockTimeslot.getDayOfWeek() - so it's checked here, not in common).
      */
     public static boolean blocksOverlap(BlockTimeslot block1, BlockTimeslot block2) {
         if (block1 == null || block2 == null) {
@@ -62,11 +65,8 @@ public final class BlockScheduleMath {
         if (!block1.getDayOfWeek().equals(block2.getDayOfWeek())) {
             return false;
         }
-        int start1 = block1.getStartHour();
-        int end1 = block1.getStartHour() + block1.getLengthHours();
-        int start2 = block2.getStartHour();
-        int end2 = block2.getStartHour() + block2.getLengthHours();
-        return start1 < end2 && start2 < end1;
+        return BlockTimingMath.overlaps(block1.getStartHour(), block1.getLengthHours(),
+                block2.getStartHour(), block2.getLengthHours());
     }
 
     /**
@@ -74,21 +74,16 @@ public final class BlockScheduleMath {
      * a set of blocks once sorted by start hour. Zero means the blocks form a
      * single contiguous chain; each break contributes one violation. Expects
      * every block to already share the same (group, course, day) grouping -
-     * only start-hour ordering is computed here.
+     * only start-hour ordering is computed here. Delegates to
+     * scheduler-common's BlockTimingMath, the same implementation web's own
+     * move-validation logic uses over its own entity rows.
      */
     public static int countChainBreaks(List<CourseBlockAssignment> blocks) {
-        List<CourseBlockAssignment> sorted = new ArrayList<>(blocks);
-        sorted.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
-        int breaks = 0;
-        for (int i = 1; i < sorted.size(); i++) {
-            BlockTimeslot prev = sorted.get(i - 1).getTimeslot();
-            BlockTimeslot curr = sorted.get(i).getTimeslot();
-            int prevEnd = prev.getStartHour() + prev.getLengthHours();
-            if (prevEnd != curr.getStartHour()) {
-                breaks++;
-            }
+        List<int[]> asPairs = new ArrayList<>();
+        for (CourseBlockAssignment a : blocks) {
+            asPairs.add(new int[] { a.getTimeslot().getStartHour(), a.getTimeslot().getLengthHours() });
         }
-        return breaks;
+        return BlockTimingMath.countChainBreaks(asPairs);
     }
 
     /**
