@@ -542,6 +542,38 @@ public final class BlockScheduleAnalyzer {
 
         List<CourseBlockAssignment> list = schedule.getCourseBlockAssignments();
 
+        // Prefer group's preferred room (SOFT, weight 2) - mirrors
+        // SchoolConstraintProvider.groupPreferredRoomConstraint / the count
+        // version above.
+        List<String> preferredRoomDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
+                var acceptableRooms = a.getGroup().getAcceptableRooms(a.getSatisfiesRoomType());
+                if (acceptableRooms != null && !acceptableRooms.contains(a.getRoom())) {
+                    preferredRoomDetails.add(blockAssignmentToString(a)
+                            + String.format(" (assigned=%s, not in group's curated range for %s)",
+                                    a.getRoom().getName(), a.getSatisfiesRoomType()));
+                }
+            }
+        }
+        details.put("Prefer group's preferred room", preferredRoomDetails);
+
+        // Room capacity should fit group size (SOFT, weight 4) - mirrors the
+        // count version above (pinned assignments NOT excluded here either).
+        List<String> roomCapacityDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getRoom() != null && a.getGroup() != null) {
+                Integer capacity = a.getRoom().getCapacity();
+                Integer studentCount = a.getGroup().getStudentCount();
+                if (capacity != null && studentCount != null && studentCount > capacity) {
+                    roomCapacityDetails.add(blockAssignmentToString(a)
+                            + String.format(" (room capacity=%d, group size=%d, over by %d)",
+                                    capacity, studentCount, studentCount - capacity));
+                }
+            }
+        }
+        details.put("Room capacity should fit group size", roomCapacityDetails);
+
         // Teacher max hours per week
         List<String> teacherMaxExcess = new ArrayList<>();
         Map<String, Integer> teacherHours = new HashMap<>();
@@ -564,6 +596,112 @@ public final class BlockScheduleAnalyzer {
             }
         }
         details.put("Teacher exceeds max hours per week", teacherMaxExcess);
+
+        // Minimize teacher idle gaps (SOFT, weight 2, availability-aware) -
+        // mirrors the count version above: same per-day grouping and
+        // BlockScheduleMath.availableGapHours() call, one description per
+        // adjacent pair with a nonzero available gap.
+        List<String> teacherIdleGapDetails = new ArrayList<>();
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> teacherDayForIdleGapDetails = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getTeacher() == null || a.getTimeslot() == null) {
+                continue;
+            }
+            teacherDayForIdleGapDetails.computeIfAbsent(a.getTeacher().getId(), k -> new HashMap<>())
+                    .computeIfAbsent(a.getTimeslot().getDayOfWeek(), k -> new ArrayList<>())
+                    .add(a);
+        }
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> byDay : teacherDayForIdleGapDetails.values()) {
+            for (List<CourseBlockAssignment> assigns : byDay.values()) {
+                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+                for (int i = 1; i < assigns.size(); i++) {
+                    CourseBlockAssignment prev = assigns.get(i - 1);
+                    CourseBlockAssignment curr = assigns.get(i);
+                    int gap = BlockScheduleMath.availableGapHours(prev, curr);
+                    if (gap > 0) {
+                        teacherIdleGapDetails.add(blockAssignmentToString(prev) + "  <->  "
+                                + blockAssignmentToString(curr) + String.format(" (available idle gap=%d hours)", gap));
+                    }
+                }
+            }
+        }
+        details.put("Minimize teacher idle gaps (availability-aware)", teacherIdleGapDetails);
+
+        // Prefer first-semester blocks to start early (SOFT, weight 6) -
+        // mirrors the count version above, but reports the specific block
+        // that is each (group, day)'s earliest semester-1 one, rather than
+        // just the aggregate deviation.
+        List<String> semesterOneStartEarlyDetails = new ArrayList<>();
+        Map<String, Map<DayOfWeek, CourseBlockAssignment>> earliestSemesterOneBlockByGroupDay = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getGroup() == null || a.getCourse() == null || a.getTimeslot() == null
+                    || !Integer.valueOf(1).equals(a.getCourse().getSemester())) {
+                continue;
+            }
+            Map<DayOfWeek, CourseBlockAssignment> byDay = earliestSemesterOneBlockByGroupDay
+                    .computeIfAbsent(a.getGroup().getId(), k -> new HashMap<>());
+            CourseBlockAssignment current = byDay.get(a.getTimeslot().getDayOfWeek());
+            if (current == null || a.getTimeslot().getStartHour() < current.getTimeslot().getStartHour()) {
+                byDay.put(a.getTimeslot().getDayOfWeek(), a);
+            }
+        }
+        for (Map<DayOfWeek, CourseBlockAssignment> byDay : earliestSemesterOneBlockByGroupDay.values()) {
+            for (CourseBlockAssignment earliest : byDay.values()) {
+                int startHour = earliest.getTimeslot().getStartHour();
+                if (startHour > BlockScheduleMath.EARLIEST_START_HOUR) {
+                    semesterOneStartEarlyDetails.add(blockAssignmentToString(earliest)
+                            + String.format(" (earliest semester-1 block that day starts at %d:00, should start by %d:00)",
+                                    startHour, BlockScheduleMath.EARLIEST_START_HOUR));
+                }
+            }
+        }
+        details.put("Prefer first-semester blocks to start early", semesterOneStartEarlyDetails);
+
+        // Minimize first-semester group idle gaps (SOFT, weight 6) - mirrors
+        // the count version above: same full-day adjacency (any semester
+        // breaks it), only sums when BOTH framing blocks are semester-1.
+        List<String> semesterOneIdleGapDetails = new ArrayList<>();
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> fullDayForSemesterOneGapDetails = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null) {
+                continue;
+            }
+            fullDayForSemesterOneGapDetails.computeIfAbsent(a.getGroup().getId(), k -> new HashMap<>())
+                    .computeIfAbsent(a.getTimeslot().getDayOfWeek(), k -> new ArrayList<>())
+                    .add(a);
+        }
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> byDay : fullDayForSemesterOneGapDetails.values()) {
+            for (List<CourseBlockAssignment> assigns : byDay.values()) {
+                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+                for (int i = 1; i < assigns.size(); i++) {
+                    CourseBlockAssignment prev = assigns.get(i - 1);
+                    CourseBlockAssignment curr = assigns.get(i);
+                    if (isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
+                        int gap = BlockScheduleMath.gapHours(prev, curr);
+                        if (gap > 0) {
+                            semesterOneIdleGapDetails.add(blockAssignmentToString(prev) + "  <->  "
+                                    + blockAssignmentToString(curr) + String.format(" (gap=%d hours)", gap));
+                        }
+                    }
+                }
+            }
+        }
+        details.put("Minimize first-semester group idle gaps", semesterOneIdleGapDetails);
+
+        // Semester hour limits should be respected (soft) - mirrors the count
+        // version above / SchoolConstraintProvider.preferSemesterHourLimits.
+        List<String> semesterHourLimitSoftDetails = new ArrayList<>();
+        for (CourseBlockAssignment a : list) {
+            if (!a.isPinned()) {
+                int excess = BlockScheduleMath.softSemesterHourLimitExcess(a);
+                if (excess > 0) {
+                    semesterHourLimitSoftDetails.add(blockAssignmentToString(a)
+                            + String.format(" (%d hour(s) past semester %d's soft limit)", excess,
+                                    a.getCourse().getSemester()));
+                }
+            }
+        }
+        details.put("Semester hour limits should be respected (soft)", semesterHourLimitSoftDetails);
 
         // Minimize group idle gaps (SOFT) - Detailed - TEMP DISABLED 2026-08-24, see
         // the count version's mirror above for why. Re-enable together with it.
