@@ -2,6 +2,7 @@ package com.example.web.controller;
 
 import com.example.web.dto.ScheduleRunDTO;
 import com.example.web.dto.ScheduleViewDTO;
+import com.example.web.dto.ScheduleViolationsDTO;
 import com.example.web.entity.*;
 import com.example.web.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,9 @@ public class ScheduleController {
         private ScheduleRunResultRepository scheduleRunResultRepository;
 
         @Autowired
+        private ScheduleRunViolationRepository scheduleRunViolationRepository;
+
+        @Autowired
         private BlockTimeslotRepository timeslotRepository;
 
         @Autowired
@@ -51,6 +55,29 @@ public class ScheduleController {
                 return scheduleRunRepository.findAllByOrderByCreatedAtDesc().stream()
                                 .map(ScheduleRunDTO::new)
                                 .collect(Collectors.toList());
+        }
+
+        /**
+         * The persisted hard/soft constraint violations for a run (see DataSaver's
+         * schedule_run_violation writes, from BlockScheduleAnalyzer's own detailed
+         * analysis) - surfaced here so admin/writer can see them in the Schedule
+         * view instead of only in the downloaded PDF report. Null runId (the
+         * default, matching every /view* endpoint's own convention) resolves to
+         * the most recent schedule_run; a run predating this feature (added
+         * 2026-09-06) simply has no rows, resolving to two empty lists rather
+         * than an error.
+         */
+        @GetMapping("/violations")
+        public ScheduleViolationsDTO getScheduleViolations(@RequestParam(required = false) Integer runId) {
+                Integer effectiveRunId = runId != null ? runId
+                                : scheduleRunRepository.findTopByOrderByCreatedAtDesc()
+                                                .map(ScheduleRunEntity::getId)
+                                                .orElse(null);
+                if (effectiveRunId == null) {
+                        return new ScheduleViolationsDTO(null, Collections.emptyList());
+                }
+                return new ScheduleViolationsDTO(effectiveRunId,
+                                scheduleRunViolationRepository.findByScheduleRunId(effectiveRunId));
         }
 
         @GetMapping("/view")

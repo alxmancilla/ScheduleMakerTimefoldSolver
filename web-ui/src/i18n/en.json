@@ -817,6 +817,13 @@
       "confirmEnable": "Turning this on lets clicking a block move or pin it, directly changing the live schedule. Enable editing?",
       "unavailableForPastRun": "Editing is only available on the latest schedule, not a past run.",
       "activeNotice": "Editing is ON — clicking a block opens the move/pin editor."
+    },
+    "violations": {
+      "summary": "{{hard}} hard, {{soft}} soft violation(s) for this run",
+      "hardHeading": "Hard constraint violations",
+      "softHeading": "Soft constraint violations",
+      "none": "No violations recorded for this run.",
+      "loadFailedPrefix": "Failed to load violations: "
     }
   },
   "mySchedule": {

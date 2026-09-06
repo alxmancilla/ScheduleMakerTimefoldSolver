@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getScheduleView, getScheduleRuns, getGroups, listTimeslots } from '../api';
+import { getScheduleView, getScheduleRuns, getGroups, listTimeslots, getScheduleViolations } from '../api';
 import { formatHour, buildDayWindows } from '../constants';
 import { useAuth } from '../auth/AuthContext';
 import { useConfirm } from '../ui/ConfirmContext';
@@ -39,6 +39,47 @@ function Schedule() {
   // for writers looking at the live schedule (selectedRunId === ''), never a
   // past run's read-only snapshot.
   const canEditGrid = canWrite() && !selectedRunId && editModeEnabled;
+
+  const [violations, setViolations] = useState({ hard: [], soft: [] });
+  const [violationsError, setViolationsError] = useState(null);
+  const [violationsExpanded, setViolationsExpanded] = useState(false);
+
+  // Persisted at solve time from BlockScheduleAnalyzer's own detailed
+  // analysis (see ScheduleRunViolationEntity) - re-fetched whenever the
+  // selected run changes, including on mount. These reflect the last SOLVE
+  // for this run, not any manual move/pin made since - a grid edit doesn't
+  // create a new schedule_run, so it can't retroactively update what a past
+  // solve's own violations were.
+  useEffect(() => {
+    loadViolations(selectedRunId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRunId]);
+
+  const loadViolations = async (runId) => {
+    try {
+      const response = await getScheduleViolations(runId || undefined);
+      setViolations({ hard: response.data.hard || [], soft: response.data.soft || [] });
+      setViolationsError(null);
+    } catch (err) {
+      setViolationsError(t('schedule.violations.loadFailedPrefix') + err.message);
+    }
+  };
+
+  // Groups a flat {constraintName, description}[] list into one entry per
+  // constraint - matching how the console/PDF report already groups the
+  // same data by rule, rather than one long undifferentiated list.
+  const groupByConstraint = (entries) => {
+    const order = [];
+    const byName = new Map();
+    entries.forEach(({ constraintName, description }) => {
+      if (!byName.has(constraintName)) {
+        byName.set(constraintName, []);
+        order.push(constraintName);
+      }
+      byName.get(constraintName).push(description);
+    });
+    return order.map((name) => ({ name, descriptions: byName.get(name) }));
+  };
 
   const handleToggleEditMode = async (e) => {
     const wantsEnabled = e.target.checked;
@@ -263,6 +304,61 @@ function Schedule() {
           <p style={{ marginTop: '6px', color: 'var(--color-danger-dark)', fontSize: '13px', fontWeight: 'bold' }}>
             ✎ {t('schedule.editMode.activeNotice')}
           </p>
+        )}
+      </div>
+
+      <div className="card">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setViolationsExpanded((v) => !v)}
+        >
+          {violationsExpanded ? '▾' : '▸'} {t('schedule.violations.summary', {
+            hard: violations.hard.length, soft: violations.soft.length,
+          })}
+        </button>
+
+        {violationsError && <div className="error" role="alert" style={{ marginTop: '10px' }}>{violationsError}</div>}
+
+        {violationsExpanded && (
+          <div style={{ marginTop: '12px' }}>
+            {violations.hard.length === 0 && violations.soft.length === 0 && !violationsError && (
+              <p style={{ color: 'var(--color-text-secondary)' }}>{t('schedule.violations.none')}</p>
+            )}
+            {violations.hard.length > 0 && (
+              <div className="error" role="alert" style={{ marginBottom: '12px' }}>
+                <strong>{t('schedule.violations.hardHeading')}</strong>
+                {groupByConstraint(violations.hard).map((group) => (
+                  <div key={group.name} style={{ marginTop: '8px' }}>
+                    <div style={{ fontWeight: 'bold' }}>{group.name} ({group.descriptions.length})</div>
+                    <ul style={{ margin: '4px 0 0 18px' }}>
+                      {group.descriptions.map((d, i) => <li key={i}>{d}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+            {violations.soft.length > 0 && (
+              <div
+                role="status"
+                style={{
+                  padding: '8px 12px', borderRadius: '4px',
+                  background: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+                  border: '1px solid var(--color-warning)', color: 'var(--color-ink)',
+                }}
+              >
+                <strong>{t('schedule.violations.softHeading')}</strong>
+                {groupByConstraint(violations.soft).map((group) => (
+                  <div key={group.name} style={{ marginTop: '8px' }}>
+                    <div style={{ fontWeight: 'bold' }}>{group.name} ({group.descriptions.length})</div>
+                    <ul style={{ margin: '4px 0 0 18px' }}>
+                      {group.descriptions.map((d, i) => <li key={i}>{d}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

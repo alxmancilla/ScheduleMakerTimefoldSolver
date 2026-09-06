@@ -9,6 +9,7 @@ import com.example.analysis.BlockScheduleAnalyzer;
 import com.example.data.DataLoader;
 import com.example.data.DataSaver;
 import com.example.data.DemoDataGenerator;
+import com.example.data.ScheduleRunViolationDetails;
 import com.example.domain.CourseBlockAssignment;
 import com.example.domain.SchoolSchedule;
 
@@ -145,7 +146,11 @@ public class BlockSchedulingIntegrationTest {
                 DataSaver saver = new DataSaver(url, user, password);
                 saver.saveSchedule(solved, null, null,
                                 BlockScheduleAnalyzer.analyzeHardConstraintViolations(solved).keySet(),
-                                BlockScheduleAnalyzer.analyzeSoftConstraintViolations(solved).keySet(), null);
+                                BlockScheduleAnalyzer.analyzeSoftConstraintViolations(solved).keySet(),
+                                new ScheduleRunViolationDetails(
+                                                BlockScheduleAnalyzer.analyzeHardConstraintViolationsDetailed(solved),
+                                                BlockScheduleAnalyzer.analyzeSoftConstraintViolationsDetailed(solved)),
+                                null);
 
                 // VERIFY: the persisted schedule reports assigned blocks (teacher, room
                 // and timeslot all set).

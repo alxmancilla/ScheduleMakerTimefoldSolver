@@ -14,13 +14,17 @@ import java.util.*;
  * and even that is never written back onto course_block_assignment itself.)
  *
  * Each save inserts one schedule_run row (score + the effective solver time
- * budget used) and one schedule_run_result row per assignment - both its
+ * budget used), one schedule_run_result row per assignment - both its
  * solved (or still-unassigned) timeslot AND a frozen copy of its input
  * fields at that moment, so a past run's exact conditions stay inspectable
  * even after course_block_assignment or the referenced teacher/room/course/
- * group later change. Prunes schedule_run down to the most recent
- * {@link #MAX_RETAINED_RUNS} rows after every insert - ON DELETE CASCADE
- * cleans up the corresponding schedule_run_result rows automatically.
+ * group later change - and one schedule_run_violation row per individual
+ * hard/soft violation instance BlockScheduleAnalyzer's detailed analysis
+ * found (see {@link ScheduleRunViolationDetails}), so the web Schedule view
+ * can show the same detail the console/PDF report already does. Prunes
+ * schedule_run down to the most recent {@link #MAX_RETAINED_RUNS} rows after
+ * every insert - ON DELETE CASCADE cleans up the corresponding
+ * schedule_run_result/schedule_run_violation rows automatically.
  * Anything that needs "the current schedule" (DataLoader, the web Schedule
  * View, PDF reports) reads through the course_block_assignment_current view
  * instead, which resolves pinned rows to their own input timeslot and every
@@ -63,6 +67,15 @@ public class DataSaver {
      *                                     the same ground truth rather than a second, hand-maintained
      *                                     list that could drift out of sync with SchoolConstraintProvider
      * @param activeSoftConstraintNames   the SOFT constraint names active for this solve, same source
+     * @param violationDetails            the detailed (per-offender) hard/soft violations for this
+     *                                     solve - typically {@code BlockScheduleAnalyzer
+     *                                     .analyzeHardConstraintViolationsDetailed(schedule)}/
+     *                                     {@code .analyzeSoftConstraintViolationsDetailed(schedule)},
+     *                                     already computed by the caller for reporting, same
+     *                                     single-source-of-truth rationale as the two Sets above.
+     *                                     Null is treated as "nothing to record" (no violation rows
+     *                                     inserted), so existing callers that predate this parameter
+     *                                     keep working unchanged.
      * @param runMetadata                 random seed / environment mode / skip-validation / timing /
      *                                     git commit / inferred termination reason for this run - see
      *                                     {@link ScheduleRunMetadata}
@@ -70,7 +83,7 @@ public class DataSaver {
      */
     public void saveSchedule(SchoolSchedule schedule, Long minutesSpentLimit, Long unimprovedMinutesSpentLimit,
             Set<String> activeHardConstraintNames, Set<String> activeSoftConstraintNames,
-            ScheduleRunMetadata runMetadata)
+            ScheduleRunViolationDetails violationDetails, ScheduleRunMetadata runMetadata)
             throws SQLException {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             conn.setAutoCommit(false); // Start transaction
@@ -79,6 +92,7 @@ public class DataSaver {
                         unimprovedMinutesSpentLimit, runMetadata);
                 insertScheduleRunResults(conn, runId, schedule.getCourseBlockAssignments());
                 insertScheduleRunConstraints(conn, runId, activeHardConstraintNames, activeSoftConstraintNames);
+                insertScheduleRunViolations(conn, runId, violationDetails);
                 pruneOldRuns(conn);
                 conn.commit();
                 System.out.println("✓ Schedule run #" + runId + " saved (keeping the most recent "
@@ -185,6 +199,43 @@ public class DataSaver {
                 stmt.addBatch();
             }
             stmt.executeBatch();
+        }
+    }
+
+    /**
+     * Records every individual violation instance (not just which constraint
+     * names were active - see insertScheduleRunConstraints above) so the web
+     * Schedule view can show the same detail the console/PDF report already
+     * does. A constraint with zero offenders in {@code violationDetails}
+     * simply gets no rows here, same as it would in the console output.
+     */
+    private void insertScheduleRunViolations(Connection conn, int runId, ScheduleRunViolationDetails violationDetails)
+            throws SQLException {
+        if (violationDetails == null) {
+            return;
+        }
+        String sql = "INSERT INTO schedule_run_violation (schedule_run_id, constraint_name, is_hard, description) "
+                + "VALUES (?, ?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            insertViolationRows(stmt, runId, violationDetails.hard(), true);
+            insertViolationRows(stmt, runId, violationDetails.soft(), false);
+            stmt.executeBatch();
+        }
+    }
+
+    private void insertViolationRows(PreparedStatement stmt, int runId, Map<String, List<String>> details,
+            boolean isHard) throws SQLException {
+        if (details == null) {
+            return;
+        }
+        for (Map.Entry<String, List<String>> entry : details.entrySet()) {
+            for (String description : entry.getValue()) {
+                stmt.setInt(1, runId);
+                stmt.setString(2, entry.getKey());
+                stmt.setBoolean(3, isHard);
+                stmt.setString(4, description);
+                stmt.addBatch();
+            }
         }
     }
 

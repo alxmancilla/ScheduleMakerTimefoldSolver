@@ -1006,6 +1006,27 @@ CREATE TABLE IF NOT EXISTS schedule_run_constraint (
 
 CREATE INDEX IF NOT EXISTS idx_schedule_run_constraint_name ON schedule_run_constraint(constraint_name);
 
+-- One row per individual violation instance from BlockScheduleAnalyzer's own
+-- analyzeHardConstraintViolationsDetailed()/analyzeSoftConstraintViolationsDetailed()
+-- output, persisted at save time so admin/writer can see them in the web
+-- Schedule view instead of only in the console/PDF report. Unlike
+-- schedule_run_constraint above (one row per constraint NAME that was
+-- active, regardless of whether it was ever violated), this is one row per
+-- actual violation description string, so a constraint can have zero, one,
+-- or many rows for a given run - hence its own surrogate id.
+CREATE TABLE IF NOT EXISTS schedule_run_violation (
+    id SERIAL PRIMARY KEY,
+    schedule_run_id INTEGER NOT NULL REFERENCES schedule_run(id) ON DELETE CASCADE,
+    constraint_name VARCHAR(200) NOT NULL,
+    is_hard BOOLEAN NOT NULL,
+    description TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_run_violation_run ON schedule_run_violation(schedule_run_id);
+
+COMMENT ON TABLE schedule_run_violation IS 'One row per individual hard/soft constraint violation instance for a schedule_run, from BlockScheduleAnalyzer''s own detailed analysis - surfaced in the web Schedule view so admin/writer can see violations without downloading the PDF report.';
+COMMENT ON COLUMN schedule_run_violation.description IS 'The same human-readable offender description BlockScheduleAnalyzer already produces for the console/PDF report (e.g. "Group G1 - Math - Mon 08:00-09:00"), not re-derived.';
+
 -- Resolves "the current effective schedule" in one place: pinned rows use
 -- their own (input) block_timeslot_id/room_name; every other row uses the
 -- most recent schedule_run's result for both. Everything that displays or

@@ -196,7 +196,7 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
             style={{
               marginBottom: '12px', padding: '8px 12px', borderRadius: '4px',
               background: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
-              border: '1px solid var(--color-warning)', color: 'var(--color-text)',
+              border: '1px solid var(--color-warning)', color: 'var(--color-ink)',
               fontSize: '13px',
             }}
           >

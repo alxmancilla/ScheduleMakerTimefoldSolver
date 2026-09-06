@@ -315,6 +315,10 @@ export const getScheduleViewByTeacher = (teacherId, runId) =>
   api.get(`/schedule/view/teacher/${teacherId}`, { params: runId ? { runId } : {} });
 export const getScheduleViewByRoom = (roomName, runId) =>
   api.get(`/schedule/view/room/${roomName}`, { params: runId ? { runId } : {} });
+// Persisted hard/soft constraint violations for a run (from BlockScheduleAnalyzer's
+// detailed analysis, saved at solve time - see ScheduleRunViolationEntity). No
+// runId resolves server-side to the most recent run, matching every /view* endpoint.
+export const getScheduleViolations = (runId) => api.get('/schedule/violations', { params: runId ? { runId } : {} });
 export const getMyScheduleView = () => api.get('/schedule/view/me');
 
 export default api;

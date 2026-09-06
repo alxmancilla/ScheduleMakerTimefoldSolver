@@ -15,6 +15,7 @@ import com.example.validation.PreSolveValidator;
 import com.example.validation.ValidationResult;
 
 import com.example.data.ScheduleRunMetadata;
+import com.example.data.ScheduleRunViolationDetails;
 
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -187,15 +188,31 @@ public class MainBlockSchedulingApp {
         softViolations.forEach((k, v) -> System.out.println("- " + k + ": " + v));
         System.out.println();
 
+        // Print detailed soft violations (mirrors the hard-constraint detail
+        // block above) - not previously computed here, only the aggregate
+        // counts were; now needed so it can be persisted alongside the hard
+        // details below.
+        System.out.println("=== Soft Constraint Violations (details) ===");
+        Map<String, List<String>> softDetails = BlockScheduleAnalyzer
+                .analyzeSoftConstraintViolationsDetailed(solvedSchedule);
+        softDetails.forEach((rule, offenders) -> {
+            System.out.println("- " + rule + ": " + offenders.size());
+            for (String desc : offenders) {
+                System.out.println("    " + desc);
+            }
+        });
+        System.out.println();
+
         // Save to database
         System.out.println("=== Saving to Database ===");
         String terminationReason = inferTerminationReason(solvedSchedule, built, lastImprovementMillis.get());
         ScheduleRunMetadata runMetadata = new ScheduleRunMetadata(built.randomSeed(), built.environmentMode(),
                 skipValidation, finishedAt, System.getenv("ENGINE_GIT_COMMIT"), terminationReason);
+        ScheduleRunViolationDetails violationDetails = new ScheduleRunViolationDetails(details, softDetails);
         DataSaver dataSaver = new DataSaver(jdbcUrl, username, password);
         try {
             dataSaver.saveSchedule(solvedSchedule, built.minutesSpentLimit(), built.unimprovedMinutesSpentLimit(),
-                    violations.keySet(), softViolations.keySet(), runMetadata);
+                    violations.keySet(), softViolations.keySet(), violationDetails, runMetadata);
 
             // Print statistics
             System.out.println();

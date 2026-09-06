@@ -42,6 +42,8 @@ public class ScheduleControllerTest {
     @MockBean
     private ScheduleRunResultRepository scheduleRunResultRepository;
     @MockBean
+    private ScheduleRunViolationRepository scheduleRunViolationRepository;
+    @MockBean
     private BlockTimeslotRepository timeslotRepository;
     @MockBean
     private CourseRepository courseRepository;
@@ -120,6 +122,48 @@ public class ScheduleControllerTest {
 
         // The raw input table is never touched for a runId-scoped lookup.
         org.mockito.Mockito.verifyNoInteractions(assignmentCurrentRepository);
+    }
+
+    @Test
+    public void getScheduleViolations_explicitRunId_splitsHardAndSoft() throws Exception {
+        when(scheduleRunViolationRepository.findByScheduleRunId(9)).thenReturn(List.of(
+                new ScheduleRunViolationEntity(1L, 9, "No teacher double-booking", true, "A <-> B"),
+                new ScheduleRunViolationEntity(2L, 9, "Prefer block's specified room", false, "A prefers R1")));
+
+        mockMvc.perform(get("/api/schedule/violations").param("runId", "9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").value(9))
+                .andExpect(jsonPath("$.hard", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.hard[0].constraintName").value("No teacher double-booking"))
+                .andExpect(jsonPath("$.hard[0].description").value("A <-> B"))
+                .andExpect(jsonPath("$.soft", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.soft[0].constraintName").value("Prefer block's specified room"));
+    }
+
+    @Test
+    public void getScheduleViolations_noRunId_resolvesToLatestRun() throws Exception {
+        ScheduleRunEntity latest = new ScheduleRunEntity(12, LocalDateTime.now(), 0, -5, 5, 2);
+        when(scheduleRunRepository.findTopByOrderByCreatedAtDesc()).thenReturn(java.util.Optional.of(latest));
+        when(scheduleRunViolationRepository.findByScheduleRunId(12)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/schedule/violations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").value(12))
+                .andExpect(jsonPath("$.hard", org.hamcrest.Matchers.hasSize(0)))
+                .andExpect(jsonPath("$.soft", org.hamcrest.Matchers.hasSize(0)));
+    }
+
+    @Test
+    public void getScheduleViolations_noRunsExistAtAll_returnsEmptyWithNullRunId() throws Exception {
+        when(scheduleRunRepository.findTopByOrderByCreatedAtDesc()).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/schedule/violations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runId").doesNotExist())
+                .andExpect(jsonPath("$.hard", org.hamcrest.Matchers.hasSize(0)))
+                .andExpect(jsonPath("$.soft", org.hamcrest.Matchers.hasSize(0)));
+
+        org.mockito.Mockito.verifyNoInteractions(scheduleRunViolationRepository);
     }
 
 }

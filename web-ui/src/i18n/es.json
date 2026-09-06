@@ -817,6 +817,13 @@
       "confirmEnable": "Al activar esto, hacer clic en un bloque permitirá moverlo o fijarlo, cambiando directamente el horario actual. ¿Habilitar edición?",
       "unavailableForPastRun": "La edición solo está disponible en el horario más reciente, no en una ejecución anterior.",
       "activeNotice": "Edición ACTIVADA — hacer clic en un bloque abre el editor de mover/fijar."
+    },
+    "violations": {
+      "summary": "{{hard}} incumplimiento(s) fuerte(s), {{soft}} suave(s) para esta ejecución",
+      "hardHeading": "Incumplimientos de restricciones fuertes",
+      "softHeading": "Incumplimientos de restricciones suaves",
+      "none": "No hay incumplimientos registrados para esta ejecución.",
+      "loadFailedPrefix": "Error al cargar incumplimientos: "
     }
   },
   "mySchedule": {
