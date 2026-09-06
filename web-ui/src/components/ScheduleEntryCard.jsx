@@ -16,14 +16,20 @@ import { formatHour } from '../constants';
  * card sizing to 100% of a shared cell would make them fight over the same
  * space instead of stacking, so a conflict cell's cards size to their own
  * natural content height instead, and the cell simply grows to fit all of
- * them.
+ * them. `onClick` is optional - only Schedule.jsx's grid (for a writer
+ * viewing the live schedule) passes one, to open the move/pin editor;
+ * MySchedule.jsx never does, so a teacher's own read-only view stays inert.
  */
-function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fillHeight = false }) {
+function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fillHeight = false, onClick = null }) {
   const { t } = useTranslation();
   const borderColor = hasConflict ? '#e74c3c' : entry.pinned ? '#ffcccc' : '#b3d9e6';
 
   return (
     <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick || undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       style={{
         backgroundColor: entry.pinned ? '#ffe6e6' : '#e8f4f8',
         border: `2px solid ${borderColor}`,
@@ -32,6 +38,7 @@ function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fil
         margin: '4px',
         fontSize: '12px',
         boxSizing: 'border-box',
+        ...(onClick ? { cursor: 'pointer' } : {}),
         ...(fillHeight ? { height: 'calc(100% - 8px)' } : {}),
       }}
     >

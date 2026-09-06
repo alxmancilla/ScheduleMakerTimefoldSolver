@@ -798,7 +798,23 @@
     },
     "noAssignments": "No se encontraron asignaciones para los filtros seleccionados",
     "pinnedLabel": "FIJADO",
-    "conflictLabel": "CONFLICTO - reservas superpuestas"
+    "conflictLabel": "CONFLICTO - reservas superpuestas",
+    "moveEditor": {
+      "day": "Día",
+      "startHour": "Hora de inicio",
+      "pinned": "Fijado",
+      "pinBlockedNoRoom": "No se puede fijar: este bloque aún no tiene un aula asignada.",
+      "conflictWarning": "{{count}} posible(s) conflicto(s) en este horario:",
+      "saving": "Guardando...",
+      "savedMessage": "Asignación actualizada.",
+      "saveFailedPrefix": "Error al guardar: "
+    },
+    "editMode": {
+      "toggleLabel": "Habilitar edición del horario",
+      "confirmEnable": "Al activar esto, hacer clic en un bloque permitirá moverlo o fijarlo, cambiando directamente el horario actual. ¿Habilitar edición?",
+      "unavailableForPastRun": "La edición solo está disponible en el horario más reciente, no en una ejecución anterior.",
+      "activeNotice": "Edición ACTIVADA — hacer clic en un bloque abre el editor de mover/fijar."
+    }
   },
   "mySchedule": {
     "title": "Mi Horario",

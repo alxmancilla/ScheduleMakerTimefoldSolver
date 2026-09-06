@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getScheduleView, getScheduleRuns, getGroups } from '../api';
+import { getScheduleView, getScheduleRuns, getGroups, listTimeslots } from '../api';
 import { formatHour, buildDayWindows } from '../constants';
+import { useAuth } from '../auth/AuthContext';
+import { useConfirm } from '../ui/ConfirmContext';
 import ScheduleEntryCard from './ScheduleEntryCard';
+import AssignmentMoveEditor from './AssignmentMoveEditor';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14];
@@ -10,6 +13,8 @@ const formatRunTimestamp = (value) => (value ? value.replace('T', ' ').split('.'
 
 function Schedule() {
   const { t } = useTranslation();
+  const { canWrite } = useAuth();
+  const confirmAction = useConfirm();
   const DAYS = DAY_KEYS.map((key) => t(`common.daysFull.${key}`));
   const [schedule, setSchedule] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,11 +25,36 @@ function Schedule() {
   const [runs, setRuns] = useState([]);
   // '' means "latest" (no runId sent - the current schedule).
   const [selectedRunId, setSelectedRunId] = useState('');
+  const [timeslots, setTimeslots] = useState([]);
+  const [editingEntry, setEditingEntry] = useState(null);
+  // Grid editing is opt-in and resets to OFF on every visit to this page
+  // (plain component state, nothing persisted) - a writer must deliberately
+  // turn it on, and confirm doing so, before any card becomes clickable.
+  // This is on top of, not instead of, the existing role/run-selection gate
+  // below: a reader (or a writer just browsing) never even sees an editable
+  // grid by accident.
+  const [editModeEnabled, setEditModeEnabled] = useState(false);
+  // Moving/pinning a block edits the live course_block_assignment row, which
+  // has no notion of "which run you were viewing" - so it's only offered
+  // for writers looking at the live schedule (selectedRunId === ''), never a
+  // past run's read-only snapshot.
+  const canEditGrid = canWrite() && !selectedRunId && editModeEnabled;
+
+  const handleToggleEditMode = async (e) => {
+    const wantsEnabled = e.target.checked;
+    if (wantsEnabled) {
+      if (!(await confirmAction(t('schedule.editMode.confirmEnable')))) return;
+    } else {
+      setEditingEntry(null);
+    }
+    setEditModeEnabled(wantsEnabled);
+  };
 
   useEffect(() => {
     loadGroups();
     loadRuns();
     loadSchedule('');
+    loadTimeslots();
   }, []);
 
   useEffect(() => {
@@ -49,6 +79,15 @@ function Schedule() {
       setRuns(response.data);
     } catch (err) {
       console.error('Failed to load run history:', err);
+    }
+  };
+
+  const loadTimeslots = async () => {
+    try {
+      const response = await listTimeslots();
+      setTimeslots(response.data);
+    } catch (err) {
+      console.error('Failed to load timeslots:', err);
     }
   };
 
@@ -191,6 +230,23 @@ function Schedule() {
               {t('schedule.clearTeacherFilter')}
             </button>
           )}
+
+          {canWrite() && (
+            <label
+              htmlFor="editModeToggle"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', cursor: 'pointer' }}
+              title={selectedRunId ? t('schedule.editMode.unavailableForPastRun') : undefined}
+            >
+              <input
+                id="editModeToggle"
+                type="checkbox"
+                checked={editModeEnabled}
+                disabled={!!selectedRunId}
+                onChange={handleToggleEditMode}
+              />
+              {t('schedule.editMode.toggleLabel')}
+            </label>
+          )}
         </div>
 
         <p style={{ marginTop: '15px', color: 'var(--color-text-secondary)' }}>
@@ -201,6 +257,11 @@ function Schedule() {
         {selectedRunId && (
           <p style={{ marginTop: '6px', color: 'var(--color-danger-dark)', fontSize: '13px' }}>
             {t('schedule.pastRunNotice')}
+          </p>
+        )}
+        {canEditGrid && (
+          <p style={{ marginTop: '6px', color: 'var(--color-danger-dark)', fontSize: '13px', fontWeight: 'bold' }}>
+            ✎ {t('schedule.editMode.activeNotice')}
           </p>
         )}
       </div>
@@ -255,7 +316,13 @@ function Schedule() {
                         </div>
                       )}
                       {cellWindow.entries.map((entry, idx) => (
-                        <ScheduleEntryCard key={idx} entry={entry} hasConflict={hasConflict} fillHeight={!hasConflict} />
+                        <ScheduleEntryCard
+                          key={idx}
+                          entry={entry}
+                          hasConflict={hasConflict}
+                          fillHeight={!hasConflict}
+                          onClick={canEditGrid ? () => setEditingEntry(entry) : null}
+                        />
                       ))}
                     </td>
                   );
@@ -265,6 +332,19 @@ function Schedule() {
           </tbody>
         </table>
       </div>
+
+      {editingEntry && (
+        <AssignmentMoveEditor
+          entry={editingEntry}
+          timeslots={timeslots}
+          allEntries={schedule.entries}
+          onClose={() => setEditingEntry(null)}
+          onSaved={() => {
+            setEditingEntry(null);
+            loadSchedule(selectedRunId);
+          }}
+        />
+      )}
     </div>
   );
 }
