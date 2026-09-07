@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getScheduleView, getScheduleRuns, getGroups, listTimeslots, getScheduleViolations } from '../api';
-import { formatHour, buildDayWindows } from '../constants';
+import { formatHour, buildDayWindows, groupByConstraint } from '../constants';
 import { useAuth } from '../auth/AuthContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import ScheduleEntryCard from './ScheduleEntryCard';
@@ -63,22 +63,6 @@ function Schedule() {
     } catch (err) {
       setViolationsError(t('schedule.violations.loadFailedPrefix') + err.message);
     }
-  };
-
-  // Groups a flat {constraintName, description}[] list into one entry per
-  // constraint - matching how the console/PDF report already groups the
-  // same data by rule, rather than one long undifferentiated list.
-  const groupByConstraint = (entries) => {
-    const order = [];
-    const byName = new Map();
-    entries.forEach(({ constraintName, description }) => {
-      if (!byName.has(constraintName)) {
-        byName.set(constraintName, []);
-        order.push(constraintName);
-      }
-      byName.get(constraintName).push(description);
-    });
-    return order.map((name) => ({ name, descriptions: byName.get(name) }));
   };
 
   const handleToggleEditMode = async (e) => {

@@ -52,3 +52,26 @@ export function buildDayWindows(entries) {
   }
   return windows;
 }
+
+/**
+ * Groups a flat {constraintName, description}[] list (as returned by
+ * GET /api/schedule/violations) into one entry per constraint, preserving
+ * first-seen order - matching how the console/PDF report already groups the
+ * same data by rule, rather than one long undifferentiated list. Used by
+ * Schedule.jsx's violations panel.
+ *
+ * @param entries [{ constraintName, description }]
+ * @returns [{ name, descriptions: [description, ...] }] in first-seen order
+ */
+export function groupByConstraint(entries) {
+  const order = [];
+  const byName = new Map();
+  entries.forEach(({ constraintName, description }) => {
+    if (!byName.has(constraintName)) {
+      byName.set(constraintName, []);
+      order.push(constraintName);
+    }
+    byName.get(constraintName).push(description);
+  });
+  return order.map((name) => ({ name, descriptions: byName.get(name) }));
+}
