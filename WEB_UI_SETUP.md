@@ -4,9 +4,9 @@
 
 The Schedule Maker Web UI provides a complete interface for viewing and editing schedules,
 teachers, courses (including dual room requirements and custom block templates), rooms,
-student groups, course block assignments, and admin functions (users, timeslots, current-term
-label, audit log, admin-triggered solver runs, Excel import/export, PDF reports). It consists
-of:
+student groups, course block assignments, scheduler functions (solver runs, constraint
+weights), and admin functions (users, timeslots, current-term label, audit log, Excel
+import/export, PDF reports). It consists of:
 
 - **Backend**: Spring Boot REST API (Java 17), one of four Maven modules — see the root
   [README.md](README.md) for the full multi-module architecture (`common`/`engine`/`reporter`/`web`)
@@ -159,22 +159,27 @@ automatically via an Axios interceptor, and redirects to `/login` on a `401`.
 
 **Roles** (one per user), enforced server-side in `SecurityConfig`:
 
-| Role      | Permissions                                                                 |
-|-----------|------------------------------------------------------------------------------|
-| `READER`  | `GET` only (view schedule and all entities).                                 |
-| `WRITER`  | `READER` + create/update/delete on domain entities (`POST`/`PUT`/`DELETE`).  |
-| `ADMIN`   | `WRITER` + full access, including user management and everything else under `/api/admin/**`. |
-| `TEACHER` | Scoped to itself only: `GET /api/schedule/view/me`, `GET /api/auth/me`, `GET /api/term`, and `PUT /api/auth/preferred-language`. **Not** included in the general `GET /api/**` rule the other three roles share, so it cannot read broader domain data (teachers, courses, rooms, the full schedule, Excel export, etc.). An admin links a `TEACHER` account to a teacher record from the Users tab. |
+| Role        | Permissions                                                                 |
+|-------------|------------------------------------------------------------------------------|
+| `READER`    | `GET` only (view schedule and all entities).                                 |
+| `WRITER`    | `READER` + create/update/delete on domain entities (`POST`/`PUT`/`DELETE`) — teachers, courses, rooms, groups. **Not** course block assignments (`/api/assignments/**`) or anything under `/api/admin/**` — see `SCHEDULER` below. |
+| `SCHEDULER` | `WRITER` + full read/write on `/api/assignments/**` (the schedule itself — general CRUD, Excel export/import, and the grid's move/pin/room/teacher editor), plus `/api/admin/engine/**` (trigger/configure solver runs) and `/api/admin/constraint-config/**` (constraint weights). Everything else under `/api/admin/**` (users, audit log, DB backup, timeslots, calendar exceptions, component block rules, semester hour limits, term label, compliance-snapshot reports) stays `ADMIN`-only. Added 2026-09-07; also removed `WRITER`'s prior access to `/api/assignments/**`'s move/validate-move endpoints (added 2026-09-06) - schedule editing now has exactly one non-`ADMIN` owner. |
+| `ADMIN`     | `SCHEDULER` + full access, including user management and everything else under `/api/admin/**`. |
+| `TEACHER`   | Scoped to itself only: `GET /api/schedule/view/me`, `GET /api/auth/me`, `GET /api/term`, and `PUT /api/auth/preferred-language`. **Not** included in the general `GET /api/**` rule the other roles share, so it cannot read broader domain data (teachers, courses, rooms, the full schedule, Excel export, etc.). An admin links a `TEACHER` account to a teacher record from the Users tab. |
 
-The React UI hides create/edit/delete controls for `READER`s and collapses the entire nav to
-"My Schedule" for `TEACHER`s, but the backend (`SecurityConfig`) is the source of truth
-regardless of what the UI shows.
+The React UI hides create/edit/delete controls for `READER`s, gives `SCHEDULER`/`ADMIN` their
+own "Scheduler" nav entry (Solver + Constraint Weights, separate from "Admin" so `SCHEDULER`
+never has to browse a menu labeled "Admin" for the two things it actually has access to), and
+collapses the entire nav to "My Schedule" for `TEACHER`s — but the backend (`SecurityConfig`)
+is the source of truth regardless of what the UI shows.
 
 ## REST API Reference
 
-Every endpoint is under `/api`. Unless noted, `GET` requires `READER`/`WRITER`/`ADMIN`
-(not `TEACHER`), and `POST`/`PUT`/`DELETE` require `WRITER`/`ADMIN`. Everything under
-`/api/admin/**` requires `ADMIN` regardless of HTTP method.
+Every endpoint is under `/api`. Unless noted, `GET` requires `READER`/`WRITER`/`SCHEDULER`/
+`ADMIN` (not `TEACHER`), and `POST`/`PUT`/`DELETE` require `WRITER`/`SCHEDULER`/`ADMIN`.
+Everything under `/api/admin/**` requires `ADMIN`, except the `/api/admin/engine/**` and
+`/api/admin/constraint-config/**` carve-outs (`SCHEDULER`/`ADMIN`) noted in their own sections
+below.
 
 ### Auth (`/api/auth`)
 | Method & Path | Role | Description |
@@ -274,10 +279,12 @@ resolves to exactly one room — a range of 2+ rooms has no single deterministic
 blocks are left for the next solve to decide among the (now on-disk) narrowed range instead.
 
 ### Assignments (`/api/assignments`)
-Unlike every other resource, writes here require **`ADMIN` specifically** — `WRITER` does not
-get its usual write access (`SecurityConfig`'s one resource-specific exception to the general
-write rule), since course block assignments carry the live/solved schedule. The one exception
-to *that* exception is `validate-move` below, which computes a result but writes nothing.
+Unlike every other resource, writes here require **`SCHEDULER` or `ADMIN` specifically** —
+`WRITER` does not get its usual write access (`SecurityConfig`'s one resource-specific
+exception to the general write rule), since course block assignments carry the live/solved
+schedule. (Before `SCHEDULER` was introduced 2026-09-07, `WRITER` briefly had `.../move` and
+`.../validate-move` access alongside `ADMIN`; that was removed so schedule editing has exactly
+one non-`ADMIN` owner.)
 
 | Method & Path | Role | Description |
 |---|---|---|
@@ -289,10 +296,13 @@ to *that* exception is `validate-move` below, which computes a result but writes
 | `GET /assignments/assigned` | `READER`+ | Assigned blocks only |
 | `GET /assignments/unassigned` | `READER`+ | Unassigned blocks only |
 | `GET /assignments/pinned` | `READER`+ | Pinned blocks only |
-| `POST /assignments` | `ADMIN` | Create |
-| `PUT /assignments/{id}` | `ADMIN` | Update |
-| `DELETE /assignments/{id}` | `ADMIN` | Delete |
-| `POST /assignments/{id}/validate-move` | `READER`+ | Check a candidate `{blockTimeslotId, pinned}` against hard constraints (double-booking, teacher availability, semester hour limit, per-day block cap, same-day consecutiveness) without saving anything — returns `{violations, warnings}`, used by the Schedule grid's move/pin editor before it lets Save proceed. A currently HARD-severity check reports as a blocking `violation`; a check an admin has switched to SOFT via Settings → Constraint Weights reports as a non-blocking `warning` instead. |
+| `POST /assignments` | `SCHEDULER`/`ADMIN` | Create |
+| `PUT /assignments/{id}` | `SCHEDULER`/`ADMIN` | Full update (course, block length, teacher, room, timeslot, pinned) |
+| `DELETE /assignments/{id}` | `SCHEDULER`/`ADMIN` | Delete |
+| `POST /assignments/{id}/validate-move` | `SCHEDULER`/`ADMIN` | Check a candidate `{blockTimeslotId, pinned}` against hard constraints (double-booking, teacher availability, semester hour limit, per-day block cap, same-day consecutiveness) without saving anything — returns `{violations, warnings}`, used by the Schedule grid's move/pin editor before it lets Save proceed. A currently HARD-severity check reports as a blocking `violation`; a check that's been switched to SOFT via the Scheduler tab's Constraint Weights page reports as a non-blocking `warning` instead. |
+| `PUT /assignments/{id}/move` | `SCHEDULER`/`ADMIN` | Move/pin a block without touching anything else — sets only `{blockTimeslotId, pinned}`, re-validating server-side (same checks as `validate-move`) before saving. The Schedule grid's move/pin editor's save path for a day/hour/pinned-only change; a room/teacher change instead goes through the general `PUT /assignments/{id}` above. |
+| `GET /assignments/export` | `READER`+ | Download all assignments as `.xlsx` |
+| `POST /assignments/import` | `SCHEDULER`/`ADMIN` | Upload an `.xlsx` workbook (same layout as export) to replace assignment data |
 
 `POST`/`PUT` apply one override automatically: if the submitted `teacherId` resolves to a
 teacher with a `requiredRoomName` whose type fits this block's `satisfiesRoomType`, `roomName`
@@ -313,7 +323,7 @@ resolves to the most recent solver run); a specific `runId` instead reads that r
 | `GET /schedule/view/teacher/{teacherId}` | `READER`+ | Schedule for one teacher |
 | `GET /schedule/view/room/{roomName}` | `READER`+ | Schedule for one room |
 | `GET /schedule/view/me` | any (incl. `TEACHER`) | The logged-in `TEACHER`'s own schedule, resolved server-side via `app_user.teacher_id` |
-| `GET /schedule/violations` | `READER`+ | Persisted hard/soft constraint violations for a run (`schedule_run_violation`, from `BlockScheduleAnalyzer`'s detailed analysis at solve time), pre-split into `{runId, hard, soft}` — each entry `{constraintName, description}`. No `runId` resolves to the most recent run. |
+| `GET /schedule/violations` | `READER`+ | Persisted hard/soft constraint violations for a run (`schedule_run_violation`, from `BlockScheduleAnalyzer`'s detailed analysis at solve time), pre-split into `{runId, hard, soft}` — each entry `{constraintName, description, assignmentIds}`. `assignmentIds` (added 2026-09-07, from `schedule_run_violation_assignment`) links the violation back to the specific `course_block_assignment` id(s) it's about (one for a single-block check, two for a pairwise check like a double-booking), letting the Schedule grid badge/highlight the exact card(s) instead of only listing the violation separately; empty for a run predating that feature. No `runId` resolves to the most recent run. |
 
 ### Timeslots
 | Method & Path | Role | Description |
@@ -334,7 +344,7 @@ row here falls back to a size-2 / max-2-per-day default in code.
 ### Excel Import / Export (`/api/import`)
 | Method & Path | Role | Description |
 |---|---|---|
-| `POST /import/excel` | `WRITER`/`ADMIN` | Upload an `.xlsx` workbook to upsert Teachers/Courses/Rooms/Groups/Group_Courses |
+| `POST /import/excel` | `WRITER`/`SCHEDULER`/`ADMIN` | Upload an `.xlsx` workbook to upsert Teachers/Courses/Rooms/Groups/Group_Courses |
 | `GET /import/excel` | `READER`+ | Download the current data in the same layout, as `schedule-export-<date>.xlsx` |
 
 ### Reports (`/api/reports`) — WRITER-triggered PDF runs
@@ -343,18 +353,33 @@ row here falls back to a size-2 / max-2-per-day default in code.
 | `GET /reports` | `READER`+ | Past report runs (newest first), each with its own files |
 | `GET /reports/status` | `READER`+ | Whether a report generation run is currently in progress |
 | `GET /reports/{runId}/{filename}` | `READER`+ | Download one PDF |
-| `POST /reports/generate` | `WRITER`/`ADMIN` | Kick off a new run |
+| `POST /reports/generate` | `WRITER`/`SCHEDULER`/`ADMIN` | Kick off a new run |
 
-### Admin-only (`/api/admin/**`, `ADMIN` role, any HTTP method)
+### Scheduler (`SCHEDULER`/`ADMIN`) — carved out of the general `/api/admin/**` ADMIN-only rule
+The Scheduler nav tab's own two pages - added 2026-09-07, split from Settings so `SCHEDULER`
+doesn't need to browse a menu labeled "Admin" to reach them.
+
+**Engine** (`/api/admin/engine`):
 | Method & Path | Description |
 |---|---|
-| `POST /admin/engine/run` | Start a solver run |
-| `GET /admin/engine/status` | Whether a solver run is currently in progress |
+| `POST /admin/engine/run` | Start a solver run - body `{minutesSpentLimit?, unimprovedMinutesSpentLimit?, skipValidation?, randomSeed?}` |
+| `GET /admin/engine/status` | Whether a solver run is currently in progress, plus its last result |
+
+**Constraint Weights** (`/api/admin/constraint-config`):
+| Method & Path | Description |
+|---|---|
+| `GET /admin/constraint-config` | Every known constraint (soft + severity-configurable hard) with its default and current-override weight/severity |
+| `PUT /admin/constraint-config/{constraintName}` | Upsert `{weightSoft}` - an override weight, or (for a configurable hard constraint) the marker that softens it |
+| `DELETE /admin/constraint-config/{constraintName}` | Reset to the code default (idempotent) |
+
+### Admin-only (`/api/admin/**`, `ADMIN` role, any HTTP method - except the Scheduler carve-out above)
+| Method & Path | Description |
+|---|---|
 | `POST /admin/blocks/generate` | (Re)generate course block assignments from course/group data |
 | `GET /admin/reports` | Compliance-snapshot PDF runs (auto-generated after each engine run), distinct from the WRITER-triggered `/api/reports` runs |
 | `GET /admin/reports/{runId}/{filename}` | Download one compliance-snapshot PDF |
 | `GET /admin/users` | List application users |
-| `POST /admin/users` | Create a user |
+| `POST /admin/users` | Create a user (role must be `ADMIN`/`SCHEDULER`/`WRITER`/`READER`/`TEACHER`) |
 | `PUT /admin/users/{username}` | Update role/enabled/linked-teacher |
 | `PUT /admin/users/{username}/password` | Reset a user's password |
 | `DELETE /admin/users/{username}` | Delete a user (blocked on the last admin or self-delete) |
@@ -444,7 +469,7 @@ The production build lands in `web-ui/dist/`.
 
 ## Next Steps
 
-1. **Run the solver** to generate a schedule (`mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"`, or trigger it from the Settings tab)
+1. **Run the solver** to generate a schedule (`mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"`, or trigger it from the Scheduler tab)
 2. **View the schedule** in the Web UI
 3. **Edit assignments** as needed (pin specific assignments)
 4. **Re-run the solver** with pinned assignments

@@ -31,12 +31,12 @@ teachers read-only access to their own resulting schedule).
 ## At a Glance
 
 - Block-based scheduling only (multi-hour consecutive blocks, 1-4 hours); hour-based scheduling has been fully removed
-- 11 hard / 12 soft constraints (9 soft active, 3 parked), kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`; 4 of the 11 hard constraints (and every active soft one) have an admin-editable weight/severity via Settings → Constraint Weights, backed by `constraint_config`
-- The schedule grid is interactive: a writer can click a block to move it to a different day/hour or toggle pinned, validated live against the same hard constraints (`POST /api/assignments/{id}/validate-move`) before Save is allowed — opt-in, behind a confirm-protected "Enable schedule editing" toggle
-- Every solve's hard/soft constraint violations (not just scores) are persisted (`schedule_run_violation`) and browsable in a collapsible panel on the Schedule page — previously only visible in the downloaded PDF report
+- 11 hard / 12 soft constraints (9 soft active, 3 parked), kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`; 4 of the 11 hard constraints (and every active soft one) have a `SCHEDULER`/`ADMIN`-editable weight/severity via the Scheduler tab's Constraint Weights page, backed by `constraint_config`
+- The schedule grid is interactive: a `SCHEDULER`/`ADMIN` can click a block to move it to a different day/hour, toggle pinned, or (also admin/scheduler) reassign room/teacher, validated live against the same hard constraints (`POST /api/assignments/{id}/validate-move`) before Save is allowed — opt-in, behind a confirm-protected "Enable schedule editing" toggle
+- Every solve's hard/soft constraint violations (not just scores) are persisted (`schedule_run_violation`) and browsable in a collapsible panel on the Schedule page, each one linked back to the exact grid card(s) it's about (`schedule_run_violation_assignment`) — previously only visible in the downloaded PDF report
 - Calendar exceptions (holidays, exam days, half-days) are tracked from Settings → Calendar — record-keeping v1, not yet read by block generation or the solver (see [Known Limitations](#known-limitations))
 - Dual room requirements and custom block templates are fully manageable from the web UI, not just the database
-- Web app: JWT auth with `READER`/`WRITER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, a mobile-friendly schedule layout, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
+- Web app: JWT auth with `READER`/`WRITER`/`SCHEDULER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, a mobile-friendly schedule layout, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
 - Solver termination: best score `0hard/0soft`, or 5 minutes, or 2 minutes without improvement (see `solverConfig.xml`)
 
 ## How It Works
@@ -79,11 +79,11 @@ test run (11 hard defined, all active; 12 soft defined, 9 active - the ones
 marked TEMP DISABLED below are currently parked by request, fully
 implemented and one line away from re-enabling). Four of the hard
 constraints below (marked ⚙) can be individually switched to SOFT severity
-by an admin via Settings → Constraint Weights (`constraint_config` table) —
-the three double-booking rules are deliberately excluded from this, since
-they encode outcomes that can't actually happen in reality, not judgment
-calls. Every active soft constraint's weight is likewise admin-editable
-there, not a fixed code literal.
+by a `SCHEDULER`/`ADMIN` via the Scheduler tab's Constraint Weights page
+(`constraint_config` table) — the three double-booking rules are
+deliberately excluded from this, since they encode outcomes that can't
+actually happen in reality, not judgment calls. Every active soft
+constraint's weight is likewise editable there, not a fixed code literal.
 
 #### Hard Constraints (must be satisfied)
 1. **Block Length Must Match Timeslot Length**
@@ -125,16 +125,17 @@ there, not a fixed code literal.
 - 4 room types: Standard, Mixed (doubles as Standard or Specialized - Workshop), Specialized - Workshop, Specialized - Computer Lab
 - PostgreSQL-backed: schema, reporting views, and data loading scripts
 - Three PDF reports (violations, by-teacher, by-group) via Constraint Streams-based analysis
-- Every solve's hard/soft constraint weight/severity overrides live in `constraint_config`, read by both the solver (`ConstraintWeightOverrides`) and the web UI (Settings → Constraint Weights) from one canonical default list (`common.SoftConstraintDefaults`) — no redeploy needed to retune a weight
+- Every solve's hard/soft constraint weight/severity overrides live in `constraint_config`, read by both the solver (`ConstraintWeightOverrides`) and the web UI (the Scheduler tab's Constraint Weights page) from one canonical default list (`common.SoftConstraintDefaults`) — no redeploy needed to retune a weight
 - `PreSolveValidator` runs before every solve (CLI and web-triggered) and also standalone from a "Run Validation" tools page — ten proven-fact checks block the solve outright, an eleventh (shared-teacher-load simulation) is an advisory warning
 
 ### Web app
-- Role-based access control (`READER`/`WRITER`/`ADMIN`/`TEACHER`) over stateless JWT — see [Authentication & Roles](#authentication--roles)
-- Full CRUD for teachers (incl. an optional required-room override), courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management, a per-course-teacher pre-assignment, and a warning when a course has no qualified teacher), and course block assignments
-- The Schedule grid is clickable for writers (opt-in, confirm-protected): move a block to a different day/hour or toggle pinned, validated live against hard constraints before Save; a collapsible panel on the same page shows every hard/soft violation persisted for the selected run
+- Role-based access control (`READER`/`WRITER`/`SCHEDULER`/`ADMIN`/`TEACHER`) over stateless JWT — see [Authentication & Roles](#authentication--roles)
+- Full CRUD for teachers (incl. an optional required-room override), courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management, a per-course-teacher pre-assignment, and a warning when a course has no qualified teacher) — `WRITER`+; course block assignments are `SCHEDULER`/`ADMIN`-only to write, `READER`+ to view
+- The Schedule grid is clickable for `SCHEDULER`/`ADMIN` (opt-in, confirm-protected): move a block to a different day/hour, toggle pinned, or reassign room/teacher, validated live against hard constraints before Save; a collapsible panel on the same page shows every hard/soft violation persisted for the selected run, each linked to and highlighting the exact grid card(s) it's about
 - Bilingual UI (English/Spanish, `react-i18next`) with a per-user language preference, and a mobile-friendly stacked-day-list layout for the schedule views below a phone-width breakpoint
-- Admin: user management, timeslot management, current-term label, calendar exceptions (holidays/exam days/half-days), constraint weights, semester hour limits, database backup/restore, write-activity audit log, admin-triggered solver runs and block generation, per-component block rules
-- Tools (any writer): PDF reports, course coverage and teacher availability at-a-glance views, Excel import/export, and standalone pre-solve validation
+- Scheduler (`SCHEDULER`/`ADMIN`, its own nav entry — not nested under "Admin"): triggering/configuring the solver, constraint weights
+- Admin (`ADMIN` only): user management, timeslot management, current-term label, calendar exceptions (holidays/exam days/half-days), semester hour limits, database backup/restore, write-activity audit log, block generation, per-component block rules
+- Tools (`WRITER`+, i.e. `WRITER`/`SCHEDULER`/`ADMIN`): PDF reports, course coverage and teacher availability at-a-glance views, Excel import/export, and standalone pre-solve validation
 - Excel import/export (`POST`/`GET /api/import/excel`) — the same `.xlsx` layout both ways, for a full export → edit → re-import round trip
 - Teacher self-service: a `TEACHER`-role account sees only its own schedule
 - Search, pagination, toast notifications, and confirm dialogs throughout
@@ -192,7 +193,8 @@ database," used specifically to avoid hand-syncing the same rule twice.
 │       ├── components/                  # One component per tab (Teachers, Courses, Rooms,
 │       │                                 # Groups, Assignments, Schedule, MySchedule, Settings,
 │       │                                 # Users, Reports, Import, Login)
-│       ├── auth/                        # AuthContext, ProtectedRoute/AdminRoute/WriteRoute
+│       ├── auth/                        # AuthContext, ProtectedRoute/AdminRoute/SchedulerRoute/
+│       │                                 # WriteRoute, AdminOnly/ScheduleEditOnly/WriteOnly
 │       ├── ui/                          # Shared ToastContext, ConfirmContext, Pagination
 │       └── i18n/                        # en.json / es.json (react-i18next)
 ├── database/
@@ -320,12 +322,13 @@ troubleshooting.
 Stateless JWT auth; every `/api/**` endpoint except `POST /api/auth/login` requires
 `Authorization: Bearer <token>`.
 
-| Role      | Permissions                                                         |
-|-----------|-----------------------------------------------------------------------|
-| `READER`  | `GET` only.                                                          |
-| `WRITER`  | `READER` + create/update/delete on domain entities.                 |
-| `ADMIN`   | `WRITER` + full access, including user management and calendar exceptions under `/api/admin/**`. |
-| `TEACHER` | Scoped to itself only: its own schedule, its own identity/language, and the term label — **not** general domain data. An admin links a `TEACHER` account to a teacher record from the Users tab. |
+| Role        | Permissions                                                         |
+|-------------|-----------------------------------------------------------------------|
+| `READER`    | `GET` only.                                                          |
+| `WRITER`    | `READER` + create/update/delete on domain entities (teachers, courses, rooms, groups). **Not** course block assignments/schedule editing (see `SCHEDULER` below) or anything under `/api/admin/**`. |
+| `SCHEDULER` | `WRITER` + full read/write on course block assignments (the schedule itself — general CRUD, Excel export/import, and the grid's move/pin/room/teacher editor), plus solver triggering/config and constraint weights (`/api/admin/engine/**`, `/api/admin/constraint-config/**`). Everything else under `/api/admin/**` (users, audit log, DB backup, and most of Settings) stays `ADMIN`-only. |
+| `ADMIN`     | `SCHEDULER` + full access, including user management and everything else under `/api/admin/**`. |
+| `TEACHER`   | Scoped to itself only: its own schedule, its own identity/language, and the term label — **not** general domain data. An admin links a `TEACHER` account to a teacher record from the Users tab. |
 
 **First-time setup** — apply the users migration (creates `app_user`; not part of the schema
 file itself), then boot with `ADMIN_BOOTSTRAP_PASSWORD` set to seed the first admin:

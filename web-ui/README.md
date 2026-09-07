@@ -2,11 +2,12 @@
 
 A React + Vite single-page app for managing the full scheduling problem — teachers, courses
 (including dual room requirements and custom block templates), rooms, student groups, and
-course block assignments — plus admin functions (users, timeslots, current-term label, audit
-log, admin-triggered solver runs, Excel import/export, PDF reports), all through the Spring
-Boot REST API in [`../web`](../web). See the root [README.md](../README.md) for backend
-setup, architecture, and the full feature/constraint list, and
-[WEB_UI_SETUP.md](../WEB_UI_SETUP.md) for the full REST API endpoint reference and RBAC table.
+course block assignments — plus scheduler functions (solver runs, constraint weights) and
+admin functions (users, timeslots, current-term label, audit log, Excel import/export, PDF
+reports), all through the Spring Boot REST API in [`../web`](../web). See the root
+[README.md](../README.md) for backend setup, architecture, and the full feature/constraint
+list, and [WEB_UI_SETUP.md](../WEB_UI_SETUP.md) for the full REST API endpoint reference and
+RBAC table.
 
 ## Prerequisites
 
@@ -53,9 +54,11 @@ README).
 
 - Top-level nav ordered by frequency of use: Schedule, Assignments, a "Setup" dropdown
   (Teachers/Courses/Rooms/Groups), a "Tools" dropdown (Reports, Course Coverage, Teacher
-  Availability, and — `WRITER`/`ADMIN` only — Import/Export and Run Validation), and an Admin
-  dropdown (Settings/Users, `ADMIN` only). Each dropdown shows which child page is active even
-  while closed (e.g. "Setup · Rooms").
+  Availability, and — `WRITER`/`SCHEDULER`/`ADMIN` only — Import/Export and Run Validation), a
+  "Scheduler" link (`SCHEDULER`/`ADMIN` only — Solver + Constraint Weights, its own page rather
+  than nested under Admin), and an Admin dropdown (Settings/Users, `ADMIN` only). Each dropdown
+  shows which child page is active even while closed (e.g. "Setup · Rooms"). An `ADMIN` account
+  sees both "Scheduler" and "Admin" side by side, not a merged menu.
 - Username, language switcher, and logout are consolidated into a single profile dropdown.
 - `TEACHER` accounts see only "My Schedule" — every other nav item and route is hidden client-
   side and blocked server-side.
@@ -67,15 +70,18 @@ README).
   day-by-day list instead (a table this wide isn't readable scrolled horizontally on a phone).
   (The old flat List view was removed — it duplicated the same data with no filtering/sorting
   advantage.)
-- **Interactive editing** (`WRITER`/`ADMIN`, opt-in): a confirm-protected "Enable schedule
+- **Interactive editing** (`SCHEDULER`/`ADMIN`, opt-in): a confirm-protected "Enable schedule
   editing" toggle (off by default, resets every visit) makes each block clickable, opening a
   move/pin editor that validates the candidate change live against hard constraints
   (`POST /api/assignments/{id}/validate-move`) before Save is allowed — a currently
-  SOFT-configured constraint shows as a non-blocking warning instead. Only available on the
-  live schedule, not a past run.
+  SOFT-configured constraint shows as a non-blocking warning instead. Room/teacher reassignment
+  is also available (same two roles), going through a separate, non-live-validated save path.
+  Only available on the live schedule, not a past run. (`WRITER` had this access briefly,
+  2026-09-06 to 2026-09-07; it moved to `SCHEDULER` when that role was introduced.)
 - **Violations panel**: a collapsible summary of every hard/soft constraint violation
-  persisted for the selected run (`GET /api/schedule/violations`), grouped by constraint —
-  previously only visible by downloading the PDF report.
+  persisted for the selected run (`GET /api/schedule/violations`), grouped by constraint, each
+  one linking to and highlighting the exact grid card(s) it's about when clicked — previously
+  only visible by downloading the PDF report.
 - **My Schedule** (`TEACHER` role): the same grid (read-only, no editing toggle), scoped
   server-side to the logged-in teacher via `GET /api/schedule/view/me`.
 
@@ -109,11 +115,11 @@ README).
 - Group, course, block length, teacher, timeslot, room, pinned status; filter by All /
   Assigned / Unassigned / Pinned
 
-### Tools (any authenticated role; Import/Export and Run Validation need `WRITER`/`ADMIN`)
+### Tools (any authenticated role; Import/Export and Run Validation need `WRITER`/`SCHEDULER`/`ADMIN`)
 
 #### Reports
-- `WRITER`/`ADMIN`-triggered PDF generation, versioned by run (past runs aren't overwritten);
-  any authenticated role (except `TEACHER`) can browse and download past runs
+- `WRITER`/`SCHEDULER`/`ADMIN`-triggered PDF generation, versioned by run (past runs aren't
+  overwritten); any authenticated role (except `TEACHER`) can browse and download past runs
 
 #### Course Coverage
 - For every group/course pair, how many hours are actually scheduled against how many are
@@ -125,27 +131,31 @@ README).
 
 #### Import / Export
 - **Import**: upload an `.xlsx` workbook to upsert Teachers/Courses/Rooms/Groups/
-  Group_Courses (`WRITER`/`ADMIN`)
+  Group_Courses (`WRITER`/`SCHEDULER`/`ADMIN`)
 - **Export**: download the current data in the exact same layout Import expects, for a full
   export → edit → re-import round trip (any role except `TEACHER`)
 
-#### Run Validation (`WRITER`/`ADMIN`)
+#### Run Validation (`WRITER`/`SCHEDULER`/`ADMIN`)
 - Runs `PreSolveValidator` by itself, independent of actually solving — a fast up-front report
   on the same ten blocking checks (plus one advisory warning) the solver itself runs before
   every solve
 
-### Settings (`ADMIN`), 11 tabs
+### Scheduler (`SCHEDULER`/`ADMIN`), 2 tabs
+Its own nav entry and page (added 2026-09-07), not nested under Admin — the two things
+`SCHEDULER` actually has access to, split out of what used to be part of Settings:
+- **Solver**: trigger solver runs, with optional random-seed control
+- **Constraint Weights**: per-constraint soft-weight overrides, plus switching one of the four
+  severity-configurable HARD constraints to SOFT
+
+### Settings (`ADMIN`), 9 tabs
 - **Term**: current-term label (a free-text string like "Fall 2026", shown in the header for
   every role)
-- **Solver**: admin-triggered solver runs, with optional random-seed control
 - **Compliance Snapshots**: the PDF report auto-generated after each engine run
 - **Generate Blocks**: admin-triggered block generation from course/group data, surfacing any
   shape adjustments it made
 - **Block Rules**: per-course-component preferred block size, max blocks per day, and margin
   (`component_block_rule`), read by "Generate Blocks" and the solver instead of being
   hardcoded — a component with no rule falls back to a size-2 / max-2-per-day default
-- **Constraint Weights**: per-constraint soft-weight overrides, plus switching one of the four
-  severity-configurable HARD constraints to SOFT
 - **Semester Hour Limits**: per-semester "must/should finish by hour X" configuration
   (HARD or SOFT), replacing an earlier hardcoded semester-1-only rule
 - **Calendar**: calendar exceptions (holidays, exam days, half-days) — record-keeping only,
@@ -155,8 +165,8 @@ README).
 - **Audit Log**: write-activity log viewer (who/what/when for every successful write)
 
 ### Users (`ADMIN`)
-- CRUD for application users and roles (`READER`/`WRITER`/`ADMIN`/`TEACHER`), with a linked-
-  teacher picker for `TEACHER` accounts, plus last-admin and self-delete guards
+- CRUD for application users and roles (`READER`/`WRITER`/`SCHEDULER`/`ADMIN`/`TEACHER`), with
+  a linked-teacher picker for `TEACHER` accounts, plus last-admin and self-delete guards
 
 ### Cross-cutting
 - Full English/Spanish localization (`react-i18next`), with a per-user preferred-language
@@ -215,17 +225,22 @@ web-ui/
 │   │   ├── TeacherAvailability.jsx  # Every teacher's weekly availability, condensed
 │   │   ├── PreSolveValidation.jsx   # Standalone "Run Validation" tools page
 │   │   ├── Import.jsx         # Excel import + export
-│   │   ├── Settings.jsx       # Thin shell rendering the 11 tabs below (always-mounted, hidden via CSS)
-│   │   ├── settings/          # One self-contained component per Settings tab (Term, Solver,
+│   │   ├── SchedulerSettings.jsx  # SCHEDULER/ADMIN: thin shell rendering 2 tabs (Solver,
+│   │   │                      # ConstraintWeights) - its own page, not nested under Settings
+│   │   ├── Settings.jsx       # ADMIN-only: thin shell rendering the other 9 tabs below (always-mounted, hidden via CSS)
+│   │   ├── settings/          # One self-contained component per tab (Term, Solver,
 │   │   │                      # ComplianceSnapshots, GenerateBlocks, BlockRules, ConstraintWeights,
-│   │   │                      # SemesterHourLimits, Calendar, Timeslots, DatabaseBackups, AuditLog)
+│   │   │                      # SemesterHourLimits, Calendar, Timeslots, DatabaseBackups, AuditLog) -
+│   │   │                      # SolverTab/ConstraintWeightsTab are mounted by SchedulerSettings.jsx,
+│   │   │                      # the other 9 by Settings.jsx
 │   │   ├── Users.jsx          # Admin: application user CRUD
 │   │   └── Login.jsx          # Login form
-│   ├── auth/                  # AuthContext, ProtectedRoute/AdminRoute/WriteRoute, AdminOnly/WriteOnly
+│   ├── auth/                  # AuthContext, ProtectedRoute/AdminRoute/SchedulerRoute/WriteRoute,
+│   │                          # AdminOnly/ScheduleEditOnly/WriteOnly
 │   ├── ui/                    # Shared ToastContext, ConfirmContext, Pagination
 │   ├── i18n/                  # en.json / es.json (react-i18next)
 │   ├── api.js                 # API service (Axios)
-│   ├── App.jsx                # Routing + nav (Setup/Tools/Admin/Profile dropdowns)
+│   ├── App.jsx                # Routing + nav (Setup/Tools/Scheduler/Admin/Profile dropdowns)
 │   ├── main.jsx                # React entry point
 │   └── index.css              # Global styles + design tokens
 ├── index.html                 # HTML template
