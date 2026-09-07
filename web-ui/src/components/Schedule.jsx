@@ -55,8 +55,12 @@ function Schedule() {
   // selected run changes, including on mount. These reflect the last SOLVE
   // for this run, not any manual move/pin made since - a grid edit doesn't
   // create a new schedule_run, so it can't retroactively update what a past
-  // solve's own violations were.
+  // solve's own violations were. SCHEDULER/ADMIN only (matching
+  // SecurityConfig's GET /api/schedule/violations carve-out, narrowed
+  // 2026-09-07) - skip the fetch entirely for READER/WRITER rather than
+  // firing a request that would just 403.
   useEffect(() => {
+    if (!canEditSchedule()) return;
     loadViolations(selectedRunId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRunId]);
@@ -321,6 +325,7 @@ function Schedule() {
         )}
       </div>
 
+      {canEditSchedule() && (
       <div className="card">
         <button
           type="button"
@@ -395,6 +400,7 @@ function Schedule() {
           </div>
         )}
       </div>
+      )}
 
       <div className="card table-wrap desktop-schedule-table">
         <table style={{ minWidth: '1000px', borderCollapse: 'collapse' }}>

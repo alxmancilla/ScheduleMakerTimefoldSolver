@@ -63,12 +63,13 @@ public class ScheduleController {
         /**
          * The persisted hard/soft constraint violations for a run (see DataSaver's
          * schedule_run_violation writes, from BlockScheduleAnalyzer's own detailed
-         * analysis) - surfaced here so admin/writer can see them in the Schedule
-         * view instead of only in the downloaded PDF report. Null runId (the
-         * default, matching every /view* endpoint's own convention) resolves to
-         * the most recent schedule_run; a run predating this feature (added
-         * 2026-09-06) simply has no rows, resolving to two empty lists rather
-         * than an error.
+         * analysis) - surfaced here so a scheduler/admin can see them in the
+         * Schedule view instead of only in the downloaded PDF report.
+         * SCHEDULER/ADMIN-only (see SecurityConfig, narrowed 2026-09-07 - READER
+         * and WRITER used to see this too). Null runId (the default, matching
+         * every /view* endpoint's own convention) resolves to the most recent
+         * schedule_run; a run predating this feature (added 2026-09-06) simply
+         * has no rows, resolving to two empty lists rather than an error.
          */
         @GetMapping("/violations")
         public ScheduleViolationsDTO getScheduleViolations(@RequestParam(required = false) Integer runId) {

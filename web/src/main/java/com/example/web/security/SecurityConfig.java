@@ -60,6 +60,13 @@ import java.util.List;
  * and the remaining Settings-tab config resources: blocks, calendar
  * exceptions, component block rules, semester hour limits, timeslots) stays
  * ADMIN-only, since none of it is a scheduling concern.
+ *
+ * GET /api/schedule/violations (added 2026-09-06, narrowed 2026-09-07) is
+ * similarly carved out of the general read-everything rule down to
+ * SCHEDULER/ADMIN only - persisted constraint violations are a scheduling
+ * concern, not general domain data every authenticated role should see.
+ * READER and WRITER lost this access when the carve-out was added; TEACHER
+ * never had it (it isn't in the general GET rule at all).
  */
 @Configuration
 @EnableWebSecurity
@@ -131,6 +138,13 @@ public class SecurityConfig {
                         .hasAnyRole("TEACHER", "READER", "WRITER", "SCHEDULER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/term")
                         .hasAnyRole("READER", "WRITER", "SCHEDULER", "ADMIN", "TEACHER")
+                        // Persisted constraint violations are a scheduling concern, not general
+                        // read-only domain data - scoped to the same SCHEDULER/ADMIN audience as
+                        // the schedule-editing endpoints above, ahead of the general GET rule
+                        // below which would otherwise open it to READER/WRITER too (TEACHER was
+                        // already excluded there, this only narrows it further).
+                        .requestMatchers(HttpMethod.GET, "/api/schedule/violations")
+                        .hasAnyRole("SCHEDULER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("READER", "WRITER", "SCHEDULER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("WRITER", "SCHEDULER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("WRITER", "SCHEDULER", "ADMIN")

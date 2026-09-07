@@ -78,10 +78,12 @@ README).
   is also available (same two roles), going through a separate, non-live-validated save path.
   Only available on the live schedule, not a past run. (`WRITER` had this access briefly,
   2026-09-06 to 2026-09-07; it moved to `SCHEDULER` when that role was introduced.)
-- **Violations panel**: a collapsible summary of every hard/soft constraint violation
-  persisted for the selected run (`GET /api/schedule/violations`), grouped by constraint, each
-  one linking to and highlighting the exact grid card(s) it's about when clicked — previously
-  only visible by downloading the PDF report.
+- **Violations panel** (`SCHEDULER`/`ADMIN` only): a collapsible summary of every hard/soft
+  constraint violation persisted for the selected run (`GET /api/schedule/violations`), grouped
+  by constraint, each one linking to and highlighting the exact grid card(s) it's about when
+  clicked — previously only visible by downloading the PDF report. Narrowed from
+  READER-visible to `SCHEDULER`/`ADMIN` on 2026-09-07 (not shown to `WRITER`, `READER`, or
+  `TEACHER` at all - the panel doesn't render and the underlying fetch doesn't fire for them).
 - **My Schedule** (`TEACHER` role): the same grid (read-only, no editing toggle), scoped
   server-side to the logged-in teacher via `GET /api/schedule/view/me`.
 
