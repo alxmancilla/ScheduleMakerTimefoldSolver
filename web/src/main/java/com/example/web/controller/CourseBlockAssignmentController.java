@@ -69,6 +69,38 @@ public class CourseBlockAssignmentController {
         return assignmentMoveValidationService.validate(id, request.getBlockTimeslotId(), request.isPinned());
     }
 
+    /**
+     * Move/pin a block without touching anything else about it - the save
+     * path behind the Schedule grid's move/pin editor. Deliberately a
+     * narrower endpoint than the general PUT below (which is ADMIN-only,
+     * carries the full DTO, and can change room/teacher/course): this one
+     * only ever sets blockTimeslotId/pinned, same shape as
+     * AssignmentMoveValidationRequest, so it can be WRITER-accessible (see
+     * SecurityConfig's carve-out, right next to validate-move's) without
+     * granting WRITER the broader ADMIN-only write access. Re-validates
+     * server-side before saving - the frontend already blocks Save on a
+     * violation, but a client-side check is advisory only from the
+     * server's point of view, and a violation reported as a warning (a
+     * currently-SOFT-configured constraint) must still not become a HARD
+     * one here if the config changed between the client's last check and
+     * this request.
+     */
+    @PutMapping("/{id}/move")
+    public CourseBlockAssignmentEntity moveAssignment(@PathVariable String id,
+            @Valid @RequestBody AssignmentMoveValidationRequest request) {
+        AssignmentMoveValidationResponse validation = assignmentMoveValidationService.validate(id,
+                request.getBlockTimeslotId(), request.isPinned());
+        if (!validation.getViolations().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Cannot save: " + String.join("; ", validation.getViolations()));
+        }
+        CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
+        assignment.setBlockTimeslotId(request.getBlockTimeslotId());
+        assignment.setPinned(request.isPinned());
+        return assignmentRepository.save(assignment);
+    }
+
     @GetMapping("/group/{groupId}")
     public List<CourseBlockAssignmentEntity> getAssignmentsByGroup(@PathVariable String groupId) {
         return assignmentRepository.findByGroupId(groupId);

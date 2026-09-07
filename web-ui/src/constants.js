@@ -13,6 +13,26 @@ export const ROOM_TYPES = [
 /** Zero-padded HH:00, e.g. formatHour(7) -> "07:00", formatHour(14) -> "14:00". */
 export const formatHour = (hour) => `${String(hour).padStart(2, '0')}:00`;
 
+// Mirrors Room.satisfiesRequirement() (engine domain model, backed by
+// common/RoomTypeCompatibility.java): a room satisfies a requirement of its
+// own type, and a Mixed room additionally satisfies Standard and
+// Specialized - Workshop (it's equipped for both), but never the reverse.
+// Specialized - Computer Lab stays strictly separate - not satisfied by
+// Mixed. The frontend has no way to call the Java implementation directly,
+// so this is a deliberate, single mirror of that rule - shared here instead
+// of re-copied per component that needs it.
+export function roomMatchesType(room, requiredType) {
+  if (!requiredType) return true;
+  if (!room) return false;
+  return room.type === requiredType
+    || (room.type === 'Mixed' && (requiredType === 'Standard' || requiredType === 'Specialized - Workshop'));
+}
+
+/** True if a teacher is qualified for a course name (or no course name was given yet). */
+export function teacherQualifiedFor(teacher, courseName) {
+  return !courseName || teacher.qualifications.some((q) => q.qualification === courseName);
+}
+
 /**
  * Merges a single day's schedule entries into non-overlapping time windows
  * (the standard "merge overlapping intervals" sweep), so a schedule grid can

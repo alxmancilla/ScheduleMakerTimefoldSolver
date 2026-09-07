@@ -201,6 +201,8 @@ public class ScheduleController {
                                 entry.setGroupName(group != null ? group.getName() : null);
                                 entry.setGroupId(group != null ? group.getId() : null);
                                 entry.setPinned(assignment.pinned());
+                                entry.setCourseId(assignment.courseId());
+                                entry.setSatisfiesRoomType(assignment.satisfiesRoomType());
 
                                 entries.add(entry);
                         }
@@ -220,16 +222,17 @@ public class ScheduleController {
          * case, or a specific run's own frozen snapshot otherwise).
          */
         private record ResolvedAssignment(String id, String groupId, String courseId, String teacherId,
-                        String roomName, String blockTimeslotId, Boolean pinned) {
+                        String roomName, String blockTimeslotId, Boolean pinned, String satisfiesRoomType) {
 
                 static ResolvedAssignment fromCurrent(CourseBlockAssignmentCurrentEntity a) {
                         return new ResolvedAssignment(a.getId(), a.getGroupId(), a.getCourseId(), a.getTeacherId(),
-                                        a.getRoomName(), a.getBlockTimeslotId(), a.getPinned());
+                                        a.getRoomName(), a.getBlockTimeslotId(), a.getPinned(), a.getSatisfiesRoomType());
                 }
 
                 static ResolvedAssignment fromRunResult(ScheduleRunResultEntity r) {
                         return new ResolvedAssignment(r.getAssignmentId(), r.getGroupId(), r.getCourseId(),
-                                        r.getTeacherId(), r.getRoomName(), r.getBlockTimeslotId(), r.getPinned());
+                                        r.getTeacherId(), r.getRoomName(), r.getBlockTimeslotId(), r.getPinned(),
+                                        r.getSatisfiesRoomType());
                 }
         }
 }

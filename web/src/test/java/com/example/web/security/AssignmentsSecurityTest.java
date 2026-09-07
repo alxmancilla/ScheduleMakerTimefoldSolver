@@ -2,6 +2,7 @@ package com.example.web.security;
 
 import com.example.web.controller.CourseBlockAssignmentController;
 import com.example.web.dto.AssignmentMoveValidationResponse;
+import com.example.web.entity.CourseBlockAssignmentEntity;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.RoomRepository;
 import com.example.web.repository.TeacherRepository;
@@ -26,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -149,5 +151,35 @@ public class AssignmentsSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
                 .andExpect(status().isOk());
+    }
+
+    // move only ever sets blockTimeslotId/pinned - narrow enough to open to
+    // WRITER too, unlike the general full-DTO PUT above (which stays
+    // ADMIN-only). This is the fix for a real bug: the move/pin editor's
+    // "Enable schedule editing" toggle was WRITER-visible (canWrite() in
+    // Schedule.jsx) but Save called the general PUT, which 403'd for WRITER.
+    @Test
+    @WithMockUser(roles = "WRITER")
+    public void writer_canPutMove() throws Exception {
+        when(assignmentMoveValidationService.validate(anyString(), anyString(), anyBoolean()))
+                .thenReturn(new AssignmentMoveValidationResponse(java.util.List.of(), java.util.List.of()));
+        CourseBlockAssignmentEntity assignment = new CourseBlockAssignmentEntity();
+        assignment.setId("block_assignment_1");
+        when(assignmentRepository.findById("block_assignment_1")).thenReturn(java.util.Optional.of(assignment));
+        when(assignmentRepository.save(org.mockito.ArgumentMatchers.any())).thenReturn(assignment);
+
+        mockMvc.perform(put("/api/assignments/block_assignment_1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "READER")
+    public void reader_cannotPutMove() throws Exception {
+        mockMvc.perform(put("/api/assignments/block_assignment_1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                .andExpect(status().isForbidden());
     }
 }

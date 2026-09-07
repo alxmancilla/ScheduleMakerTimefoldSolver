@@ -141,6 +141,9 @@ export const getAssignments = () => api.get('/assignments');
 export const getAssignment = (id) => api.get(`/assignments/${id}`);
 export const createAssignment = (assignment) => api.post('/assignments', assignment);
 export const updateAssignment = (id, assignment) => api.put(`/assignments/${id}`, assignment);
+// Move/pin only - narrower than updateAssignment above (which needs the full
+// DTO and is ADMIN-only). WRITER-accessible - see SecurityConfig's carve-out.
+export const moveAssignment = (id, request) => api.put(`/assignments/${id}/move`, request);
 export const deleteAssignment = (id) => api.delete(`/assignments/${id}`);
 // Checks a candidate move/pin against hard constraints without saving anything
 // - see AssignmentMoveValidationService (backend). { blockTimeslotId, pinned } in,

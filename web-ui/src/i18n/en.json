@@ -810,7 +810,10 @@
       "validating": "Checking...",
       "violationsHeading": "This move can't be saved:",
       "warningsHeading": "This move is allowed, but worth noting:",
-      "validationFailedPrefix": "Could not check this move: "
+      "validationFailedPrefix": "Could not check this move: ",
+      "room": "Room",
+      "teacher": "Teacher",
+      "roomTeacherNotLiveValidated": "Room/teacher changes aren't checked live the way day/hour is - review carefully before saving."
     },
     "editMode": {
       "toggleLabel": "Enable schedule editing",

@@ -95,7 +95,28 @@ public class ScheduleControllerTest {
         mockMvc.perform(get("/api/schedule/view"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.entries[0].id").value("a1"))
-                .andExpect(jsonPath("$.entries[0].courseName").value("Math"));
+                .andExpect(jsonPath("$.entries[0].courseName").value("Math"))
+                .andExpect(jsonPath("$.entries[0].courseId").value("C1"));
+    }
+
+    @Test
+    public void getScheduleView_carriesSatisfiesRoomTypeThrough() throws Exception {
+        // Needed by the Schedule grid's admin-only room reassignment field to
+        // filter room choices to the block's own type - was silently dropped
+        // before ResolvedAssignment/ScheduleEntry both carried it.
+        CourseBlockAssignmentCurrentEntity a = new CourseBlockAssignmentCurrentEntity(
+                "a1", "G1", "C1", 1, false, null, "TS1", null, "Mixed", null);
+        when(assignmentCurrentRepository.findAll()).thenReturn(List.of(a));
+        when(timeslotRepository.findAll()).thenReturn(List.of(timeslot("TS1")));
+        when(courseRepository.findAll()).thenReturn(List.of(course("C1", "Math")));
+        when(teacherRepository.findAll()).thenReturn(List.of());
+        when(roomRepository.findAll()).thenReturn(List.of());
+        when(groupRepository.findAll()).thenReturn(List.of());
+        when(assignmentRepository.findUnassignedBlocks()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/schedule/view"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].satisfiesRoomType").value("Mixed"));
     }
 
     @Test

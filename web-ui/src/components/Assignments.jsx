@@ -8,7 +8,7 @@ import {
 import AdminOnly from '../auth/AdminOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-import { ROOM_TYPES, formatHour } from '../constants';
+import { ROOM_TYPES, formatHour, roomMatchesType, teacherQualifiedFor } from '../constants';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const BLOCK_LENGTHS = [1, 2, 3, 4];
@@ -52,16 +52,6 @@ function Assignments() {
   const [importError, setImportError] = useState(null);
   const importFileInputRef = useRef(null);
 
-  // Mirrors Room.satisfiesRequirement() (engine domain model): a room satisfies a
-  // requirement of its own type, and a Mixed room additionally satisfies Standard
-  // and Specialized - Workshop (it's equipped for both), but never the reverse.
-  // Specialized - Computer Lab stays strictly separate - not satisfied by Mixed.
-  const roomMatchesType = (room, requiredType) => {
-    if (!requiredType) return true;
-    if (!room) return false;
-    return room.type === requiredType
-      || (room.type === 'Mixed' && (requiredType === 'Standard' || requiredType === 'Specialized - Workshop'));
-  };
   const roomsMatchingType = (requiredType) => rooms.filter((r) => roomMatchesType(r, requiredType));
 
   // Group.courses / Teacher.qualifications come embedded from getGroups()/getTeachers(),
@@ -72,8 +62,6 @@ function Assignments() {
     const names = new Set(group.courses.map((gc) => gc.courseName));
     return courses.filter((c) => names.has(c.name));
   };
-  const teacherQualifiedFor = (teacher, courseName) =>
-    !courseName || teacher.qualifications.some((q) => q.qualification === courseName);
   const teachersForCourse = (cId) => {
     const course = courses.find((c) => c.id === cId);
     if (!course) return teachers;
@@ -622,7 +610,9 @@ function Assignments() {
                 <td>{teacherDisplay(assignment.teacherId)}</td>
                 <td>{timeslotDisplay(assignment.blockTimeslotId)}</td>
                 <td>{assignment.roomName || '-'}</td>
-                <td>{assignment.pinned ? '📌' : ''}</td>
+                <td aria-label={assignment.pinned ? t('common.yes') : t('common.no')}>
+                  {assignment.pinned ? <span aria-hidden="true">📌</span> : ''}
+                </td>
                 <td>
                   <AdminOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(assignment)} style={{ marginRight: '5px' }}>

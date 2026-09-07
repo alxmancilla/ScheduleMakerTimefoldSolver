@@ -83,6 +83,12 @@ public class SecurityConfig {
                         // ADMIN-only POST rule for this resource right below.
                         .requestMatchers(HttpMethod.POST, "/api/assignments/*/validate-move")
                         .hasAnyRole("READER", "WRITER", "ADMIN")
+                        // move only ever sets blockTimeslotId/pinned (never room/teacher/course),
+                        // re-validated server-side - narrow enough to open to WRITER too, ahead of
+                        // the general ADMIN-only PUT rule right below which governs the full-DTO
+                        // edit endpoint (room/teacher/course changes stay ADMIN-only there).
+                        .requestMatchers(HttpMethod.PUT, "/api/assignments/*/move")
+                        .hasAnyRole("WRITER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/assignments/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/assignments/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/assignments/**").hasRole("ADMIN")

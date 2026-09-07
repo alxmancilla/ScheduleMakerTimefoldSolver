@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatHour, buildDayWindows, groupByConstraint } from './constants';
+import { formatHour, buildDayWindows, groupByConstraint, roomMatchesType, teacherQualifiedFor } from './constants';
 
 describe('formatHour', () => {
   test('zero-pads a single-digit hour', () => {
@@ -102,5 +102,60 @@ describe('groupByConstraint', () => {
   test('a constraint with a single instance still becomes a one-element group', () => {
     const result = groupByConstraint([{ constraintName: 'Room capacity', description: 'over by 3' }]);
     expect(result).toEqual([{ name: 'Room capacity', descriptions: ['over by 3'] }]);
+  });
+});
+
+// Mirrors Room.satisfiesRequirement() (engine domain model / common/RoomTypeCompatibility.java).
+describe('roomMatchesType', () => {
+  test('no required type means every room matches', () => {
+    expect(roomMatchesType({ type: 'Standard' }, null)).toBe(true);
+    expect(roomMatchesType({ type: 'Standard' }, undefined)).toBe(true);
+    expect(roomMatchesType({ type: 'Standard' }, '')).toBe(true);
+  });
+
+  test('no room never matches a real requirement', () => {
+    expect(roomMatchesType(null, 'Standard')).toBe(false);
+  });
+
+  test('a room of the exact required type matches', () => {
+    expect(roomMatchesType({ type: 'Specialized - Computer Lab' }, 'Specialized - Computer Lab')).toBe(true);
+  });
+
+  test('Mixed satisfies Standard and Specialized - Workshop', () => {
+    expect(roomMatchesType({ type: 'Mixed' }, 'Standard')).toBe(true);
+    expect(roomMatchesType({ type: 'Mixed' }, 'Specialized - Workshop')).toBe(true);
+  });
+
+  test('Mixed does NOT satisfy Specialized - Computer Lab', () => {
+    expect(roomMatchesType({ type: 'Mixed' }, 'Specialized - Computer Lab')).toBe(false);
+  });
+
+  test('the reverse never holds - a Standard room does not satisfy a Mixed requirement', () => {
+    expect(roomMatchesType({ type: 'Standard' }, 'Mixed')).toBe(false);
+  });
+
+  test('a mismatched non-Mixed type never matches', () => {
+    expect(roomMatchesType({ type: 'Specialized - Workshop' }, 'Specialized - Computer Lab')).toBe(false);
+  });
+});
+
+describe('teacherQualifiedFor', () => {
+  const teacher = (...qualifications) => ({ qualifications: qualifications.map((q) => ({ qualification: q })) });
+
+  test('no course name means any teacher qualifies (nothing to check yet)', () => {
+    expect(teacherQualifiedFor(teacher(), null)).toBe(true);
+    expect(teacherQualifiedFor(teacher(), '')).toBe(true);
+  });
+
+  test('a teacher qualified for the exact course name matches', () => {
+    expect(teacherQualifiedFor(teacher('Math', 'Physics'), 'Math')).toBe(true);
+  });
+
+  test('a teacher not qualified for the course does not match', () => {
+    expect(teacherQualifiedFor(teacher('Physics'), 'Math')).toBe(false);
+  });
+
+  test('a teacher with no qualifications at all does not match a real course name', () => {
+    expect(teacherQualifiedFor(teacher(), 'Math')).toBe(false);
   });
 });

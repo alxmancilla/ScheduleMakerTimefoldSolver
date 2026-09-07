@@ -810,7 +810,10 @@
       "validating": "Verificando...",
       "violationsHeading": "Este cambio no se puede guardar:",
       "warningsHeading": "Este cambio es posible, pero vale la pena notar:",
-      "validationFailedPrefix": "No se pudo verificar este cambio: "
+      "validationFailedPrefix": "No se pudo verificar este cambio: ",
+      "room": "Aula",
+      "teacher": "Maestro",
+      "roomTeacherNotLiveValidated": "Los cambios de aula/maestro no se verifican en vivo como el día/hora - revise con cuidado antes de guardar."
     },
     "editMode": {
       "toggleLabel": "Habilitar edición del horario",

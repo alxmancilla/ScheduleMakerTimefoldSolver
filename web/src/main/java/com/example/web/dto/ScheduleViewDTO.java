@@ -20,6 +20,8 @@ public class ScheduleViewDTO {
         private String groupName;
         private String groupId;
         private Boolean pinned;
+        private String courseId;
+        private String satisfiesRoomType;
 
         // Getters and Setters
 
@@ -109,6 +111,22 @@ public class ScheduleViewDTO {
 
         public void setPinned(Boolean pinned) {
             this.pinned = pinned;
+        }
+
+        public String getCourseId() {
+            return courseId;
+        }
+
+        public void setCourseId(String courseId) {
+            this.courseId = courseId;
+        }
+
+        public String getSatisfiesRoomType() {
+            return satisfiesRoomType;
+        }
+
+        public void setSatisfiesRoomType(String satisfiesRoomType) {
+            this.satisfiesRoomType = satisfiesRoomType;
         }
     }
 

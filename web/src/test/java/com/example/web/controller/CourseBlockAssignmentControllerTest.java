@@ -356,4 +356,56 @@ public class CourseBlockAssignmentControllerTest {
                 .andExpect(status().isNotFound());
         verify(assignmentRepository, never()).delete(any(CourseBlockAssignmentEntity.class));
     }
+
+    // ---- PUT /{id}/move ----
+
+    @Test
+    public void moveAssignment_noViolations_savesOnlyBlockTimeslotIdAndPinned() throws Exception {
+        when(assignmentMoveValidationService.validate("A1", "TS1", true))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(put("/api/assignments/A1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockTimeslotId").value("TS1"))
+                .andExpect(jsonPath("$.pinned").value(true))
+                // Untouched fields from setUp() survive - this endpoint never
+                // touches group/course/room/teacher.
+                .andExpect(jsonPath("$.groupId").value("G1"))
+                .andExpect(jsonPath("$.courseId").value("C1"));
+    }
+
+    @Test
+    public void moveAssignment_serverSideViolation_returns400AndDoesNotSave() throws Exception {
+        // The frontend already blocks Save on a violation, but the server
+        // re-validates independently - e.g. a constraint that was SOFT when
+        // the client last checked could have been switched back to HARD
+        // since.
+        when(assignmentMoveValidationService.validate("A1", "TS1", false))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(
+                        List.of("Teacher double-booking with A2 at that time"), List.of()));
+
+        mockMvc.perform(put("/api/assignments/A1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", false))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Teacher double-booking")));
+
+        verify(assignmentRepository, never()).save(any(CourseBlockAssignmentEntity.class));
+    }
+
+    @Test
+    public void moveAssignment_notFound_returns404() throws Exception {
+        when(assignmentMoveValidationService.validate("nope", "TS1", false))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
+        when(assignmentRepository.findById("nope")).thenReturn(Optional.empty());
+
+        mockMvc.perform(put("/api/assignments/nope/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", false))))
+                .andExpect(status().isNotFound());
+    }
 }
