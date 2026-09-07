@@ -9,10 +9,11 @@ import { useAuth } from './AuthContext';
  * authentication has already been checked. Non-scheduler/admins are
  * redirected to the schedule home page, same as AdminRoute's own behavior.
  *
- * Used for /settings, which SCHEDULER now needs (Solver + Constraint
- * Weights tabs - see Settings.jsx's own per-tab filtering for the rest,
- * which stay ADMIN-only within the page). /users stays under the stricter
- * AdminRoute - user management is not a scheduling concern.
+ * Used for /scheduler (SchedulerSettings.jsx - Solver + Constraint Weights,
+ * SCHEDULER's own dedicated page, split out of Settings.jsx on 2026-09-07 so
+ * SCHEDULER doesn't have to browse a menu labeled "Admin"). /settings and
+ * /users stay under the stricter AdminRoute - everything else in Settings,
+ * and user management, are not scheduling concerns.
  */
 function SchedulerRoute() {
   const { canEditSchedule } = useAuth();

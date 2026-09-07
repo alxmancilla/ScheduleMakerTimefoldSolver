@@ -14,10 +14,12 @@ import Reports from './components/Reports';
 import ImportExcel from './components/Import';
 import PreSolveValidation from './components/PreSolveValidation';
 import Settings from './components/Settings';
+import SchedulerSettings from './components/SchedulerSettings';
 import Users from './components/Users';
 import Login from './components/Login';
 import ProtectedRoute from './auth/ProtectedRoute';
 import AdminRoute from './auth/AdminRoute';
+import AdminOnly from './auth/AdminOnly';
 import SchedulerRoute from './auth/SchedulerRoute';
 import ScheduleEditOnly from './auth/ScheduleEditOnly';
 import WriteRoute from './auth/WriteRoute';
@@ -32,13 +34,14 @@ const SETUP_ITEMS = [
   { path: '/rooms', labelKey: 'nav.rooms' },
   { path: '/groups', labelKey: 'nav.groups' },
 ];
-// Settings is SCHEDULER+ADMIN (see SchedulerRoute) - Settings.jsx itself
-// filters which of its 11 tabs a SCHEDULER actually sees (Solver +
-// Constraint Weights only; the rest stay ADMIN-only within the page). Users
-// is ADMIN-only (adminOnly) - user management is not a scheduling concern.
+// ADMIN-only - user management, audit log, DB backup, and every Settings
+// tab except Solver/Constraint Weights (see SCHEDULER_ITEMS below, which
+// SCHEDULER reaches through its own dedicated nav entry instead of this
+// "Admin" one, so it never has to browse a menu labeled "Admin" for the
+// two things it actually has access to).
 const ADMIN_ITEMS = [
   { path: '/settings', labelKey: 'nav.settings' },
-  { path: '/users', labelKey: 'nav.users', adminOnly: true },
+  { path: '/users', labelKey: 'nav.users' },
 ];
 // Reports/Course Coverage are READER+ (no gate); Import is WRITER+ (writeOnly) -
 // filtered per role before rendering, unlike SETUP_ITEMS/ADMIN_ITEMS which are uniform.
@@ -148,10 +151,8 @@ function ToolsNavDropdown() {
 
 function AdminNavDropdown() {
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
   const location = useLocation();
-  const visibleItems = ADMIN_ITEMS.filter((item) => !item.adminOnly || isAdmin());
-  const activeItem = visibleItems.find((item) => item.path === location.pathname);
+  const activeItem = ADMIN_ITEMS.find((item) => item.path === location.pathname);
 
   return (
     <NavDropdown
@@ -161,7 +162,7 @@ function AdminNavDropdown() {
     >
       {(close) => (
         <>
-          {visibleItems.map((item) => (
+          {ADMIN_ITEMS.map((item) => (
             <NavLink key={item.path} to={item.path} className={navLinkClass} onClick={close}>
               {t(item.labelKey)}
             </NavLink>
@@ -291,8 +292,11 @@ function Layout() {
                 <SetupNavDropdown />
                 <ToolsNavDropdown />
                 <ScheduleEditOnly>
-                  <AdminNavDropdown />
+                  <NavLink to="/scheduler" className={navLinkClass}>{t('nav.scheduler')}</NavLink>
                 </ScheduleEditOnly>
+                <AdminOnly>
+                  <AdminNavDropdown />
+                </AdminOnly>
               </>
             )}
           </nav>
@@ -337,9 +341,10 @@ function App() {
               <Route path="/validation" element={<PreSolveValidation />} />
             </Route>
             <Route element={<SchedulerRoute />}>
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/scheduler" element={<SchedulerSettings />} />
             </Route>
             <Route element={<AdminRoute />}>
+              <Route path="/settings" element={<Settings />} />
               <Route path="/users" element={<Users />} />
             </Route>
           </Route>

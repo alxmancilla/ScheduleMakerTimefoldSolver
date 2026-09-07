@@ -46,6 +46,7 @@
     "teacherAvailability": "Disponibilidad de Maestros",
     "import": "Importar / Exportar",
     "validation": "Validación",
+    "scheduler": "Planificador",
     "admin": "Administración",
     "settings": "Configuración",
     "users": "Usuarios",
@@ -482,6 +483,10 @@
     "resultPassed": "✓ No se encontraron problemas bloqueantes",
     "resultProblems": "⚠ Se encontraron problemas bloqueantes — vea el reporte abajo",
     "resultFailed": "✗ La ejecución de validación no se completó — vea el registro abajo"
+  },
+  "schedulerSettings": {
+    "title": "Planificador",
+    "description": "Ejecuta y configura el solver, y ajusta los pesos de las restricciones."
   },
   "settings": {
     "title": "Configuración",

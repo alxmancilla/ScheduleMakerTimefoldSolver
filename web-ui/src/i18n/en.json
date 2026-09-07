@@ -46,6 +46,7 @@
     "teacherAvailability": "Teacher Availability",
     "import": "Import / Export",
     "validation": "Validation",
+    "scheduler": "Scheduler",
     "admin": "Admin",
     "settings": "Settings",
     "users": "Users",
@@ -482,6 +483,10 @@
     "resultPassed": "✓ No blocking problems found",
     "resultProblems": "⚠ Blocking problems found — see the report below",
     "resultFailed": "✗ Validation run failed to complete — see the log below"
+  },
+  "schedulerSettings": {
+    "title": "Scheduler",
+    "description": "Run and configure the solver, and tune constraint weights."
   },
   "settings": {
     "title": "Settings",
