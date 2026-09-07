@@ -375,9 +375,10 @@ sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 - [ ] Student preferences for elective courses
 - [ ] Multi-week scheduling patterns (dated calendar instead of a recurring weekly template)
 - [ ] Calendar system integration (iCal/Google Calendar export)
-- [x] Real-time constraint violation feedback during manual edits — done: the Schedule grid's move/pin editor validates live against hard constraints (`POST /api/assignments/{id}/validate-move`), and a persisted per-run violations panel is browsable on the same page
-- [ ] Extend grid editing beyond move/pin to room/teacher reassignment
-- [ ] Link a persisted violation directly to its grid cell (needs structured, assignment-ID-bearing analyzer output, not just the current human-readable description strings)
+- [x] Real-time constraint violation feedback during manual edits — done: the Schedule grid's move/pin editor validates live against hard constraints (`POST /api/assignments/{id}/validate-move`), and a persisted per-run violations panel (`SCHEDULER`/`ADMIN` only) is browsable on the same page
+- [x] Extend grid editing beyond move/pin to room/teacher reassignment — done: `AssignmentMoveEditor` gained admin/scheduler-only room/teacher fields, going through the full `PUT /api/assignments/{id}` (not live-validated, unlike day/hour/pinned)
+- [x] Link a persisted violation directly to its grid cell — done: `ViolationInstance` carries each violation's own `assignmentIds` through to `schedule_run_violation_assignment`; the Schedule grid badges/highlights the exact card(s) and scrolls to them when a violation description is clicked
+- [ ] Schedule approval/publish gate (`SCHEDULER`/`ADMIN` approve before `READER`/`WRITER`/`TEACHER` can see it) — today every solve *and* every hand-edit (move/pin/room/teacher) is immediately visible to every role with read access, with no draft/pending state at all. Proposed approach (lighter than full draft/what-if versioning): a `schedule_publication` singleton (mirrors `school_term`'s pattern) pointing at a `schedule_run`; a publish action snapshots the *current live state* (solved + hand-edited since the last solve) into a fresh run/result set and repoints the singleton; `ScheduleController`'s no-`runId` default resolves to that published run for non-scheduler roles (`SCHEDULER`/`ADMIN` keep seeing true live), reusing the existing `schedule_run_result` snapshot/`?runId=` mechanism rather than building a parallel draft-editing surface. No auto-republish on further edits - publishing is a deliberate, separate action.
 
 ## Contributing
 
