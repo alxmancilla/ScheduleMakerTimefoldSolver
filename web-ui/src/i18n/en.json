@@ -778,9 +778,9 @@
     "gridView": "Grid View",
     "listView": "List View",
     "run": "Run:",
-    "latestRun": "Latest (current schedule)",
+    "latestRun": "Latest (current timetable)",
     "runOption": "Run #{{id}} — {{timestamp}} ({{hard}}h / {{soft}}s)",
-    "pastRunNotice": "Viewing a past run — this is not the current schedule.",
+    "pastRunNotice": "Viewing a past run — this is not the current timetable.",
     "group": "Group:",
     "teacher": "Teacher:",
     "allTeachers": "All Teachers",
@@ -788,9 +788,9 @@
     "showing": "Showing {{filtered}} of {{total}} assignments",
     "groupSuffix": " | Group: {{name}}",
     "teacherSuffix": " | Teacher: {{name}}",
-    "loading": "Loading schedule...",
-    "loadFailedPrefix": "Failed to load schedule: ",
-    "noData": "No schedule data",
+    "loading": "Loading timetable...",
+    "loadFailedPrefix": "Failed to load timetable: ",
+    "noData": "No timetable data",
     "hour": "Hour",
     "list": {
       "day": "Day",
@@ -821,9 +821,9 @@
       "roomTeacherNotLiveValidated": "Room/teacher changes aren't checked live the way day/hour is - review carefully before saving."
     },
     "editMode": {
-      "toggleLabel": "Enable schedule editing",
-      "confirmEnable": "Turning this on lets clicking a block move or pin it, directly changing the live schedule. Enable editing?",
-      "unavailableForPastRun": "Editing is only available on the latest schedule, not a past run.",
+      "toggleLabel": "Enable timetable editing",
+      "confirmEnable": "Turning this on lets clicking a block move or pin it, directly changing the live timetable. Enable editing?",
+      "unavailableForPastRun": "Editing is only available on the latest timetable, not a past run.",
       "activeNotice": "Editing is ON — clicking a block opens the move/pin editor."
     },
     "violations": {
@@ -845,8 +845,8 @@
   },
   "mySchedule": {
     "title": "My Timetable",
-    "loading": "Loading your schedule...",
-    "loadFailedPrefix": "Failed to load your schedule: ",
+    "loading": "Loading your timetable...",
+    "loadFailedPrefix": "Failed to load your timetable: ",
     "noTeacherLinked": "Your account isn't linked to a teacher record yet. Ask an admin to link it in Users.",
     "none": "No blocks scheduled yet."
   }
