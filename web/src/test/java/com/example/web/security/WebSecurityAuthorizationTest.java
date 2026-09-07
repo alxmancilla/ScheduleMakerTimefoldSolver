@@ -34,8 +34,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Verifies the role-based authorization rules in {@link SecurityConfig} against
  * a representative write-protected resource (TeacherController): reads need any
- * role, writes need WRITER/ADMIN, /api/admin/** needs ADMIN, and anonymous
- * requests are rejected with 401.
+ * role, writes need WRITER/SCHEDULER/ADMIN, /api/admin/** needs ADMIN (except
+ * the /api/admin/engine/**+/api/admin/constraint-config/** carve-outs tested
+ * elsewhere), and anonymous requests are rejected with 401. SCHEDULER is
+ * WRITER-plus for general domain-data resources like this one - it gets the
+ * same read/write access WRITER does here, plus the scheduling-specific
+ * extras (assignments, engine, constraint-config) tested in their own
+ * dedicated security test classes.
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(TeacherController.class)
@@ -126,8 +131,36 @@ public class WebSecurityAuthorizationTest {
     }
 
     @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canRead() throws Exception {
+        when(teacherRepository.findAll()).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/teachers"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canWrite() throws Exception {
+        when(teacherRepository.existsById("T1")).thenReturn(false);
+        when(teacherRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        mockMvc.perform(post("/api/teachers").contentType(MediaType.APPLICATION_JSON).content(validTeacherJson()))
+                .andExpect(status().isOk());
+        verify(teacherRepository).save(any());
+    }
+
+    @Test
     @WithMockUser(roles = "WRITER")
     public void writer_cannotAccessAdminRoutes() throws Exception {
+        mockMvc.perform(get("/api/admin/users"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_cannotAccessUserManagement() throws Exception {
+        // SCHEDULER is WRITER-plus for scheduling concerns (assignments,
+        // engine, constraint-config - see their own dedicated tests), but
+        // user management stays outside that grant, same as WRITER.
         mockMvc.perform(get("/api/admin/users"))
                 .andExpect(status().isForbidden());
     }

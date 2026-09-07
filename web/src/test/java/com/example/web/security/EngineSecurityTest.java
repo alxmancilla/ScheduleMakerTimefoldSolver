@@ -22,8 +22,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Confirms /api/admin/engine is gated to ADMIN: READER and WRITER get 403,
- * ADMIN gets through to the controller.
+ * Confirms /api/admin/engine is gated to SCHEDULER/ADMIN (carved out of the
+ * general ADMIN-only /api/admin/** rule - see SecurityConfig): READER and
+ * WRITER get 403, SCHEDULER and ADMIN get through to the controller.
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(EngineController.class)
@@ -62,6 +63,15 @@ public class EngineSecurityTest {
     public void writer_isForbidden() throws Exception {
         mockMvc.perform(post("/api/admin/engine/run"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canAccess() throws Exception {
+        when(engineRunnerService.getSnapshot()).thenReturn(
+                new EngineRunnerService.Snapshot(EngineRunnerService.State.IDLE, null, null, null, List.of()));
+        mockMvc.perform(get("/api/admin/engine/status"))
+                .andExpect(status().isOk());
     }
 
     @Test

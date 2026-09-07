@@ -5,7 +5,8 @@ import java.time.LocalDateTime;
 
 /**
  * Application user backing authentication and role-based authorization.
- * Each user has exactly one role: ADMIN, WRITER or READER.
+ * Each user has exactly one role: ADMIN, SCHEDULER, WRITER, READER, or
+ * TEACHER - see SecurityConfig for what each one can actually do.
  */
 @Entity
 @Table(name = "app_user")

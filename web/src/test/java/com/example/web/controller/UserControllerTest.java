@@ -110,6 +110,20 @@ public class UserControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    public void createUser_roleScheduler_returnsSaved() throws Exception {
+        when(userRepository.existsById("newscheduler")).thenReturn(false);
+        when(passwordEncoder.encode("supersecret")).thenReturn("hashed");
+        when(userRepository.save(any(AppUserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = Map.of("username", "newscheduler", "password", "supersecret", "role", "SCHEDULER");
+        mockMvc.perform(post("/api/admin/users").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("SCHEDULER"));
+        verify(userRepository).save(any(AppUserEntity.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     public void createUser_duplicateUsername_returns400() throws Exception {
         when(userRepository.existsById("admin")).thenReturn(true);
         Map<String, Object> body = Map.of("username", "admin", "password", "supersecret", "role", "WRITER");

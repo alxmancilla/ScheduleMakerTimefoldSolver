@@ -9,28 +9,29 @@ const DAY_KEY_BY_NUMBER = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
 const VALIDATE_DEBOUNCE_MS = 300;
 
 /**
- * Move/pin editor opened by clicking a card in Schedule.jsx's grid (writers
- * only, live schedule only - see Schedule.jsx): day/hour, pinned, and -
- * ADMIN only - room/teacher reassignment. A full edit (course, block length,
+ * Move/pin editor opened by clicking a card in Schedule.jsx's grid
+ * (SCHEDULER/ADMIN only, live schedule only - see Schedule.jsx's
+ * canEditSchedule()): day/hour, pinned, and - also SCHEDULER/ADMIN, gated
+ * separately below since it goes through a different, broader-access
+ * endpoint - room/teacher reassignment. A full edit (course, block length,
  * etc.) still belongs to Assignments.jsx; this stays scoped to what a
  * quick in-grid fix realistically needs.
  *
  * Two different save paths, chosen by what actually changed:
  *  - day/hour/pinned only: `PUT /api/assignments/{id}/move`
  *    (`moveAssignment` in api.js) - a narrow endpoint that touches only
- *    blockTimeslotId/pinned, is WRITER-accessible (matching this popover's
- *    own WRITER-visible "Enable schedule editing" toggle), and re-validates
- *    server-side before saving instead of trusting the client's last
- *    debounced check.
- *  - room and/or teacher also changed (ADMIN only - the fields below only
- *    render for isAdmin()): the general `PUT /api/assignments/{id}`
- *    (`updateAssignment`), which needs the full CourseBlockAssignmentDTO -
- *    fetched fresh via getAssignment() right before saving, same
- *    explicit-field-list approach Assignments.jsx's own submit handler
- *    uses. Deliberately NOT covered by the live validate-move check below
- *    (see the room/teacher section's own note) - same lack of live
- *    pre-validation Assignments.jsx's full edit form already has today for
- *    these two fields, not a new gap.
+ *    blockTimeslotId/pinned, SCHEDULER/ADMIN-accessible (matching this
+ *    popover's own gate), and re-validates server-side before saving
+ *    instead of trusting the client's last debounced check.
+ *  - room and/or teacher also changed (the fields below only render for
+ *    canEditRoomTeacher, i.e. isAdmin() || isScheduler()): the general
+ *    `PUT /api/assignments/{id}` (`updateAssignment`), which needs the full
+ *    CourseBlockAssignmentDTO - fetched fresh via getAssignment() right
+ *    before saving, same explicit-field-list approach Assignments.jsx's own
+ *    submit handler uses. Deliberately NOT covered by the live validate-move
+ *    check below (see the room/teacher section's own note) - same lack of
+ *    live pre-validation Assignments.jsx's full edit form already has today
+ *    for these two fields, not a new gap.
  *
  * The live check itself: every day/hour/pinned change is re-checked,
  * debounced, against `POST /api/assignments/{id}/validate-move`, which
@@ -45,7 +46,7 @@ const VALIDATE_DEBOUNCE_MS = 300;
  */
 function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isScheduler } = useAuth();
   const showToast = useToast();
 
   const matchingTimeslots = useMemo(
@@ -70,16 +71,19 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
   const [violations, setViolations] = useState([]);
   const [warnings, setWarnings] = useState([]);
 
-  const admin = isAdmin();
+  // Room/teacher reassignment goes through the general PUT (SCHEDULER or
+  // ADMIN - see SecurityConfig), so both roles get these fields, not just
+  // ADMIN.
+  const canEditRoomTeacher = isAdmin() || isScheduler();
 
   // Rooms/teachers are READER-accessible endpoints, so loading them
-  // unconditionally (not gated on admin) keeps this simple - the fields
-  // themselves still only render for an admin.
+  // unconditionally (not gated on the role check) keeps this simple - the
+  // fields themselves still only render for canEditRoomTeacher.
   useEffect(() => {
-    if (!admin) return;
+    if (!canEditRoomTeacher) return;
     getRooms().then((res) => setRooms(res.data)).catch(() => setRooms([]));
     getTeachers().then((res) => setTeachers(res.data)).catch(() => setTeachers([]));
-  }, [admin]);
+  }, [canEditRoomTeacher]);
 
   const roomsForType = useMemo(
     () => rooms.filter((r) => roomMatchesType(r, entry.satisfiesRoomType)),
@@ -265,7 +269,7 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
           )}
         </div>
 
-        {admin && (
+        {canEditRoomTeacher && (
           <>
             <div className="form-group">
               <label htmlFor="move-editor-room">{t('schedule.moveEditor.room')}</label>

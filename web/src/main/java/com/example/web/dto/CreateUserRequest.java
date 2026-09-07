@@ -17,7 +17,8 @@ public class CreateUserRequest {
     private String password;
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(ADMIN|WRITER|READER|TEACHER)$", message = "Role must be ADMIN, WRITER, READER, or TEACHER")
+    @Pattern(regexp = "^(ADMIN|SCHEDULER|WRITER|READER|TEACHER)$",
+            message = "Role must be ADMIN, SCHEDULER, WRITER, READER, or TEACHER")
     private String role;
 
     /** Optional; only meaningful when role is TEACHER. */

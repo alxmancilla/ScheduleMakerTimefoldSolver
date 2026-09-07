@@ -18,7 +18,8 @@ import Users from './components/Users';
 import Login from './components/Login';
 import ProtectedRoute from './auth/ProtectedRoute';
 import AdminRoute from './auth/AdminRoute';
-import AdminOnly from './auth/AdminOnly';
+import SchedulerRoute from './auth/SchedulerRoute';
+import ScheduleEditOnly from './auth/ScheduleEditOnly';
 import WriteRoute from './auth/WriteRoute';
 import { useAuth } from './auth/AuthContext';
 import { getTerm, TERM_UPDATED_EVENT } from './api';
@@ -31,9 +32,13 @@ const SETUP_ITEMS = [
   { path: '/rooms', labelKey: 'nav.rooms' },
   { path: '/groups', labelKey: 'nav.groups' },
 ];
+// Settings is SCHEDULER+ADMIN (see SchedulerRoute) - Settings.jsx itself
+// filters which of its 11 tabs a SCHEDULER actually sees (Solver +
+// Constraint Weights only; the rest stay ADMIN-only within the page). Users
+// is ADMIN-only (adminOnly) - user management is not a scheduling concern.
 const ADMIN_ITEMS = [
   { path: '/settings', labelKey: 'nav.settings' },
-  { path: '/users', labelKey: 'nav.users' },
+  { path: '/users', labelKey: 'nav.users', adminOnly: true },
 ];
 // Reports/Course Coverage are READER+ (no gate); Import is WRITER+ (writeOnly) -
 // filtered per role before rendering, unlike SETUP_ITEMS/ADMIN_ITEMS which are uniform.
@@ -143,8 +148,10 @@ function ToolsNavDropdown() {
 
 function AdminNavDropdown() {
   const { t } = useTranslation();
+  const { isAdmin } = useAuth();
   const location = useLocation();
-  const activeItem = ADMIN_ITEMS.find((item) => item.path === location.pathname);
+  const visibleItems = ADMIN_ITEMS.filter((item) => !item.adminOnly || isAdmin());
+  const activeItem = visibleItems.find((item) => item.path === location.pathname);
 
   return (
     <NavDropdown
@@ -154,7 +161,7 @@ function AdminNavDropdown() {
     >
       {(close) => (
         <>
-          {ADMIN_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <NavLink key={item.path} to={item.path} className={navLinkClass} onClick={close}>
               {t(item.labelKey)}
             </NavLink>
@@ -283,9 +290,9 @@ function Layout() {
                 <NavLink to="/assignments" className={navLinkClass}>{t('nav.assignments')}</NavLink>
                 <SetupNavDropdown />
                 <ToolsNavDropdown />
-                <AdminOnly>
+                <ScheduleEditOnly>
                   <AdminNavDropdown />
-                </AdminOnly>
+                </ScheduleEditOnly>
               </>
             )}
           </nav>
@@ -329,8 +336,10 @@ function App() {
               <Route path="/import" element={<ImportExcel />} />
               <Route path="/validation" element={<PreSolveValidation />} />
             </Route>
-            <Route element={<AdminRoute />}>
+            <Route element={<SchedulerRoute />}>
               <Route path="/settings" element={<Settings />} />
+            </Route>
+            <Route element={<AdminRoute />}>
               <Route path="/users" element={<Users />} />
             </Route>
           </Route>

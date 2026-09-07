@@ -13,7 +13,7 @@ const formatRunTimestamp = (value) => (value ? value.replace('T', ' ').split('.'
 
 function Schedule() {
   const { t } = useTranslation();
-  const { canWrite } = useAuth();
+  const { canEditSchedule } = useAuth();
   const confirmAction = useConfirm();
   const DAYS = DAY_KEYS.map((key) => t(`common.daysFull.${key}`));
   const [schedule, setSchedule] = useState(null);
@@ -28,17 +28,19 @@ function Schedule() {
   const [timeslots, setTimeslots] = useState([]);
   const [editingEntry, setEditingEntry] = useState(null);
   // Grid editing is opt-in and resets to OFF on every visit to this page
-  // (plain component state, nothing persisted) - a writer must deliberately
-  // turn it on, and confirm doing so, before any card becomes clickable.
-  // This is on top of, not instead of, the existing role/run-selection gate
-  // below: a reader (or a writer just browsing) never even sees an editable
-  // grid by accident.
+  // (plain component state, nothing persisted) - a scheduler/admin must
+  // deliberately turn it on, and confirm doing so, before any card becomes
+  // clickable. This is on top of, not instead of, the existing role/
+  // run-selection gate below: a reader or writer (who can no longer edit the
+  // schedule - see canEditSchedule()) never even sees an editable grid.
   const [editModeEnabled, setEditModeEnabled] = useState(false);
   // Moving/pinning a block edits the live course_block_assignment row, which
-  // has no notion of "which run you were viewing" - so it's only offered
-  // for writers looking at the live schedule (selectedRunId === ''), never a
-  // past run's read-only snapshot.
-  const canEditGrid = canWrite() && !selectedRunId && editModeEnabled;
+  // has no notion of "which run you were viewing" - so it's only offered to
+  // SCHEDULER/ADMIN (canEditSchedule(), matching SecurityConfig's own
+  // /api/assignments/** write carve-out - WRITER no longer qualifies) looking
+  // at the live schedule (selectedRunId === ''), never a past run's
+  // read-only snapshot.
+  const canEditGrid = canEditSchedule() && !selectedRunId && editModeEnabled;
 
   const [violations, setViolations] = useState({ hard: [], soft: [] });
   const [violationsError, setViolationsError] = useState(null);
@@ -284,7 +286,7 @@ function Schedule() {
             </button>
           )}
 
-          {canWrite() && (
+          {canEditSchedule() && (
             <label
               htmlFor="editModeToggle"
               style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', cursor: 'pointer' }}

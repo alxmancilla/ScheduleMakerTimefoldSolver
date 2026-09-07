@@ -8,7 +8,8 @@ import jakarta.validation.constraints.Pattern;
 public class UpdateUserRequest {
 
     @NotBlank(message = "Role is required")
-    @Pattern(regexp = "^(ADMIN|WRITER|READER|TEACHER)$", message = "Role must be ADMIN, WRITER, READER, or TEACHER")
+    @Pattern(regexp = "^(ADMIN|SCHEDULER|WRITER|READER|TEACHER)$",
+            message = "Role must be ADMIN, SCHEDULER, WRITER, READER, or TEACHER")
     private String role;
 
     @NotNull(message = "Enabled is required")

@@ -5,7 +5,7 @@ import {
   getGroups, getCourses, getTeachers, getRooms, listTimeslots, getGroupRoomRanges,
   exportAssignments, importAssignments,
 } from '../api';
-import AdminOnly from '../auth/AdminOnly';
+import ScheduleEditOnly from '../auth/ScheduleEditOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import { ROOM_TYPES, formatHour, roomMatchesType, teacherQualifiedFor } from '../constants';
@@ -327,11 +327,11 @@ function Assignments() {
               <option value="unassigned">{t('assignments.filters.unassigned')}</option>
               <option value="pinned">{t('assignments.filters.pinned')}</option>
             </select>
-            <AdminOnly>
+            <ScheduleEditOnly>
               <button className="btn btn-success" onClick={handleAdd}>
                 {t('assignments.addAssignment')}
               </button>
-            </AdminOnly>
+            </ScheduleEditOnly>
           </div>
         </div>
         <p style={{ marginTop: '10px', color: 'var(--color-text-secondary)' }}>
@@ -351,7 +351,7 @@ function Assignments() {
             </button>
             {exportError && <div className="error" role="alert" style={{ marginTop: '8px' }}>{exportError}</div>}
           </div>
-          <AdminOnly>
+          <ScheduleEditOnly>
             <div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 <input
@@ -385,7 +385,7 @@ function Assignments() {
                 </div>
               )}
             </div>
-          </AdminOnly>
+          </ScheduleEditOnly>
         </div>
       </div>
 
@@ -614,14 +614,14 @@ function Assignments() {
                   {assignment.pinned ? <span aria-hidden="true">📌</span> : ''}
                 </td>
                 <td>
-                  <AdminOnly>
+                  <ScheduleEditOnly>
                     <button className="btn btn-primary" onClick={() => handleEdit(assignment)} style={{ marginRight: '5px' }}>
                       {t('common.edit')}
                     </button>
                     <button className="btn btn-danger" onClick={() => handleDelete(assignment.id)}>
                       {t('common.delete')}
                     </button>
-                  </AdminOnly>
+                  </ScheduleEditOnly>
                 </td>
               </tr>
             ))}

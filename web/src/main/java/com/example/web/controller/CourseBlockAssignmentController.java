@@ -72,18 +72,17 @@ public class CourseBlockAssignmentController {
     /**
      * Move/pin a block without touching anything else about it - the save
      * path behind the Schedule grid's move/pin editor. Deliberately a
-     * narrower endpoint than the general PUT below (which is ADMIN-only,
-     * carries the full DTO, and can change room/teacher/course): this one
-     * only ever sets blockTimeslotId/pinned, same shape as
-     * AssignmentMoveValidationRequest, so it can be WRITER-accessible (see
-     * SecurityConfig's carve-out, right next to validate-move's) without
-     * granting WRITER the broader ADMIN-only write access. Re-validates
-     * server-side before saving - the frontend already blocks Save on a
-     * violation, but a client-side check is advisory only from the
-     * server's point of view, and a violation reported as a warning (a
-     * currently-SOFT-configured constraint) must still not become a HARD
-     * one here if the config changed between the client's last check and
-     * this request.
+     * narrower endpoint than the general PUT below (which carries the full
+     * DTO and can change room/teacher/course too): this one only ever sets
+     * blockTimeslotId/pinned, same shape as AssignmentMoveValidationRequest.
+     * Both this and the general PUT require SCHEDULER or ADMIN (see
+     * SecurityConfig) - WRITER does not get either, unlike its usual write
+     * access to every other domain-data resource. Re-validates server-side
+     * before saving - the frontend already blocks Save on a violation, but
+     * a client-side check is advisory only from the server's point of view,
+     * and a violation reported as a warning (a currently-SOFT-configured
+     * constraint) must still not become a HARD one here if the config
+     * changed between the client's last check and this request.
      */
     @PutMapping("/{id}/move")
     public CourseBlockAssignmentEntity moveAssignment(@PathVariable String id,
@@ -207,9 +206,9 @@ public class CourseBlockAssignmentController {
         assignment.setRoomName(teacher.getRequiredRoomName());
     }
 
-    // ---- Excel export/import (whole table, ADMIN-only same as everything
-    // else under /api/assignments/**) - see AssignmentExcelService's own doc
-    // for why this is separate from ImportController's base-data flow. ----
+    // ---- Excel export/import (whole table, SCHEDULER/ADMIN-only same as
+    // everything else under /api/assignments/**) - see AssignmentExcelService's
+    // own doc for why this is separate from ImportController's base-data flow. ----
 
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportExcel() throws IOException {

@@ -69,8 +69,14 @@ export function AuthProvider({ children }) {
   };
 
   const hasRole = (...roles) => user != null && roles.includes(user.role);
-  const canWrite = () => hasRole('WRITER', 'ADMIN');
+  const canWrite = () => hasRole('WRITER', 'SCHEDULER', 'ADMIN');
   const isAdmin = () => hasRole('ADMIN');
+  const isScheduler = () => hasRole('SCHEDULER');
+  // Assignments (Assignments.jsx) and schedule-view editing (Schedule.jsx's
+  // grid, AssignmentMoveEditor) are the one resource carved out of the
+  // general canWrite() rule - since 2026-09-07, only SCHEDULER and ADMIN can
+  // write there, not plain WRITER - matching SecurityConfig's own carve-out.
+  const canEditSchedule = () => hasRole('SCHEDULER', 'ADMIN');
 
   const value = {
     user,
@@ -82,6 +88,8 @@ export function AuthProvider({ children }) {
     hasRole,
     canWrite,
     isAdmin,
+    isScheduler,
+    canEditSchedule,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

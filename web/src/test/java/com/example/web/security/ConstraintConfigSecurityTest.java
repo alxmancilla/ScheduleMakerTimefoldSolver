@@ -20,9 +20,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Confirms /api/admin/constraint-config is ADMIN-only (falls under the
- * blanket /api/admin/** rule): READER and WRITER get 403, matching
- * AdminReportSecurityTest's convention for the same rule.
+ * Confirms /api/admin/constraint-config is SCHEDULER/ADMIN-only (carved out
+ * of the blanket ADMIN-only /api/admin/** rule - see SecurityConfig): READER
+ * and WRITER get 403, SCHEDULER and ADMIN get through.
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(ConstraintConfigController.class)
@@ -57,6 +57,14 @@ public class ConstraintConfigSecurityTest {
     public void writer_isForbidden() throws Exception {
         mockMvc.perform(get("/api/admin/constraint-config"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canAccess() throws Exception {
+        when(configRepository.findAll()).thenReturn(List.of());
+        mockMvc.perform(get("/api/admin/constraint-config"))
+                .andExpect(status().isOk());
     }
 
     @Test

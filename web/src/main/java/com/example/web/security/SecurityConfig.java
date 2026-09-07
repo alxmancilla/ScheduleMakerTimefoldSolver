@@ -33,12 +33,33 @@ import java.util.List;
 
 /**
  * Stateless security: authenticate with a signed JWT (HMAC) carrying the user's
- * role. Reads are open to any authenticated role; writes require WRITER or
- * ADMIN; user management under /api/admin/** requires ADMIN. Course block
- * assignments (/api/assignments/**) are the one resource-specific exception to
- * the general write rule: reads are open the same as everywhere else
- * (READER/WRITER/ADMIN), but writes are ADMIN-only - WRITER does not get its
- * usual write access here, unlike every other domain-data resource.
+ * role. Reads are open to any authenticated role; writes require WRITER,
+ * SCHEDULER, or ADMIN; user management under /api/admin/** requires ADMIN
+ * specifically, except two carve-outs described below. SCHEDULER (added
+ * 2026-09-07) is WRITER-plus: everything WRITER can do, plus triggering/
+ * configuring the solver and full control over the schedule itself (see
+ * below) - a persona for "runs and tunes the solver, fixes what comes out"
+ * without handing them user management, audit logs, or DB backup/restore.
+ *
+ * Course block assignments (/api/assignments/**) and schedule-view editing
+ * are the one resource-specific exception to the general write rule, and -
+ * since 2026-09-07 - to the general WRITER-can-write rule too: reads are open
+ * the same as everywhere else (READER/WRITER/SCHEDULER/ADMIN), but every
+ * write (the move/pin editor's PUT .../move, its live-check POST
+ * .../validate-move, and the general POST/PUT/DELETE, including /export
+ * /import) requires SCHEDULER or ADMIN specifically - WRITER does not get
+ * its usual write access here, unlike every other domain-data resource.
+ * (Before 2026-09-07, WRITER had this access via .../move and
+ * .../validate-move; it was intentionally removed when SCHEDULER was
+ * introduced so schedule editing has exactly one non-ADMIN owner.)
+ *
+ * Solver triggering/config (/api/admin/engine/**) and constraint weights
+ * (/api/admin/constraint-config/**) are carved out of the general ADMIN-only
+ * /api/admin/** rule to admit SCHEDULER too - every other /api/admin/**
+ * resource (users, audit log, DB backup/restore, admin report snapshots,
+ * and the remaining Settings-tab config resources: blocks, calendar
+ * exceptions, component block rules, semester hour limits, timeslots) stays
+ * ADMIN-only, since none of it is a scheduling concern.
  */
 @Configuration
 @EnableWebSecurity
@@ -66,46 +87,54 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         // A personal UI preference, not a domain-data write: any authenticated
                         // role (including READER) may update their own, unlike the general PUT
-                        // rule below which requires WRITER/ADMIN.
+                        // rule below which requires WRITER/SCHEDULER/ADMIN.
                         .requestMatchers(HttpMethod.PUT, "/api/auth/preferred-language")
-                        .hasAnyRole("READER", "WRITER", "ADMIN", "TEACHER")
+                        .hasAnyRole("READER", "WRITER", "SCHEDULER", "ADMIN", "TEACHER")
+                        // Solver triggering/config and constraint weights are scheduling
+                        // concerns, not admin ones - carved out of the general ADMIN-only
+                        // /api/admin/** rule below so SCHEDULER reaches them too, ahead of
+                        // that blanket rule which still governs every other /api/admin/**
+                        // resource (users, audit log, DB backup, etc).
+                        .requestMatchers("/api/admin/engine/**").hasAnyRole("SCHEDULER", "ADMIN")
+                        .requestMatchers("/api/admin/constraint-config/**").hasAnyRole("SCHEDULER", "ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // Course block assignments carry the live/solved schedule - reads stay
-                        // open to READER/WRITER/ADMIN like everywhere else, but every write
-                        // (POST/PUT/DELETE, including the /export /import endpoints) is
-                        // ADMIN-only, ahead of the general per-method rules below which would
-                        // otherwise let WRITER write here too.
+                        // open to READER/WRITER/SCHEDULER/ADMIN like everywhere else, but every
+                        // write (POST/PUT/DELETE, including the /export /import endpoints) needs
+                        // SCHEDULER or ADMIN specifically, ahead of the general per-method rules
+                        // below which would otherwise let plain WRITER write here too.
                         .requestMatchers(HttpMethod.GET, "/api/assignments/**")
-                        .hasAnyRole("READER", "WRITER", "ADMIN")
-                        // validate-move computes and returns a result, it doesn't write anything -
-                        // POST only because it takes a request body (a candidate timeslot/pinned
-                        // pair) - so it follows the GET rule above, ahead of the general
-                        // ADMIN-only POST rule for this resource right below.
+                        .hasAnyRole("READER", "WRITER", "SCHEDULER", "ADMIN")
+                        // validate-move computes and returns a result, it doesn't write anything,
+                        // but it exists only in service of the move/pin editor below - scoped to
+                        // the same SCHEDULER/ADMIN audience as the write itself, not the broader
+                        // read audience the GET rule above gets.
                         .requestMatchers(HttpMethod.POST, "/api/assignments/*/validate-move")
-                        .hasAnyRole("READER", "WRITER", "ADMIN")
+                        .hasAnyRole("SCHEDULER", "ADMIN")
                         // move only ever sets blockTimeslotId/pinned (never room/teacher/course),
-                        // re-validated server-side - narrow enough to open to WRITER too, ahead of
-                        // the general ADMIN-only PUT rule right below which governs the full-DTO
-                        // edit endpoint (room/teacher/course changes stay ADMIN-only there).
+                        // re-validated server-side - narrower in scope than the general PUT rule
+                        // right below (which governs the full-DTO edit endpoint, room/teacher/
+                        // course included), but the same SCHEDULER/ADMIN audience as it.
                         .requestMatchers(HttpMethod.PUT, "/api/assignments/*/move")
-                        .hasAnyRole("WRITER", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/assignments/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/assignments/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/assignments/**").hasRole("ADMIN")
+                        .hasAnyRole("SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/assignments/**").hasAnyRole("SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/assignments/**").hasAnyRole("SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/assignments/**").hasAnyRole("SCHEDULER", "ADMIN")
                         // TEACHER is deliberately NOT in the general GET rule below - it can only
                         // read its own schedule/identity/term, not the broader domain data every
                         // other role can. Without this exception, GET /api/auth/me (used on every
                         // page load to hydrate the session) would 403 for TEACHER and immediately
                         // log them back out.
                         .requestMatchers(HttpMethod.GET, "/api/auth/me")
-                        .hasAnyRole("TEACHER", "READER", "WRITER", "ADMIN")
+                        .hasAnyRole("TEACHER", "READER", "WRITER", "SCHEDULER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/schedule/view/me")
-                        .hasAnyRole("TEACHER", "READER", "WRITER", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/term").hasAnyRole("READER", "WRITER", "ADMIN", "TEACHER")
-                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("READER", "WRITER", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("WRITER", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("WRITER", "ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("WRITER", "ADMIN")
+                        .hasAnyRole("TEACHER", "READER", "WRITER", "SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/term")
+                        .hasAnyRole("READER", "WRITER", "SCHEDULER", "ADMIN", "TEACHER")
+                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("READER", "WRITER", "SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole("WRITER", "SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole("WRITER", "SCHEDULER", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole("WRITER", "SCHEDULER", "ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter)))
                 .httpBasic(basic -> basic.disable())

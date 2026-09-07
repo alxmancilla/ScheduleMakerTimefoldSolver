@@ -741,7 +741,7 @@
     "saveFailedPrefix": "Error al guardar usuario: ",
     "deleteFailedPrefix": "Error al eliminar usuario: ",
     "confirmDelete": "¿Eliminar el usuario \"{{username}}\"?",
-    "description": "Exclusivo para administradores. Gestiona quién puede iniciar sesión y con qué rol (ADMIN, WRITER, READER). No puede eliminar su propia cuenta, y el último ADMIN habilitado restante no puede eliminarse, degradarse ni deshabilitarse.",
+    "description": "Exclusivo para administradores. Gestiona quién puede iniciar sesión y con qué rol (ADMIN, SCHEDULER, WRITER, READER, TEACHER). No puede eliminar su propia cuenta, y el último ADMIN habilitado restante no puede eliminarse, degradarse ni deshabilitarse.",
     "fields": {
       "username": "Usuario:",
       "password": "Contraseña:",

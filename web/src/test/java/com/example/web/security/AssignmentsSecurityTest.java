@@ -31,11 +31,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Verifies the ADMIN-only write exception carved out for /api/assignments/**
- * in {@link SecurityConfig}: reads are open the same as everywhere else
- * (READER/WRITER/ADMIN), but writes require ADMIN specifically - WRITER does
- * not get its usual write access here, unlike every other domain-data
- * resource.
+ * Verifies the SCHEDULER/ADMIN-only write exception carved out for
+ * /api/assignments/** in {@link SecurityConfig}: reads are open the same as
+ * everywhere else (READER/WRITER/SCHEDULER/ADMIN), but every write (the
+ * general CRUD, move, and validate-move) requires SCHEDULER or ADMIN
+ * specifically - WRITER does not get its usual write access here, unlike
+ * every other domain-data resource (added 2026-09-07, when SCHEDULER was
+ * introduced - WRITER had move/validate-move access before that).
  */
 @RunWith(SpringRunner.class)
 @WebMvcTest(CourseBlockAssignmentController.class)
@@ -101,10 +103,30 @@ public class AssignmentsSecurityTest {
     @Test
     @WithMockUser(roles = "WRITER")
     public void writer_cannotWrite() throws Exception {
-        // Unlike the general write rule (WRITER or ADMIN), the
-        // assignments-specific ADMIN-only override excludes WRITER here.
+        // Unlike the general write rule (WRITER/SCHEDULER/ADMIN), the
+        // assignments-specific SCHEDULER/ADMIN-only override excludes WRITER here.
         mockMvc.perform(post("/api/assignments"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canRead() throws Exception {
+        when(assignmentRepository.findAll()).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/assignments"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_passesWriteAuthorization() throws Exception {
+        // No request body is supplied, so this may still fail validation
+        // downstream - the point is only that authorization itself passes
+        // (neither 401 nor 403).
+        int statusCode = mockMvc.perform(post("/api/assignments"))
+                .andReturn().getResponse().getStatus();
+        assertNotEquals(401, statusCode);
+        assertNotEquals(403, statusCode);
     }
 
     @Test
@@ -128,39 +150,46 @@ public class AssignmentsSecurityTest {
     }
 
     // validate-move is a POST (it takes a request body), but computes a
-    // result rather than writing anything - SecurityConfig carves it out of
-    // the general ADMIN-only write rule above so WRITER (and READER) keep
-    // the same access they have to every other read on this resource.
+    // result rather than writing anything - it exists only in service of the
+    // move/pin editor's write, so it's scoped to the same SCHEDULER/ADMIN
+    // audience as the write itself, not the broader READER/WRITER read
+    // audience the GET rule above gets.
     @Test
-    @WithMockUser(roles = "WRITER")
-    public void writer_canPostValidateMove() throws Exception {
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canPostValidateMove() throws Exception {
         when(assignmentMoveValidationService.validate(anyString(), anyString(), anyBoolean()))
                 .thenReturn(new AssignmentMoveValidationResponse(java.util.List.of(), java.util.List.of()));
         mockMvc.perform(post("/api/assignments/block_assignment_1/validate-move")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "WRITER")
+    public void writer_cannotPostValidateMove() throws Exception {
+        // Removed 2026-09-07 when SCHEDULER was introduced - WRITER had this
+        // access before that.
+        mockMvc.perform(post("/api/assignments/block_assignment_1/validate-move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(roles = "READER")
-    public void reader_canPostValidateMove() throws Exception {
-        when(assignmentMoveValidationService.validate(anyString(), anyString(), anyBoolean()))
-                .thenReturn(new AssignmentMoveValidationResponse(java.util.List.of(), java.util.List.of()));
+    public void reader_cannotPostValidateMove() throws Exception {
         mockMvc.perform(post("/api/assignments/block_assignment_1/validate-move")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
-    // move only ever sets blockTimeslotId/pinned - narrow enough to open to
-    // WRITER too, unlike the general full-DTO PUT above (which stays
-    // ADMIN-only). This is the fix for a real bug: the move/pin editor's
-    // "Enable schedule editing" toggle was WRITER-visible (canWrite() in
-    // Schedule.jsx) but Save called the general PUT, which 403'd for WRITER.
+    // move only ever sets blockTimeslotId/pinned - narrower in scope than the
+    // general full-DTO PUT above, but the same SCHEDULER/ADMIN audience as it.
     @Test
-    @WithMockUser(roles = "WRITER")
-    public void writer_canPutMove() throws Exception {
+    @WithMockUser(roles = "SCHEDULER")
+    public void scheduler_canPutMove() throws Exception {
         when(assignmentMoveValidationService.validate(anyString(), anyString(), anyBoolean()))
                 .thenReturn(new AssignmentMoveValidationResponse(java.util.List.of(), java.util.List.of()));
         CourseBlockAssignmentEntity assignment = new CourseBlockAssignmentEntity();
@@ -172,6 +201,21 @@ public class AssignmentsSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "WRITER")
+    public void writer_cannotPutMove() throws Exception {
+        // This is the reverse of the fix from 2026-09-06 (WRITER could open the
+        // move/pin editor via canWrite() but Save 403'd because the general PUT
+        // was ADMIN-only): now that SCHEDULER exists, WRITER's move access
+        // (added by that fix) is intentionally removed again - schedule editing
+        // has exactly one non-ADMIN owner (SCHEDULER), and Schedule.jsx's own
+        // canEditSchedule() gate keeps WRITER from ever reaching this editor.
+        mockMvc.perform(put("/api/assignments/block_assignment_1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

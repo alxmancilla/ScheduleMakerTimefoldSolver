@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
 
-const ROLES = ['ADMIN', 'WRITER', 'READER', 'TEACHER'];
+const ROLES = ['ADMIN', 'SCHEDULER', 'WRITER', 'READER', 'TEACHER'];
 // Each language's own native name, shown regardless of the current UI language
 // (the conventional pattern for language pickers).
 const LANGUAGES = [

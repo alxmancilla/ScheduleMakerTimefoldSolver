@@ -741,7 +741,7 @@
     "saveFailedPrefix": "Failed to save user: ",
     "deleteFailedPrefix": "Failed to delete user: ",
     "confirmDelete": "Delete user \"{{username}}\"?",
-    "description": "Admin-only. Manages who can sign in and with which role (ADMIN, WRITER, READER). You can't delete your own account, and the last remaining enabled ADMIN can't be deleted, demoted, or disabled.",
+    "description": "Admin-only. Manages who can sign in and with which role (ADMIN, SCHEDULER, WRITER, READER, TEACHER). You can't delete your own account, and the last remaining enabled ADMIN can't be deleted, demoted, or disabled.",
     "fields": {
       "username": "Username:",
       "password": "Password:",
