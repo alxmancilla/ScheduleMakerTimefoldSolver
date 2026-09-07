@@ -84,6 +84,10 @@ README).
   clicked — previously only visible by downloading the PDF report. Narrowed from
   READER-visible to `SCHEDULER`/`ADMIN` on 2026-09-07 (not shown to `WRITER`, `READER`, or
   `TEACHER` at all - the panel doesn't render and the underlying fetch doesn't fire for them).
+  A Show: All/Hard only/Soft only filter (added 2026-09-07) controls both the panel's own
+  sections and the grid's card badges/borders - purely a display filter over already-fetched
+  data, not a change to how a constraint's severity is configured (that's the separate
+  Constraint Weights mechanism, see below).
 - **My Schedule** (`TEACHER` role): the same grid (read-only, no editing toggle), scoped
   server-side to the logged-in teacher via `GET /api/schedule/view/me`.
 
