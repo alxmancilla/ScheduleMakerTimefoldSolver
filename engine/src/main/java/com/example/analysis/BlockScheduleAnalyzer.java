@@ -230,8 +230,8 @@ public final class BlockScheduleAnalyzer {
      * Analyze hard constraint violations with detailed descriptions.
      * Returns a map of constraint name to list of violation descriptions.
      */
-    public static Map<String, List<String>> analyzeHardConstraintViolationsDetailed(SchoolSchedule schedule) {
-        Map<String, List<String>> details = new LinkedHashMap<>();
+    public static Map<String, List<ViolationInstance>> analyzeHardConstraintViolationsDetailed(SchoolSchedule schedule) {
+        Map<String, List<ViolationInstance>> details = new LinkedHashMap<>();
 
         if (schedule.getCourseBlockAssignments() == null) {
             return details;
@@ -240,37 +240,37 @@ public final class BlockScheduleAnalyzer {
         List<CourseBlockAssignment> list = schedule.getCourseBlockAssignments();
 
         // Block length must match timeslot length (CRITICAL)
-        List<String> blockLengthMismatch = new ArrayList<>();
+        List<ViolationInstance> blockLengthMismatch = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (a.getTimeslot() != null && a.getBlockLength() != a.getTimeslot().getLengthHours()) {
-                blockLengthMismatch.add(blockAssignmentToString(a) +
+                blockLengthMismatch.add(ViolationInstance.of(blockAssignmentToString(a) +
                         " (block_length=" + a.getBlockLength() + "h, timeslot_length=" +
-                        a.getTimeslot().getLengthHours() + "h)");
+                        a.getTimeslot().getLengthHours() + "h)", a.getId()));
             }
         }
         details.put("Block length must match timeslot length", blockLengthMismatch);
 
         // Teacher must be qualified
-        List<String> unqualified = new ArrayList<>();
+        List<ViolationInstance> unqualified = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (a.getTeacher() != null && !a.getTeacher().isQualifiedFor(a.getCourse().getName())) {
-                unqualified.add(blockAssignmentToString(a));
+                unqualified.add(ViolationInstance.of(blockAssignmentToString(a), a.getId()));
             }
         }
         details.put("Teacher must be qualified", unqualified);
 
         // Teacher must be available for entire block
-        List<String> unavailable = new ArrayList<>();
+        List<ViolationInstance> unavailable = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getTeacher() != null && a.getTimeslot() != null
                     && !a.getTeacher().isAvailableForBlock(a.getTimeslot())) {
-                unavailable.add(blockAssignmentToString(a));
+                unavailable.add(ViolationInstance.of(blockAssignmentToString(a), a.getId()));
             }
         }
         details.put("Teacher must be available for entire block", unavailable);
 
         // No teacher double-booking
-        List<String> teacherDouble = new ArrayList<>();
+        List<ViolationInstance> teacherDouble = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
@@ -281,14 +281,16 @@ public final class BlockScheduleAnalyzer {
                         && a1.getTeacher() != null && a1.getTeacher().equals(a2.getTeacher())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
-                    teacherDouble.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
+                    teacherDouble.add(ViolationInstance.of(
+                            blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2),
+                            a1.getId(), a2.getId()));
                 }
             }
         }
         details.put("No teacher double-booking", teacherDouble);
 
         // No room double-booking
-        List<String> roomDouble = new ArrayList<>();
+        List<ViolationInstance> roomDouble = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
@@ -299,50 +301,55 @@ public final class BlockScheduleAnalyzer {
                         && a1.getRoom() != null && a1.getRoom().equals(a2.getRoom())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
-                    roomDouble.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
+                    roomDouble.add(ViolationInstance.of(
+                            blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2),
+                            a1.getId(), a2.getId()));
                 }
             }
         }
         details.put("No room double-booking", roomDouble);
 
         // Room type must satisfy course requirement (uses dual room requirements)
-        List<String> roomTypeMismatch = new ArrayList<>();
+        List<ViolationInstance> roomTypeMismatch = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null && a.getSatisfiesRoomType() != null
                     && !a.getRoom().satisfiesRequirement(a.getSatisfiesRoomType())) {
-                roomTypeMismatch.add(
+                roomTypeMismatch.add(ViolationInstance.of(
                         blockAssignmentToString(a) + " (satisfiesRoomType=" + a.getSatisfiesRoomType()
-                                + ", assignedRoomType=" + a.getRoom().getType() + ")");
+                                + ", assignedRoomType=" + a.getRoom().getType() + ")",
+                        a.getId()));
             }
         }
         details.put("Room type must satisfy course requirement", roomTypeMismatch);
 
         // Teacher's required room must be used - NOT excluded for pinned
         // assignments, see the count version above for why.
-        List<String> teacherRequiredRoomMismatch = new ArrayList<>();
+        List<ViolationInstance> teacherRequiredRoomMismatch = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (a.isTeacherRequiredRoomApplicable() && a.getRoom() != null
                     && !a.getTeacher().getRequiredRoomName().equals(a.getRoom().getName())) {
-                teacherRequiredRoomMismatch.add(
+                teacherRequiredRoomMismatch.add(ViolationInstance.of(
                         blockAssignmentToString(a) + " (requiredRoom=" + a.getTeacher().getRequiredRoomName()
-                                + ", assignedRoom=" + a.getRoom().getName() + ")");
+                                + ", assignedRoom=" + a.getRoom().getName() + ")",
+                        a.getId()));
             }
         }
         details.put("Teacher's required room must be used", teacherRequiredRoomMismatch);
 
         // Semester hour limits must be respected (hard) - NOT excluded for
         // pinned assignments, see the count version above for why.
-        List<String> semesterHourLimitHard = new ArrayList<>();
+        List<ViolationInstance> semesterHourLimitHard = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (BlockScheduleMath.violatesHardSemesterHourLimit(a)) {
-                semesterHourLimitHard.add(blockAssignmentToString(a) +
-                        String.format(" (limit=%d:00, severity=HARD)", a.getCourse().getLatestEndHour()));
+                semesterHourLimitHard.add(ViolationInstance.of(blockAssignmentToString(a) +
+                        String.format(" (limit=%d:00, severity=HARD)", a.getCourse().getLatestEndHour()),
+                        a.getId()));
             }
         }
         details.put("Semester hour limits must be respected (hard)", semesterHourLimitHard);
 
         // Group cannot have two courses at same time
-        List<String> groupConflict = new ArrayList<>();
+        List<ViolationInstance> groupConflict = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
@@ -353,7 +360,9 @@ public final class BlockScheduleAnalyzer {
                         && a1.getGroup().equals(a2.getGroup())
                         && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && BlockScheduleMath.blocksOverlap(a1.getTimeslot(), a2.getTimeslot())) {
-                    groupConflict.add(blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
+                    groupConflict.add(ViolationInstance.of(
+                            blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2),
+                            a1.getId(), a2.getId()));
                 }
             }
         }
@@ -362,7 +371,9 @@ public final class BlockScheduleAnalyzer {
         // Maximum blocks per course per group per day (HARD) - Detailed
         // Limit is per-component via component_block_rule, falling back to
         // DEFAULT_MAX_BLOCKS_PER_DAY when a component has no configured rule.
-        List<String> maxTwoBlocksDetails = new ArrayList<>();
+        // Every block in the offending day's chain gets its id attached, not
+        // just the first one - any of them could be the one moved to fix it.
+        List<ViolationInstance> maxTwoBlocksDetails = new ArrayList<>();
         Map<String, Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>>> groupCourseDayAssignments2 = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getGroup() != null && a.getCourse() != null && a.getTimeslot() != null) {
@@ -390,7 +401,11 @@ public final class BlockScheduleAnalyzer {
                             String dayName = formatDay(dayEntry.getKey());
                             String reason = String.format("(%s has %d blocks on %s, limit=%d)",
                                     groupName, count, dayName, limit);
-                            maxTwoBlocksDetails.add(courseName + " " + reason);
+                            List<String> ids = new ArrayList<>();
+                            for (CourseBlockAssignment a : assignments) {
+                                ids.add(a.getId());
+                            }
+                            maxTwoBlocksDetails.add(new ViolationInstance(ids, courseName + " " + reason));
                         }
                     }
                 }
@@ -399,7 +414,7 @@ public final class BlockScheduleAnalyzer {
         details.put("Maximum blocks per course per group per day", maxTwoBlocksDetails);
 
         // Course blocks must be consecutive (HARD) - Detailed
-        List<String> courseBlocksNonConsecutiveDetails = new ArrayList<>();
+        List<ViolationInstance> courseBlocksNonConsecutiveDetails = new ArrayList<>();
         for (int i = 0; i < list.size(); i++) {
             for (int j = i + 1; j < list.size(); j++) {
                 CourseBlockAssignment a1 = list.get(i);
@@ -419,8 +434,9 @@ public final class BlockScheduleAnalyzer {
 
                     boolean areConsecutive = (end1 == start2 || end2 == start1);
                     if (!areConsecutive) {
-                        courseBlocksNonConsecutiveDetails.add(
-                                blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2));
+                        courseBlocksNonConsecutiveDetails.add(ViolationInstance.of(
+                                blockAssignmentToString(a1) + "  <->  " + blockAssignmentToString(a2),
+                                a1.getId(), a2.getId()));
                     }
                 }
             }
@@ -438,8 +454,8 @@ public final class BlockScheduleAnalyzer {
      * Analyze soft constraint violations with detailed descriptions.
      * Returns a map of constraint name to list of violation descriptions.
      */
-    public static Map<String, List<String>> analyzeSoftConstraintViolationsDetailed(SchoolSchedule schedule) {
-        Map<String, List<String>> details = new LinkedHashMap<>();
+    public static Map<String, List<ViolationInstance>> analyzeSoftConstraintViolationsDetailed(SchoolSchedule schedule) {
+        Map<String, List<ViolationInstance>> details = new LinkedHashMap<>();
 
         if (schedule.getCourseBlockAssignments() == null) {
             return details;
@@ -450,14 +466,15 @@ public final class BlockScheduleAnalyzer {
         // Prefer group's preferred room (SOFT, weight 2) - mirrors
         // SchoolConstraintProvider.groupPreferredRoomConstraint / the count
         // version above.
-        List<String> preferredRoomDetails = new ArrayList<>();
+        List<ViolationInstance> preferredRoomDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
                 var acceptableRooms = a.getGroup().getAcceptableRooms(a.getSatisfiesRoomType());
                 if (acceptableRooms != null && !acceptableRooms.contains(a.getRoom())) {
-                    preferredRoomDetails.add(blockAssignmentToString(a)
+                    preferredRoomDetails.add(ViolationInstance.of(blockAssignmentToString(a)
                             + String.format(" (assigned=%s, not in group's curated range for %s)",
-                                    a.getRoom().getName(), a.getSatisfiesRoomType()));
+                                    a.getRoom().getName(), a.getSatisfiesRoomType()),
+                            a.getId()));
                 }
             }
         }
@@ -465,29 +482,35 @@ public final class BlockScheduleAnalyzer {
 
         // Room capacity should fit group size (SOFT, weight 4) - mirrors the
         // count version above (pinned assignments NOT excluded here either).
-        List<String> roomCapacityDetails = new ArrayList<>();
+        List<ViolationInstance> roomCapacityDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (a.getRoom() != null && a.getGroup() != null) {
                 Integer capacity = a.getRoom().getCapacity();
                 Integer studentCount = a.getGroup().getStudentCount();
                 if (capacity != null && studentCount != null && studentCount > capacity) {
-                    roomCapacityDetails.add(blockAssignmentToString(a)
+                    roomCapacityDetails.add(ViolationInstance.of(blockAssignmentToString(a)
                             + String.format(" (room capacity=%d, group size=%d, over by %d)",
-                                    capacity, studentCount, studentCount - capacity));
+                                    capacity, studentCount, studentCount - capacity),
+                            a.getId()));
                 }
             }
         }
         details.put("Room capacity should fit group size", roomCapacityDetails);
 
-        // Teacher max hours per week
-        List<String> teacherMaxExcess = new ArrayList<>();
+        // Teacher max hours per week - an aggregate across ALL of one
+        // teacher's blocks, not a single instance, so every one of that
+        // teacher's block ids is attached - any of them could be the one
+        // moved to bring the total back under the limit.
+        List<ViolationInstance> teacherMaxExcess = new ArrayList<>();
         Map<String, Integer> teacherHours = new HashMap<>();
         Map<String, Teacher> teacherMap = new HashMap<>();
+        Map<String, List<String>> teacherAssignmentIds = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (a.getTeacher() != null && a.getTimeslot() != null) {
                 String teacherId = a.getTeacher().getId();
                 teacherHours.put(teacherId, teacherHours.getOrDefault(teacherId, 0) + a.getBlockLength());
                 teacherMap.put(teacherId, a.getTeacher());
+                teacherAssignmentIds.computeIfAbsent(teacherId, k -> new ArrayList<>()).add(a.getId());
             }
         }
         for (Map.Entry<String, Integer> entry : teacherHours.entrySet()) {
@@ -496,8 +519,9 @@ public final class BlockScheduleAnalyzer {
             Teacher teacher = teacherMap.get(teacherId);
             if (teacher != null && totalHours > teacher.getMaxHoursPerWeek()) {
                 int excess = totalHours - teacher.getMaxHoursPerWeek();
-                teacherMaxExcess.add(String.format("%s: assigned=%d hours, max=%d hours, excess=%d hours",
-                        teacher.getName(), totalHours, teacher.getMaxHoursPerWeek(), excess));
+                teacherMaxExcess.add(new ViolationInstance(teacherAssignmentIds.get(teacherId),
+                        String.format("%s: assigned=%d hours, max=%d hours, excess=%d hours",
+                                teacher.getName(), totalHours, teacher.getMaxHoursPerWeek(), excess)));
             }
         }
         details.put("Teacher exceeds max hours per week", teacherMaxExcess);
@@ -506,7 +530,7 @@ public final class BlockScheduleAnalyzer {
         // mirrors the count version above: same per-day grouping and
         // BlockScheduleMath.availableGapHours() call, one description per
         // adjacent pair with a nonzero available gap.
-        List<String> teacherIdleGapDetails = new ArrayList<>();
+        List<ViolationInstance> teacherIdleGapDetails = new ArrayList<>();
         Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> teacherDayForIdleGapDetails = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (a.getTeacher() == null || a.getTimeslot() == null) {
@@ -524,8 +548,10 @@ public final class BlockScheduleAnalyzer {
                     CourseBlockAssignment curr = assigns.get(i);
                     int gap = BlockScheduleMath.availableGapHours(prev, curr);
                     if (gap > 0) {
-                        teacherIdleGapDetails.add(blockAssignmentToString(prev) + "  <->  "
-                                + blockAssignmentToString(curr) + String.format(" (available idle gap=%d hours)", gap));
+                        teacherIdleGapDetails.add(ViolationInstance.of(
+                                blockAssignmentToString(prev) + "  <->  "
+                                        + blockAssignmentToString(curr) + String.format(" (available idle gap=%d hours)", gap),
+                                prev.getId(), curr.getId()));
                     }
                 }
             }
@@ -536,7 +562,7 @@ public final class BlockScheduleAnalyzer {
         // mirrors the count version above, but reports the specific block
         // that is each (group, day)'s earliest semester-1 one, rather than
         // just the aggregate deviation.
-        List<String> semesterOneStartEarlyDetails = new ArrayList<>();
+        List<ViolationInstance> semesterOneStartEarlyDetails = new ArrayList<>();
         Map<String, Map<DayOfWeek, CourseBlockAssignment>> earliestSemesterOneBlockByGroupDay = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (a.isPinned() || a.getGroup() == null || a.getCourse() == null || a.getTimeslot() == null
@@ -554,9 +580,10 @@ public final class BlockScheduleAnalyzer {
             for (CourseBlockAssignment earliest : byDay.values()) {
                 int startHour = earliest.getTimeslot().getStartHour();
                 if (startHour > BlockScheduleMath.EARLIEST_START_HOUR) {
-                    semesterOneStartEarlyDetails.add(blockAssignmentToString(earliest)
+                    semesterOneStartEarlyDetails.add(ViolationInstance.of(blockAssignmentToString(earliest)
                             + String.format(" (earliest semester-1 block that day starts at %d:00, should start by %d:00)",
-                                    startHour, BlockScheduleMath.EARLIEST_START_HOUR));
+                                    startHour, BlockScheduleMath.EARLIEST_START_HOUR),
+                            earliest.getId()));
                 }
             }
         }
@@ -565,7 +592,7 @@ public final class BlockScheduleAnalyzer {
         // Minimize first-semester group idle gaps (SOFT, weight 6) - mirrors
         // the count version above: same full-day adjacency (any semester
         // breaks it), only sums when BOTH framing blocks are semester-1.
-        List<String> semesterOneIdleGapDetails = new ArrayList<>();
+        List<ViolationInstance> semesterOneIdleGapDetails = new ArrayList<>();
         Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> fullDayForSemesterOneGapDetails = new HashMap<>();
         for (CourseBlockAssignment a : list) {
             if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null) {
@@ -584,8 +611,10 @@ public final class BlockScheduleAnalyzer {
                     if (isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
                         int gap = BlockScheduleMath.gapHours(prev, curr);
                         if (gap > 0) {
-                            semesterOneIdleGapDetails.add(blockAssignmentToString(prev) + "  <->  "
-                                    + blockAssignmentToString(curr) + String.format(" (gap=%d hours)", gap));
+                            semesterOneIdleGapDetails.add(ViolationInstance.of(
+                                    blockAssignmentToString(prev) + "  <->  "
+                                            + blockAssignmentToString(curr) + String.format(" (gap=%d hours)", gap),
+                                    prev.getId(), curr.getId()));
                         }
                     }
                 }
@@ -595,14 +624,15 @@ public final class BlockScheduleAnalyzer {
 
         // Semester hour limits should be respected (soft) - mirrors the count
         // version above / SchoolConstraintProvider.preferSemesterHourLimits.
-        List<String> semesterHourLimitSoftDetails = new ArrayList<>();
+        List<ViolationInstance> semesterHourLimitSoftDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned()) {
                 int excess = BlockScheduleMath.softSemesterHourLimitExcess(a);
                 if (excess > 0) {
-                    semesterHourLimitSoftDetails.add(blockAssignmentToString(a)
+                    semesterHourLimitSoftDetails.add(ViolationInstance.of(blockAssignmentToString(a)
                             + String.format(" (%d hour(s) past semester %d's soft limit)", excess,
-                                    a.getCourse().getSemester()));
+                                    a.getCourse().getSemester()),
+                            a.getId()));
                 }
             }
         }
@@ -640,7 +670,7 @@ public final class BlockScheduleAnalyzer {
         // details.put("Minimize group idle gaps", groupIdleGapsDetails);
 
         // Prefer block's specified room (SOFT) - Detailed
-        List<String> blockSpecifiedRoomDetails = new ArrayList<>();
+        List<ViolationInstance> blockSpecifiedRoomDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null) {
                 String preferredRoomHint = a.getPreferredRoomHint();
@@ -648,7 +678,8 @@ public final class BlockScheduleAnalyzer {
                     if (!preferredRoomHint.equals(a.getRoom().getName())) {
                         String reason = String.format("(preferred=%s, assigned=%s)",
                                 preferredRoomHint, a.getRoom().getName());
-                        blockSpecifiedRoomDetails.add(blockAssignmentToString(a) + " " + reason);
+                        blockSpecifiedRoomDetails.add(ViolationInstance.of(
+                                blockAssignmentToString(a) + " " + reason, a.getId()));
                     }
                 }
             }
@@ -657,7 +688,7 @@ public final class BlockScheduleAnalyzer {
 
         // Non-standard rooms should finish by 2pm (SOFT, weight 10) - Detailed
         // Mirrors the solver: excludes pinned assignments (fixed from database).
-        List<String> nonStandardAfter2pmDetails = new ArrayList<>();
+        List<ViolationInstance> nonStandardAfter2pmDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
             if (!a.isPinned() && a.getRoom() != null && a.getTimeslot() != null) {
                 String roomType = a.getRoom().getType();
@@ -665,8 +696,9 @@ public final class BlockScheduleAnalyzer {
                 if (isNonStandard) {
                     int endHour = a.getTimeslot().getStartHour() + a.getTimeslot().getLengthHours();
                     if (endHour > 14) {
-                        nonStandardAfter2pmDetails.add(blockAssignmentToString(a) +
-                                String.format(" (ends at %d:00, should end by 14:00)", endHour));
+                        nonStandardAfter2pmDetails.add(ViolationInstance.of(blockAssignmentToString(a) +
+                                String.format(" (ends at %d:00, should end by 14:00)", endHour),
+                                a.getId()));
                     }
                 }
             }

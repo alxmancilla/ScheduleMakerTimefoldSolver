@@ -1,6 +1,7 @@
 package com.example.data;
 
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
+import com.example.analysis.ViolationInstance;
 import com.example.domain.*;
 import java.sql.*;
 import java.util.*;
@@ -214,27 +215,55 @@ public class DataSaver {
         if (violationDetails == null) {
             return;
         }
-        String sql = "INSERT INTO schedule_run_violation (schedule_run_id, constraint_name, is_hard, description) "
-                + "VALUES (?, ?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            insertViolationRows(stmt, runId, violationDetails.hard(), true);
-            insertViolationRows(stmt, runId, violationDetails.soft(), false);
-            stmt.executeBatch();
-        }
+        insertViolationRows(conn, runId, violationDetails.hard(), true);
+        insertViolationRows(conn, runId, violationDetails.soft(), false);
     }
 
-    private void insertViolationRows(PreparedStatement stmt, int runId, Map<String, List<String>> details,
+    /**
+     * One row in schedule_run_violation per ViolationInstance, plus one row
+     * in schedule_run_violation_assignment per assignment id it carries (so
+     * the web Schedule view can link a violation back to the specific grid
+     * card(s) it's about). Each violation is its own INSERT (not one big
+     * batch across all of them, like the single-column schedule_run_constraint/
+     * schedule_run_result inserts elsewhere in this class) because its
+     * generated id is needed immediately afterward to insert its own link
+     * rows - correctness over batching efficiency, and violation counts per
+     * run are modest (tens, not thousands).
+     */
+    private void insertViolationRows(Connection conn, int runId, Map<String, List<ViolationInstance>> details,
             boolean isHard) throws SQLException {
         if (details == null) {
             return;
         }
-        for (Map.Entry<String, List<String>> entry : details.entrySet()) {
-            for (String description : entry.getValue()) {
-                stmt.setInt(1, runId);
-                stmt.setString(2, entry.getKey());
-                stmt.setBoolean(3, isHard);
-                stmt.setString(4, description);
-                stmt.addBatch();
+        String violationSql = "INSERT INTO schedule_run_violation (schedule_run_id, constraint_name, is_hard, description) "
+                + "VALUES (?, ?, ?, ?)";
+        String linkSql = "INSERT INTO schedule_run_violation_assignment (violation_id, assignment_id) VALUES (?, ?)";
+        for (Map.Entry<String, List<ViolationInstance>> entry : details.entrySet()) {
+            for (ViolationInstance instance : entry.getValue()) {
+                long violationId;
+                try (PreparedStatement stmt = conn.prepareStatement(violationSql, Statement.RETURN_GENERATED_KEYS)) {
+                    stmt.setInt(1, runId);
+                    stmt.setString(2, entry.getKey());
+                    stmt.setBoolean(3, isHard);
+                    stmt.setString(4, instance.description());
+                    stmt.executeUpdate();
+                    try (ResultSet keys = stmt.getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            throw new SQLException("Failed to obtain generated schedule_run_violation id");
+                        }
+                        violationId = keys.getLong(1);
+                    }
+                }
+                if (!instance.assignmentIds().isEmpty()) {
+                    try (PreparedStatement linkStmt = conn.prepareStatement(linkSql)) {
+                        for (String assignmentId : instance.assignmentIds()) {
+                            linkStmt.setLong(1, violationId);
+                            linkStmt.setString(2, assignmentId);
+                            linkStmt.addBatch();
+                        }
+                        linkStmt.executeBatch();
+                    }
+                }
             }
         }
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getScheduleView, getScheduleRuns, getGroups, listTimeslots, getScheduleViolations } from '../api';
-import { formatHour, buildDayWindows, groupByConstraint } from '../constants';
+import { formatHour, buildDayWindows, groupByConstraint, buildViolationsByAssignment } from '../constants';
 import { useAuth } from '../auth/AuthContext';
 import { useConfirm } from '../ui/ConfirmContext';
 import ScheduleEntryCard from './ScheduleEntryCard';
@@ -43,6 +43,10 @@ function Schedule() {
   const [violations, setViolations] = useState({ hard: [], soft: [] });
   const [violationsError, setViolationsError] = useState(null);
   const [violationsExpanded, setViolationsExpanded] = useState(false);
+  // Set while a violations-panel description is clicked, so its own card(s)
+  // get an extra highlight ring on top of their usual violation badge - see
+  // highlightAssignments below. Cleared on the next click / run change.
+  const [highlightedAssignmentIds, setHighlightedAssignmentIds] = useState(new Set());
 
   // Persisted at solve time from BlockScheduleAnalyzer's own detailed
   // analysis (see ScheduleRunViolationEntity) - re-fetched whenever the
@@ -63,6 +67,27 @@ function Schedule() {
     } catch (err) {
       setViolationsError(t('schedule.violations.loadFailedPrefix') + err.message);
     }
+  };
+
+  // Clicking a violation description in the panel jumps to and rings the
+  // grid card(s) it's about (assignmentIds - see ScheduleViolationsDTO.Entry
+  // / buildViolationsByAssignment). A card outside the current group/teacher
+  // filter simply won't be found by getElementById - the highlight set still
+  // updates so it applies as soon as the filters bring the card into view.
+  // Every entry actually renders twice - once in the desktop table, once in
+  // the CSS-only-hidden mobile list (see the two ScheduleEntryCard call
+  // sites' idSuffix) - so this picks whichever copy the current breakpoint
+  // is actually showing rather than always scrolling to the (possibly
+  // invisible) desktop one.
+  const highlightAssignments = (assignmentIds) => {
+    if (!assignmentIds || assignmentIds.length === 0) return;
+    setHighlightedAssignmentIds(new Set(assignmentIds));
+    const candidates = [
+      document.getElementById(`schedule-entry-${assignmentIds[0]}`),
+      document.getElementById(`schedule-entry-${assignmentIds[0]}-mobile`),
+    ].filter(Boolean);
+    const target = candidates.find((el) => el.getClientRects().length > 0) || candidates[0];
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const handleToggleEditMode = async (e) => {
@@ -186,6 +211,9 @@ function Schedule() {
   // instead of each claiming their own table cell.
   const dayWindows = DAY_KEYS.map((_, idx) =>
     buildDayWindows(filteredEntries.filter((entry) => entry.dayOfWeek === idx + 1)));
+  // Re-indexed by assignment id so each rendered card can look up its own
+  // violations in O(1) - see buildViolationsByAssignment in constants.js.
+  const violationsByAssignment = buildViolationsByAssignment(violations.hard, violations.soft);
 
   return (
     <div>
@@ -316,7 +344,17 @@ function Schedule() {
                   <div key={group.name} style={{ marginTop: '8px' }}>
                     <div style={{ fontWeight: 'bold' }}>{group.name} ({group.descriptions.length})</div>
                     <ul style={{ margin: '4px 0 0 18px' }}>
-                      {group.descriptions.map((d, i) => <li key={i}>{d}</li>)}
+                      {group.items.map((item, i) => (
+                        <li
+                          key={i}
+                          onClick={item.assignmentIds.length > 0 ? () => highlightAssignments(item.assignmentIds) : undefined}
+                          style={item.assignmentIds.length > 0
+                            ? { cursor: 'pointer', textDecoration: 'underline dotted' } : undefined}
+                          title={item.assignmentIds.length > 0 ? t('schedule.violations.clickToHighlight') : undefined}
+                        >
+                          {item.description}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 ))}
@@ -336,7 +374,17 @@ function Schedule() {
                   <div key={group.name} style={{ marginTop: '8px' }}>
                     <div style={{ fontWeight: 'bold' }}>{group.name} ({group.descriptions.length})</div>
                     <ul style={{ margin: '4px 0 0 18px' }}>
-                      {group.descriptions.map((d, i) => <li key={i}>{d}</li>)}
+                      {group.items.map((item, i) => (
+                        <li
+                          key={i}
+                          onClick={item.assignmentIds.length > 0 ? () => highlightAssignments(item.assignmentIds) : undefined}
+                          style={item.assignmentIds.length > 0
+                            ? { cursor: 'pointer', textDecoration: 'underline dotted' } : undefined}
+                          title={item.assignmentIds.length > 0 ? t('schedule.violations.clickToHighlight') : undefined}
+                        >
+                          {item.description}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 ))}
@@ -397,6 +445,8 @@ function Schedule() {
                           hasConflict={hasConflict}
                           fillHeight={!hasConflict}
                           onClick={canEditGrid ? () => setEditingEntry(entry) : null}
+                          violationInfo={violationsByAssignment.get(entry.id)}
+                          highlighted={highlightedAssignmentIds.has(entry.id)}
                         />
                       ))}
                     </td>
@@ -434,6 +484,9 @@ function Schedule() {
                         entry={entry}
                         hasConflict={hasConflict}
                         onClick={canEditGrid ? () => setEditingEntry(entry) : null}
+                        violationInfo={violationsByAssignment.get(entry.id)}
+                        highlighted={highlightedAssignmentIds.has(entry.id)}
+                        idSuffix="-mobile"
                       />
                     ))}
                   </div>

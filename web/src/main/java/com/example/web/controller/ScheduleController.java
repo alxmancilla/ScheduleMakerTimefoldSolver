@@ -32,6 +32,9 @@ public class ScheduleController {
         private ScheduleRunViolationRepository scheduleRunViolationRepository;
 
         @Autowired
+        private ScheduleRunViolationAssignmentRepository scheduleRunViolationAssignmentRepository;
+
+        @Autowired
         private BlockTimeslotRepository timeslotRepository;
 
         @Autowired
@@ -76,8 +79,14 @@ public class ScheduleController {
                 if (effectiveRunId == null) {
                         return new ScheduleViolationsDTO(null, Collections.emptyList());
                 }
-                return new ScheduleViolationsDTO(effectiveRunId,
-                                scheduleRunViolationRepository.findByScheduleRunId(effectiveRunId));
+                List<ScheduleRunViolationEntity> rows = scheduleRunViolationRepository
+                                .findByScheduleRunId(effectiveRunId);
+                List<Long> violationIds = rows.stream().map(ScheduleRunViolationEntity::getId)
+                                .collect(Collectors.toList());
+                List<ScheduleRunViolationAssignmentEntity> assignmentLinks = violationIds.isEmpty()
+                                ? Collections.emptyList()
+                                : scheduleRunViolationAssignmentRepository.findByViolationIdIn(violationIds);
+                return new ScheduleViolationsDTO(effectiveRunId, rows, assignmentLinks);
         }
 
         @GetMapping("/view")

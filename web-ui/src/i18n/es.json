@@ -826,7 +826,9 @@
       "hardHeading": "Incumplimientos de restricciones fuertes",
       "softHeading": "Incumplimientos de restricciones suaves",
       "none": "No hay incumplimientos registrados para esta ejecución.",
-      "loadFailedPrefix": "Error al cargar incumplimientos: "
+      "loadFailedPrefix": "Error al cargar incumplimientos: ",
+      "clickToHighlight": "Haz clic para resaltar el/los bloque(s) afectado(s) en la cuadrícula",
+      "cardBadgeLabel": "{{hard}} incumplimiento(s) fuerte(s), {{soft}} suave(s) para este bloque"
     }
   },
   "mySchedule": {

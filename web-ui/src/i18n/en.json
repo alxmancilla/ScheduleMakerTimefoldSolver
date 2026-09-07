@@ -826,7 +826,9 @@
       "hardHeading": "Hard constraint violations",
       "softHeading": "Soft constraint violations",
       "none": "No violations recorded for this run.",
-      "loadFailedPrefix": "Failed to load violations: "
+      "loadFailedPrefix": "Failed to load violations: ",
+      "clickToHighlight": "Click to highlight the affected block(s) in the grid",
+      "cardBadgeLabel": "{{hard}} hard, {{soft}} soft violation(s) for this block"
     }
   },
   "mySchedule": {

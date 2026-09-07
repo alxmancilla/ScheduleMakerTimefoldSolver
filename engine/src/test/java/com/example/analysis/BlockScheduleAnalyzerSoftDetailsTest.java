@@ -41,7 +41,7 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
         return new SchoolSchedule(teachers, timeslots, rooms, courses, groups, assignments);
     }
 
-    private static Map<String, List<String>> softDetails(SchoolSchedule schedule) {
+    private static Map<String, List<ViolationInstance>> softDetails(SchoolSchedule schedule) {
         return BlockScheduleAnalyzer.analyzeSoftConstraintViolationsDetailed(schedule);
     }
 
@@ -94,7 +94,7 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
         String name = "Room capacity should fit group size";
         assertEquals(1, softCounts(schedule).get(name).intValue());
         assertEquals(1, softDetails(schedule).get(name).size());
-        assertTrue(softDetails(schedule).get(name).get(0).contains("capacity=20"));
+        assertTrue(softDetails(schedule).get(name).get(0).description().contains("capacity=20"));
     }
 
     // ---- Minimize teacher idle gaps (availability-aware) ----
@@ -121,9 +121,9 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
 
         String name = "Minimize teacher idle gaps (availability-aware)";
         assertEquals(2, softCounts(schedule).get(name).intValue()); // hours 8,9 idle
-        List<String> details = softDetails(schedule).get(name);
+        List<ViolationInstance> details = softDetails(schedule).get(name);
         assertEquals(1, details.size()); // one adjacent-pair description
-        assertTrue(details.get(0).contains("available idle gap=2 hours"));
+        assertTrue(details.get(0).description().contains("available idle gap=2 hours"));
     }
 
     // ---- Prefer first-semester blocks to start early ----
@@ -143,9 +143,9 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
 
         String name = "Prefer first-semester blocks to start early";
         assertEquals(2, softCounts(schedule).get(name).intValue()); // 9 - 7 = 2
-        List<String> details = softDetails(schedule).get(name);
+        List<ViolationInstance> details = softDetails(schedule).get(name);
         assertEquals(1, details.size());
-        assertTrue(details.get(0).contains("starts at 9:00"));
+        assertTrue(details.get(0).description().contains("starts at 9:00"));
     }
 
     // ---- Minimize first-semester group idle gaps ----
@@ -167,9 +167,9 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
 
         String name = "Minimize first-semester group idle gaps";
         assertEquals(1, softCounts(schedule).get(name).intValue());
-        List<String> details = softDetails(schedule).get(name);
+        List<ViolationInstance> details = softDetails(schedule).get(name);
         assertEquals(1, details.size());
-        assertTrue(details.get(0).contains("gap=1 hours"));
+        assertTrue(details.get(0).description().contains("gap=1 hours"));
     }
 
     // ---- Semester hour limits should be respected (soft) ----
@@ -191,9 +191,9 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
 
         String name = "Semester hour limits should be respected (soft)";
         assertEquals(1, softCounts(schedule).get(name).intValue());
-        List<String> details = softDetails(schedule).get(name);
+        List<ViolationInstance> details = softDetails(schedule).get(name);
         assertEquals(1, details.size());
-        assertTrue(details.get(0).contains("1 hour(s) past semester 5's soft limit"));
+        assertTrue(details.get(0).description().contains("1 hour(s) past semester 5's soft limit"));
     }
 
     // ---- Full coverage: every active soft constraint has SOME detail entry (a list, even if empty) ----
@@ -202,7 +202,7 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
     public void everyActiveSoftConstraint_hasADetailedEntryInTheMap() {
         SchoolSchedule empty = scheduleOf(List.of(), List.of(), List.of(), List.of(), List.of(),
                 new ArrayList<>());
-        Map<String, List<String>> details = softDetails(empty);
+        Map<String, List<ViolationInstance>> details = softDetails(empty);
         for (String constraintName : softCounts(empty).keySet()) {
             assertTrue("missing detailed entry for: " + constraintName, details.containsKey(constraintName));
         }

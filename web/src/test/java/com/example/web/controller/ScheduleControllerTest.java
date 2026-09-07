@@ -44,6 +44,8 @@ public class ScheduleControllerTest {
     @MockBean
     private ScheduleRunViolationRepository scheduleRunViolationRepository;
     @MockBean
+    private ScheduleRunViolationAssignmentRepository scheduleRunViolationAssignmentRepository;
+    @MockBean
     private BlockTimeslotRepository timeslotRepository;
     @MockBean
     private CourseRepository courseRepository;
@@ -150,6 +152,10 @@ public class ScheduleControllerTest {
         when(scheduleRunViolationRepository.findByScheduleRunId(9)).thenReturn(List.of(
                 new ScheduleRunViolationEntity(1L, 9, "No teacher double-booking", true, "A <-> B"),
                 new ScheduleRunViolationEntity(2L, 9, "Prefer block's specified room", false, "A prefers R1")));
+        when(scheduleRunViolationAssignmentRepository.findByViolationIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                new ScheduleRunViolationAssignmentEntity(1L, "a1"),
+                new ScheduleRunViolationAssignmentEntity(1L, "a2"),
+                new ScheduleRunViolationAssignmentEntity(2L, "a1")));
 
         mockMvc.perform(get("/api/schedule/violations").param("runId", "9"))
                 .andExpect(status().isOk())
@@ -157,8 +163,24 @@ public class ScheduleControllerTest {
                 .andExpect(jsonPath("$.hard", org.hamcrest.Matchers.hasSize(1)))
                 .andExpect(jsonPath("$.hard[0].constraintName").value("No teacher double-booking"))
                 .andExpect(jsonPath("$.hard[0].description").value("A <-> B"))
+                .andExpect(jsonPath("$.hard[0].assignmentIds", org.hamcrest.Matchers.contains("a1", "a2")))
                 .andExpect(jsonPath("$.soft", org.hamcrest.Matchers.hasSize(1)))
-                .andExpect(jsonPath("$.soft[0].constraintName").value("Prefer block's specified room"));
+                .andExpect(jsonPath("$.soft[0].constraintName").value("Prefer block's specified room"))
+                .andExpect(jsonPath("$.soft[0].assignmentIds", org.hamcrest.Matchers.contains("a1")));
+    }
+
+    @Test
+    public void getScheduleViolations_violationWithNoLinkedAssignments_hasEmptyAssignmentIds() throws Exception {
+        // A run predating this feature (added 2026-09-07), or a purely aggregate
+        // violation instance with no assignmentIds recorded, should still resolve
+        // cleanly to an empty list rather than null or an error.
+        when(scheduleRunViolationRepository.findByScheduleRunId(9)).thenReturn(List.of(
+                new ScheduleRunViolationEntity(1L, 9, "No teacher double-booking", true, "A <-> B")));
+        when(scheduleRunViolationAssignmentRepository.findByViolationIdIn(List.of(1L))).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/schedule/violations").param("runId", "9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hard[0].assignmentIds", org.hamcrest.Matchers.hasSize(0)));
     }
 
     @Test

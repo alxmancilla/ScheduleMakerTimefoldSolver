@@ -1027,6 +1027,22 @@ CREATE INDEX IF NOT EXISTS idx_schedule_run_violation_run ON schedule_run_violat
 COMMENT ON TABLE schedule_run_violation IS 'One row per individual hard/soft constraint violation instance for a schedule_run, from BlockScheduleAnalyzer''s own detailed analysis - surfaced in the web Schedule view so admin/writer can see violations without downloading the PDF report.';
 COMMENT ON COLUMN schedule_run_violation.description IS 'The same human-readable offender description BlockScheduleAnalyzer already produces for the console/PDF report (e.g. "Group G1 - Math - Mon 08:00-09:00"), not re-derived.';
 
+-- Which course_block_assignment(s) each violation above is about, so the web
+-- Schedule view can highlight the exact grid card(s) instead of only
+-- listing the violation as free text. assignment_id is a plain label, not a
+-- live FK - same deliberate choice as schedule_run_result.assignment_id.
+CREATE TABLE IF NOT EXISTS schedule_run_violation_assignment (
+    violation_id INTEGER NOT NULL REFERENCES schedule_run_violation(id) ON DELETE CASCADE,
+    assignment_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (violation_id, assignment_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_run_violation_assignment_assignment
+    ON schedule_run_violation_assignment(assignment_id);
+
+COMMENT ON TABLE schedule_run_violation_assignment IS 'Which course_block_assignment(s) each schedule_run_violation row is about - lets the web Schedule view highlight the exact grid card(s) instead of only listing the violation as free text.';
+COMMENT ON COLUMN schedule_run_violation_assignment.assignment_id IS 'The assignment this violation involved, at save time - a plain label, not a live FK (deliberately, like schedule_run_result.assignment_id): deleting or regenerating that course_block_assignment row later must not delete this historical link.';
+
 -- Resolves "the current effective schedule" in one place: pinned rows use
 -- their own (input) block_timeslot_id/room_name; every other row uses the
 -- most recent schedule_run's result for both. Everything that displays or

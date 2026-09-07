@@ -2,6 +2,7 @@ package com.example.reporter;
 
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import com.example.analysis.BlockScheduleAnalyzer;
+import com.example.analysis.ViolationInstance;
 import com.example.data.DataLoader;
 import com.example.domain.SchoolSchedule;
 import com.example.util.PdfReporter;
@@ -87,11 +88,11 @@ public class PdfReportApp {
         System.out.println();
 
         System.out.println("=== Hard Constraint Violations (details) ===");
-        Map<String, List<String>> details = BlockScheduleAnalyzer.analyzeHardConstraintViolationsDetailed(schedule);
+        Map<String, List<ViolationInstance>> details = BlockScheduleAnalyzer.analyzeHardConstraintViolationsDetailed(schedule);
         details.forEach((rule, offenders) -> {
             System.out.println("- " + rule + ": " + offenders.size());
-            for (String desc : offenders) {
-                System.out.println("    " + desc);
+            for (ViolationInstance offender : offenders) {
+                System.out.println("    " + offender.description());
             }
         });
         System.out.println();

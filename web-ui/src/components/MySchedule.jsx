@@ -141,7 +141,7 @@ function MySchedule() {
                           <div className="schedule-conflict-banner">⚠ {t('schedule.conflictLabel')}</div>
                         )}
                         {window.entries.map((entry, eIdx) => (
-                          <ScheduleEntryCard key={eIdx} entry={entry} hasConflict={hasConflict} showTeacher={false} />
+                          <ScheduleEntryCard key={eIdx} entry={entry} hasConflict={hasConflict} showTeacher={false} idSuffix="-mobile" />
                         ))}
                       </div>
                     );

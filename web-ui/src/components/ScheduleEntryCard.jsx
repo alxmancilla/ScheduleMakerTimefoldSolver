@@ -19,25 +19,51 @@ import { formatHour } from '../constants';
  * them. `onClick` is optional - only Schedule.jsx's grid (for a writer
  * viewing the live schedule) passes one, to open the move/pin editor;
  * MySchedule.jsx never does, so a teacher's own read-only view stays inert.
+ * `violationInfo` (optional, only Schedule.jsx passes one - see
+ * buildViolationsByAssignment in constants.js) is this entry's own persisted
+ * hard/soft violations for the currently-viewed run, so the card that's
+ * actually involved gets flagged directly instead of only appearing in the
+ * separate violations list above the grid. `highlighted` (also only
+ * Schedule.jsx) is true right after that same list was clicked to point at
+ * this specific card. `idSuffix` disambiguates the DOM id when the same
+ * entry renders twice (Schedule.jsx's desktop table and its CSS-only-hidden
+ * mobile list both render unconditionally) - without it, both copies would
+ * share one id and getElementById would only ever find the desktop one.
  */
-function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fillHeight = false, onClick = null }) {
+function ScheduleEntryCard({
+  entry, hasConflict = false, showTeacher = true, fillHeight = false, onClick = null,
+  violationInfo = null, highlighted = false, idSuffix = '',
+}) {
   const { t } = useTranslation();
+  const hasHardViolation = (violationInfo?.hardCount ?? 0) > 0;
+  const hasSoftViolation = (violationInfo?.softCount ?? 0) > 0;
   // Derived (color-mix) from the same primary/danger tokens the rest of the
   // app uses, rather than one-off hex - see Teachers.jsx's own
-  // color-mix(...) usage for the established pattern this follows.
-  const borderColor = hasConflict
+  // color-mix(...) usage for the established pattern this follows. A real
+  // conflict (double-booking, computed live from the grid itself) and a
+  // persisted hard violation both read as "hard" severity, so they share the
+  // same solid danger border; a persisted soft-only violation gets the
+  // warning token instead, distinct from the pinned/movable outline below.
+  const borderColor = (hasConflict || hasHardViolation)
     ? 'var(--color-danger)'
-    : entry.pinned
-      ? 'color-mix(in srgb, var(--color-danger) 45%, white)'
-      : 'color-mix(in srgb, var(--color-primary) 45%, white)';
+    : hasSoftViolation
+      ? 'var(--color-warning)'
+      : entry.pinned
+        ? 'color-mix(in srgb, var(--color-danger) 45%, white)'
+        : 'color-mix(in srgb, var(--color-primary) 45%, white)';
+  const violationTooltip = violationInfo
+    ? violationInfo.items.map((v) => `${v.isHard ? '⛔' : '⚠'} ${v.description}`).join('\n')
+    : undefined;
 
   return (
     <div
+      id={`schedule-entry-${entry.id}${idSuffix}`}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick || undefined}
       onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       style={{
+        position: 'relative',
         backgroundColor: entry.pinned ? 'var(--color-danger-bg)' : 'var(--color-info-bg)',
         border: `2px solid ${borderColor}`,
         borderRadius: '4px',
@@ -47,8 +73,25 @@ function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fil
         boxSizing: 'border-box',
         ...(onClick ? { cursor: 'pointer' } : {}),
         ...(fillHeight ? { height: 'calc(100% - 8px)' } : {}),
+        ...(highlighted ? { boxShadow: '0 0 0 3px var(--color-primary)' } : {}),
       }}
     >
+      {(hasHardViolation || hasSoftViolation) && (
+        <span
+          aria-label={t('schedule.violations.cardBadgeLabel', {
+            hard: violationInfo.hardCount, soft: violationInfo.softCount,
+          })}
+          title={violationTooltip}
+          style={{
+            position: 'absolute', top: '-8px', right: '-8px',
+            background: hasHardViolation ? 'var(--color-danger)' : 'var(--color-warning)',
+            color: 'white', borderRadius: '10px', padding: '1px 6px',
+            fontSize: '10px', fontWeight: 'bold', lineHeight: '14px',
+          }}
+        >
+          {hasHardViolation ? '⛔' : '⚠'} {violationInfo.hardCount + violationInfo.softCount}
+        </span>
+      )}
       <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{entry.courseName}</div>
       <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{entry.groupName}</div>
       {showTeacher && <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>{entry.teacherName}</div>}

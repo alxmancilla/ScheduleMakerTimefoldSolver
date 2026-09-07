@@ -11,6 +11,7 @@ import com.example.data.DemoDataGenerator;
 import com.example.domain.SchoolSchedule;
 import com.example.solver.SchoolSolverConfig;
 import com.example.analysis.BlockScheduleAnalyzer;
+import com.example.analysis.ViolationInstance;
 import com.example.validation.PreSolveValidator;
 import com.example.validation.ValidationResult;
 
@@ -172,12 +173,12 @@ public class MainBlockSchedulingApp {
 
         // Print detailed violations
         System.out.println("=== Hard Constraint Violations (details) ===");
-        Map<String, List<String>> details = BlockScheduleAnalyzer
+        Map<String, List<ViolationInstance>> details = BlockScheduleAnalyzer
                 .analyzeHardConstraintViolationsDetailed(solvedSchedule);
         details.forEach((rule, offenders) -> {
             System.out.println("- " + rule + ": " + offenders.size());
-            for (String desc : offenders) {
-                System.out.println("    " + desc);
+            for (ViolationInstance offender : offenders) {
+                System.out.println("    " + offender.description());
             }
         });
         System.out.println();
@@ -193,12 +194,12 @@ public class MainBlockSchedulingApp {
         // counts were; now needed so it can be persisted alongside the hard
         // details below.
         System.out.println("=== Soft Constraint Violations (details) ===");
-        Map<String, List<String>> softDetails = BlockScheduleAnalyzer
+        Map<String, List<ViolationInstance>> softDetails = BlockScheduleAnalyzer
                 .analyzeSoftConstraintViolationsDetailed(solvedSchedule);
         softDetails.forEach((rule, offenders) -> {
             System.out.println("- " + rule + ": " + offenders.size());
-            for (String desc : offenders) {
-                System.out.println("    " + desc);
+            for (ViolationInstance offender : offenders) {
+                System.out.println("    " + offender.description());
             }
         });
         System.out.println();

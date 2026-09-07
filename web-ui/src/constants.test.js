@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatHour, buildDayWindows, groupByConstraint, roomMatchesType, teacherQualifiedFor } from './constants';
+import { formatHour, buildDayWindows, groupByConstraint, buildViolationsByAssignment, roomMatchesType, teacherQualifiedFor } from './constants';
 
 describe('formatHour', () => {
   test('zero-pads a single-digit hour', () => {
@@ -86,7 +86,14 @@ describe('groupByConstraint', () => {
       { constraintName: 'No teacher double-booking', description: 'C <-> D' },
     ]);
     expect(result).toEqual([
-      { name: 'No teacher double-booking', descriptions: ['A <-> B', 'C <-> D'] },
+      {
+        name: 'No teacher double-booking',
+        descriptions: ['A <-> B', 'C <-> D'],
+        items: [
+          { description: 'A <-> B', assignmentIds: [] },
+          { description: 'C <-> D', assignmentIds: [] },
+        ],
+      },
     ]);
   });
 
@@ -101,7 +108,65 @@ describe('groupByConstraint', () => {
 
   test('a constraint with a single instance still becomes a one-element group', () => {
     const result = groupByConstraint([{ constraintName: 'Room capacity', description: 'over by 3' }]);
-    expect(result).toEqual([{ name: 'Room capacity', descriptions: ['over by 3'] }]);
+    expect(result).toEqual([{
+      name: 'Room capacity',
+      descriptions: ['over by 3'],
+      items: [{ description: 'over by 3', assignmentIds: [] }],
+    }]);
+  });
+
+  test('carries each entry\'s own assignmentIds through into items', () => {
+    const result = groupByConstraint([
+      { constraintName: 'No teacher double-booking', description: 'A <-> B', assignmentIds: ['a1', 'a2'] },
+    ]);
+    expect(result[0].items).toEqual([{ description: 'A <-> B', assignmentIds: ['a1', 'a2'] }]);
+  });
+});
+
+describe('buildViolationsByAssignment', () => {
+  test('empty input produces an empty map', () => {
+    expect(buildViolationsByAssignment([], []).size).toBe(0);
+  });
+
+  test('indexes a hard violation under each of its assignmentIds', () => {
+    const map = buildViolationsByAssignment(
+      [{ constraintName: 'No teacher double-booking', description: 'A <-> B', assignmentIds: ['a1', 'a2'] }],
+      [],
+    );
+    expect(map.get('a1')).toEqual({
+      hardCount: 1, softCount: 0,
+      items: [{ constraintName: 'No teacher double-booking', description: 'A <-> B', isHard: true }],
+    });
+    expect(map.get('a2').hardCount).toBe(1);
+  });
+
+  test('indexes a soft violation under softCount, not hardCount', () => {
+    const map = buildViolationsByAssignment(
+      [],
+      [{ constraintName: 'Prefer block\'s specified room', description: 'A prefers R1', assignmentIds: ['a1'] }],
+    );
+    expect(map.get('a1')).toEqual({
+      hardCount: 0, softCount: 1,
+      items: [{ constraintName: 'Prefer block\'s specified room', description: 'A prefers R1', isHard: false }],
+    });
+  });
+
+  test('accumulates multiple violations touching the same assignment', () => {
+    const map = buildViolationsByAssignment(
+      [{ constraintName: 'No teacher double-booking', description: 'A <-> B', assignmentIds: ['a1'] }],
+      [{ constraintName: 'Prefer block\'s specified room', description: 'A prefers R1', assignmentIds: ['a1'] }],
+    );
+    expect(map.get('a1').hardCount).toBe(1);
+    expect(map.get('a1').softCount).toBe(1);
+    expect(map.get('a1').items).toHaveLength(2);
+  });
+
+  test('an assignment with no violations has no entry in the map', () => {
+    const map = buildViolationsByAssignment(
+      [{ constraintName: 'No teacher double-booking', description: 'A <-> B', assignmentIds: ['a1'] }],
+      [],
+    );
+    expect(map.has('a3')).toBe(false);
   });
 });
 

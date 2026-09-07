@@ -78,20 +78,62 @@ export function buildDayWindows(entries) {
  * GET /api/schedule/violations) into one entry per constraint, preserving
  * first-seen order - matching how the console/PDF report already groups the
  * same data by rule, rather than one long undifferentiated list. Used by
- * Schedule.jsx's violations panel.
+ * Schedule.jsx's violations panel. Each entry also keeps its own
+ * assignmentIds (added 2026-09-07, alongside `descriptions` rather than
+ * replacing it, so existing description-only rendering keeps working) so a
+ * single description in the panel can be clicked to highlight the exact
+ * grid card(s) it's about.
  *
- * @param entries [{ constraintName, description }]
- * @returns [{ name, descriptions: [description, ...] }] in first-seen order
+ * @param entries [{ constraintName, description, assignmentIds }]
+ * @returns [{ name, descriptions: [description, ...], items: [{ description, assignmentIds }, ...] }] in first-seen order
  */
 export function groupByConstraint(entries) {
   const order = [];
   const byName = new Map();
-  entries.forEach(({ constraintName, description }) => {
+  entries.forEach(({ constraintName, description, assignmentIds }) => {
     if (!byName.has(constraintName)) {
-      byName.set(constraintName, []);
+      byName.set(constraintName, { descriptions: [], items: [] });
       order.push(constraintName);
     }
-    byName.get(constraintName).push(description);
+    const bucket = byName.get(constraintName);
+    bucket.descriptions.push(description);
+    bucket.items.push({ description, assignmentIds: assignmentIds || [] });
   });
-  return order.map((name) => ({ name, descriptions: byName.get(name) }));
+  return order.map((name) => ({ name, descriptions: byName.get(name).descriptions, items: byName.get(name).items }));
+}
+
+/**
+ * The same flat hard/soft violation lists (GET /api/schedule/violations),
+ * re-indexed by assignment id instead of by constraint - {@code assignmentId
+ * -> { hardCount, softCount, items }} - so Schedule.jsx's grid can flag
+ * exactly which card(s) a persisted violation involves (via each entry's own
+ * assignmentIds - see ScheduleViolationsDTO.Entry) instead of only listing
+ * violations separately from the grid. An assignment with no violations
+ * simply has no entry in the returned map.
+ *
+ * @param hardEntries [{ constraintName, description, assignmentIds }]
+ * @param softEntries [{ constraintName, description, assignmentIds }]
+ * @returns Map<assignmentId, { hardCount, softCount, items: [{ constraintName, description, isHard }] }>
+ */
+export function buildViolationsByAssignment(hardEntries, softEntries) {
+  const map = new Map();
+  const add = (entries, isHard) => {
+    (entries || []).forEach(({ constraintName, description, assignmentIds }) => {
+      (assignmentIds || []).forEach((id) => {
+        if (!map.has(id)) {
+          map.set(id, { hardCount: 0, softCount: 0, items: [] });
+        }
+        const bucket = map.get(id);
+        if (isHard) {
+          bucket.hardCount += 1;
+        } else {
+          bucket.softCount += 1;
+        }
+        bucket.items.push({ constraintName, description, isHard });
+      });
+    });
+  };
+  add(hardEntries, true);
+  add(softEntries, false);
+  return map;
 }
