@@ -833,7 +833,14 @@
       "none": "No hay incumplimientos registrados para esta ejecución.",
       "loadFailedPrefix": "Error al cargar incumplimientos: ",
       "clickToHighlight": "Haz clic para resaltar el/los bloque(s) afectado(s) en la cuadrícula",
-      "cardBadgeLabel": "{{hard}} incumplimiento(s) fuerte(s), {{soft}} suave(s) para este bloque"
+      "cardBadgeLabel": "{{hard}} incumplimiento(s) fuerte(s), {{soft}} suave(s) para este bloque",
+      "noneForFilter": "No hay incumplimientos de esta severidad para esta ejecución.",
+      "severityFilter": {
+        "label": "Mostrar:",
+        "all": "Todos",
+        "hardOnly": "Solo fuertes",
+        "softOnly": "Solo suaves"
+      }
     }
   },
   "mySchedule": {

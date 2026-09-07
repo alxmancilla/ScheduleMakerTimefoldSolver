@@ -45,6 +45,11 @@ function Schedule() {
   const [violations, setViolations] = useState({ hard: [], soft: [] });
   const [violationsError, setViolationsError] = useState(null);
   const [violationsExpanded, setViolationsExpanded] = useState(false);
+  // Which severity to actually display, in both the panel's own sections and
+  // the grid's card badges/borders (see violationsByAssignment below) -
+  // 'all' (default, today's behavior), 'hard', or 'soft'. Plain unpersisted
+  // state, resets every page visit, same convention as editModeEnabled.
+  const [severityFilter, setSeverityFilter] = useState('all');
   // Set while a violations-panel description is clicked, so its own card(s)
   // get an extra highlight ring on top of their usual violation badge - see
   // highlightAssignments below. Cleared on the next click / run change.
@@ -219,7 +224,15 @@ function Schedule() {
     buildDayWindows(filteredEntries.filter((entry) => entry.dayOfWeek === idx + 1)));
   // Re-indexed by assignment id so each rendered card can look up its own
   // violations in O(1) - see buildViolationsByAssignment in constants.js.
-  const violationsByAssignment = buildViolationsByAssignment(violations.hard, violations.soft);
+  // severityFilter controls what actually feeds in here: passing [] for a
+  // filtered-out severity is the whole mechanism - ScheduleEntryCard already
+  // derives its border/badge purely from hardCount/softCount, so a zeroed
+  // count there is all it takes to hide that severity on the grid too,
+  // with no changes needed in ScheduleEntryCard itself.
+  const violationsByAssignment = buildViolationsByAssignment(
+    severityFilter !== 'soft' ? violations.hard : [],
+    severityFilter !== 'hard' ? violations.soft : [],
+  );
 
   return (
     <div>
@@ -327,15 +340,30 @@ function Schedule() {
 
       {canEditSchedule() && (
       <div className="card">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => setViolationsExpanded((v) => !v)}
-        >
-          {violationsExpanded ? '▾' : '▸'} {t('schedule.violations.summary', {
-            hard: violations.hard.length, soft: violations.soft.length,
-          })}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setViolationsExpanded((v) => !v)}
+          >
+            {violationsExpanded ? '▾' : '▸'} {t('schedule.violations.summary', {
+              hard: violations.hard.length, soft: violations.soft.length,
+            })}
+          </button>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+            {t('schedule.violations.severityFilter.label')}
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              style={{ padding: '4px 8px' }}
+            >
+              <option value="all">{t('schedule.violations.severityFilter.all')}</option>
+              <option value="hard">{t('schedule.violations.severityFilter.hardOnly')}</option>
+              <option value="soft">{t('schedule.violations.severityFilter.softOnly')}</option>
+            </select>
+          </label>
+        </div>
 
         {violationsError && <div className="error" role="alert" style={{ marginTop: '10px' }}>{violationsError}</div>}
 
@@ -344,7 +372,13 @@ function Schedule() {
             {violations.hard.length === 0 && violations.soft.length === 0 && !violationsError && (
               <p style={{ color: 'var(--color-text-secondary)' }}>{t('schedule.violations.none')}</p>
             )}
-            {violations.hard.length > 0 && (
+            {severityFilter === 'hard' && violations.hard.length === 0 && violations.soft.length > 0 && (
+              <p style={{ color: 'var(--color-text-secondary)' }}>{t('schedule.violations.noneForFilter')}</p>
+            )}
+            {severityFilter === 'soft' && violations.soft.length === 0 && violations.hard.length > 0 && (
+              <p style={{ color: 'var(--color-text-secondary)' }}>{t('schedule.violations.noneForFilter')}</p>
+            )}
+            {severityFilter !== 'soft' && violations.hard.length > 0 && (
               <div className="error" role="alert" style={{ marginBottom: '12px' }}>
                 <strong>{t('schedule.violations.hardHeading')}</strong>
                 {groupByConstraint(violations.hard).map((group) => (
@@ -367,7 +401,7 @@ function Schedule() {
                 ))}
               </div>
             )}
-            {violations.soft.length > 0 && (
+            {severityFilter !== 'hard' && violations.soft.length > 0 && (
               <div
                 role="status"
                 style={{

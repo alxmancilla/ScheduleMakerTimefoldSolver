@@ -833,7 +833,14 @@
       "none": "No violations recorded for this run.",
       "loadFailedPrefix": "Failed to load violations: ",
       "clickToHighlight": "Click to highlight the affected block(s) in the grid",
-      "cardBadgeLabel": "{{hard}} hard, {{soft}} soft violation(s) for this block"
+      "cardBadgeLabel": "{{hard}} hard, {{soft}} soft violation(s) for this block",
+      "noneForFilter": "No violations of this severity for this run.",
+      "severityFilter": {
+        "label": "Show:",
+        "all": "All",
+        "hardOnly": "Hard only",
+        "softOnly": "Soft only"
+      }
     }
   },
   "mySchedule": {
