@@ -33,7 +33,7 @@
     }
   },
   "nav": {
-    "schedule": "Schedule",
+    "schedule": "Timetable",
     "setup": "Setup",
     "teachers": "Teachers",
     "courses": "Courses",
@@ -52,7 +52,7 @@
     "users": "Users",
     "logout": "Logout",
     "language": "Language",
-    "mySchedule": "My Schedule",
+    "mySchedule": "My Timetable",
     "toggleMenu": "Toggle menu"
   },
   "login": {
@@ -774,7 +774,7 @@
     "passwordResetMessage": "Password reset"
   },
   "schedule": {
-    "title": "Schedule View",
+    "title": "Timetable View",
     "gridView": "Grid View",
     "listView": "List View",
     "run": "Run:",
@@ -844,7 +844,7 @@
     }
   },
   "mySchedule": {
-    "title": "My Schedule",
+    "title": "My Timetable",
     "loading": "Loading your schedule...",
     "loadFailedPrefix": "Failed to load your schedule: ",
     "noTeacherLinked": "Your account isn't linked to a teacher record yet. Ask an admin to link it in Users.",
