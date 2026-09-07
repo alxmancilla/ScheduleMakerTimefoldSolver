@@ -52,18 +52,21 @@ README).
 
 ### Navigation
 
-- Top-level nav ordered by frequency of use: Schedule, Assignments, a "Setup" dropdown
+- Top-level nav ordered by frequency of use: Timetable, Assignments, a "Setup" dropdown
   (Teachers/Courses/Rooms/Groups), a "Tools" dropdown (Reports, Course Coverage, Teacher
   Availability, and — `WRITER`/`SCHEDULER`/`ADMIN` only — Import/Export and Run Validation), a
   "Scheduler" link (`SCHEDULER`/`ADMIN` only — Solver + Constraint Weights, its own page rather
   than nested under Admin), and an Admin dropdown (Settings/Users, `ADMIN` only). Each dropdown
   shows which child page is active even while closed (e.g. "Setup · Rooms"). An `ADMIN` account
-  sees both "Scheduler" and "Admin" side by side, not a merged menu.
+  sees both "Scheduler" and "Admin" side by side, not a merged menu. The nav label reads
+  "Timetable" (renamed 2026-09-07, English only - see below) even though the underlying
+  component/route/API/i18n-key namespace all still say "schedule," to avoid it sitting right
+  next to "Scheduler" as a one-letter, easy-to-mis-click pair.
 - Username, language switcher, and logout are consolidated into a single profile dropdown.
-- `TEACHER` accounts see only "My Schedule" — every other nav item and route is hidden client-
+- `TEACHER` accounts see only "My Timetable" — every other nav item and route is hidden client-
   side and blocked server-side.
 
-### Schedule View
+### Timetable View
 
 - **Grid view**: calendar-style schedule by day and hour, with group/teacher/run filters and
   pinned-assignment highlighting; below a phone-width breakpoint it switches to a stacked
@@ -88,7 +91,7 @@ README).
   sections and the grid's card badges/borders - purely a display filter over already-fetched
   data, not a change to how a constraint's severity is configured (that's the separate
   Constraint Weights mechanism, see below).
-- **My Schedule** (`TEACHER` role): the same grid (read-only, no editing toggle), scoped
+- **My Timetable** (`TEACHER` role): the same grid (read-only, no editing toggle), scoped
   server-side to the logged-in teacher via `GET /api/schedule/view/me`.
 
 ### Entity Management (CRUD, search, pagination)
