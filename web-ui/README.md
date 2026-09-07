@@ -123,6 +123,9 @@ README).
 #### Course Block Assignments
 - Group, course, block length, teacher, timeslot, room, pinned status; filter by All /
   Assigned / Unassigned / Pinned
+- The pinned icon's tooltip shows who pinned it and when (added 2026-09-07) - a person's
+  username, or "pinned automatically by the system" for a block `BlockGenerationService`
+  pinned itself at generation time (see `tryPinExclusiveTeacherBlocks` in the root README)
 
 ### Tools (any authenticated role; Import/Export and Run Validation need `WRITER`/`SCHEDULER`/`ADMIN`)
 

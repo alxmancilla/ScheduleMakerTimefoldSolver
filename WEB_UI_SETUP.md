@@ -309,6 +309,13 @@ teacher with a `requiredRoomName` whose type fits this block's `satisfiesRoomTyp
 is forced to it regardless of what was submitted — matching "this teacher always uses this
 room" even if a different room (e.g. one from the group's curated range) was sent in the request body.
 
+Every response also carries `pinnedAt`/`pinnedBy`/`pinSource` (`"USER"` or `"SYSTEM"`, added
+2026-09-07) — when this row was pinned, by whom (for a `SYSTEM` pin, `null` - no user account
+initiated it), and whether a person pinned it (via any of `POST`/`PUT`/`PUT .../move`) or
+`BlockGenerationService.tryPinExclusiveTeacherBlocks()` did automatically at generation time.
+All three are `null` when the row isn't currently pinned, and are stamped/cleared only on an
+actual pinned transition - editing an already-pinned row's other fields leaves them untouched.
+
 ### Schedule (`/api/schedule`)
 Every `/view*` endpoint below takes an optional `?runId=` — omitted, it reads through
 `course_block_assignment_current` (pinned rows keep their own timeslot, everything else

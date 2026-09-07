@@ -18,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -129,6 +130,7 @@ public class CourseBlockAssignmentControllerTest {
     // ---- POST (create) ----
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_valid_returnsSaved() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -185,6 +187,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_pinnedWithoutRoom_returns400() throws Exception {
         Map<String, Object> body = validPayload();
         body.put("pinned", true);
@@ -195,6 +198,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_pinnedWithRoom_succeeds() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -207,6 +211,22 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void createAssignment_pinned_stampsUserProvenance() throws Exception {
+        when(assignmentRepository.existsById("A1")).thenReturn(false);
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        Map<String, Object> body = validPayload();
+        body.put("pinned", true);
+        body.put("roomName", "AULA 1");
+        mockMvc.perform(post("/api/assignments").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pinSource").value("USER"))
+                .andExpect(jsonPath("$.pinnedBy").value("scheduler_test"))
+                .andExpect(jsonPath("$.pinnedAt").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_teacherHasCompatibleRequiredRoom_overridesSubmittedRoom() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -225,6 +245,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_teacherRequiredRoomIncompatibleType_keepsSubmittedRoom() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -244,6 +265,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_teacherWithoutRequiredRoom_keepsSubmittedRoom() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -259,6 +281,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_withTeacher_syncsGroupCourseDefaultTeacher() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -274,6 +297,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void createAssignment_withoutTeacher_stillSyncsWithNullTeacher() throws Exception {
         when(assignmentRepository.existsById("A1")).thenReturn(false);
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -290,6 +314,7 @@ public class CourseBlockAssignmentControllerTest {
     // ---- PUT (update) ----
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void updateAssignment_valid_returnsUpdated() throws Exception {
         when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -303,6 +328,7 @@ public class CourseBlockAssignmentControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void updateAssignment_withTeacher_syncsGroupCourseDefaultTeacher() throws Exception {
         when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
         when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -316,6 +342,74 @@ public class CourseBlockAssignmentControllerTest {
                 .andExpect(status().isOk());
 
         verify(groupCourseDefaultTeacherSyncService).sync("G1", "C1", "T1");
+    }
+
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void updateAssignment_pinningPreviouslyUnpinned_stampsUserProvenance() throws Exception {
+        // fixture `assignment` starts unpinned (setUp() never sets pinned/pinnedAt/etc).
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("pinned", true);
+        body.put("roomName", "AULA 1");
+        mockMvc.perform(put("/api/assignments/A1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pinSource").value("USER"))
+                .andExpect(jsonPath("$.pinnedBy").value("scheduler_test"))
+                .andExpect(jsonPath("$.pinnedAt").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void updateAssignment_unpinningPreviouslyPinned_clearsProvenance() throws Exception {
+        assignment.setPinned(true);
+        assignment.setRoomName("AULA 1");
+        assignment.setPinnedAt(java.time.LocalDateTime.of(2026, 1, 1, 9, 0));
+        assignment.setPinnedBy("someone_else");
+        assignment.setPinSource("USER");
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("pinned", false);
+        mockMvc.perform(put("/api/assignments/A1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pinSource").doesNotExist())
+                .andExpect(jsonPath("$.pinnedBy").doesNotExist())
+                .andExpect(jsonPath("$.pinnedAt").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void updateAssignment_editingAlreadyPinnedAssignment_leavesProvenanceUntouched() throws Exception {
+        // Changing an unrelated field (blockLength) on a row that's already
+        // pinned must not reset "when was this pinned" - only a genuine
+        // false->true transition should.
+        java.time.LocalDateTime originalPinnedAt = java.time.LocalDateTime.of(2026, 1, 1, 9, 0);
+        assignment.setPinned(true);
+        assignment.setRoomName("AULA 1");
+        assignment.setPinnedAt(originalPinnedAt);
+        assignment.setPinnedBy("original_pinner");
+        assignment.setPinSource("USER");
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> body = validPayload();
+        body.remove("id");
+        body.put("blockLength", 3);
+        body.put("pinned", true);
+        body.put("roomName", "AULA 1");
+        mockMvc.perform(put("/api/assignments/A1").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pinnedBy").value("original_pinner"))
+                .andExpect(jsonPath("$.pinSource").value("USER"));
+        // pinnedAt itself is asserted via the entity, not JSON, to avoid depending
+        // on the exact serialized datetime shape.
+        org.junit.Assert.assertEquals(originalPinnedAt, assignment.getPinnedAt());
     }
 
     @Test
@@ -360,6 +454,7 @@ public class CourseBlockAssignmentControllerTest {
     // ---- PUT /{id}/move ----
 
     @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
     public void moveAssignment_noViolations_savesOnlyBlockTimeslotIdAndPinned() throws Exception {
         when(assignmentMoveValidationService.validate("A1", "TS1", true))
                 .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
@@ -376,6 +471,23 @@ public class CourseBlockAssignmentControllerTest {
                 // touches group/course/room/teacher.
                 .andExpect(jsonPath("$.groupId").value("G1"))
                 .andExpect(jsonPath("$.courseId").value("C1"));
+    }
+
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void moveAssignment_pinningPreviouslyUnpinned_stampsUserProvenance() throws Exception {
+        when(assignmentMoveValidationService.validate("A1", "TS1", true))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(put("/api/assignments/A1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pinSource").value("USER"))
+                .andExpect(jsonPath("$.pinnedBy").value("scheduler_test"))
+                .andExpect(jsonPath("$.pinnedAt").exists());
     }
 
     @Test

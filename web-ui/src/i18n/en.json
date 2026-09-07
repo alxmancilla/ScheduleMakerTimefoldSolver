@@ -371,7 +371,10 @@
       "teacher": "Teacher",
       "schedule": "Schedule",
       "room": "Room",
-      "pinned": "Pinned"
+      "pinned": "Pinned",
+      "pinnedByUser": "Pinned by {{username}} on {{date}}",
+      "pinnedBySystem": "Pinned automatically by the system on {{date}}",
+      "pinnedNoProvenance": "Pinned (before pin history was tracked)"
     },
     "savedMessage": "Assignment saved",
     "deletedMessage": "Assignment deleted",

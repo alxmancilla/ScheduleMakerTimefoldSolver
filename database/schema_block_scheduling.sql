@@ -321,6 +321,9 @@ CREATE TABLE IF NOT EXISTS course_block_assignment (
     block_timeslot_id VARCHAR(50),
     room_name VARCHAR(100),
     pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    pinned_at TIMESTAMP,
+    pinned_by VARCHAR(100),
+    pin_source VARCHAR(10),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_block_assignment_group FOREIGN KEY (group_id) REFERENCES student_group(id) ON DELETE CASCADE,
@@ -330,7 +333,8 @@ CREATE TABLE IF NOT EXISTS course_block_assignment (
     CONSTRAINT fk_block_assignment_room FOREIGN KEY (room_name) REFERENCES room(name) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT check_block_assignment_length CHECK (block_length BETWEEN 1 AND 4),
     CONSTRAINT check_block_assignment_pinned_requires_timeslot CHECK (pinned = FALSE OR block_timeslot_id IS NOT NULL),
-    CONSTRAINT check_block_assignment_pinned_requires_room CHECK (pinned = FALSE OR room_name IS NOT NULL)
+    CONSTRAINT check_block_assignment_pinned_requires_room CHECK (pinned = FALSE OR room_name IS NOT NULL),
+    CONSTRAINT check_block_assignment_pin_source CHECK (pin_source IN ('USER', 'SYSTEM'))
     -- Note: No unique constraint on (group_id, course_id) because a course can have multiple blocks
     -- For example: A 5-hour course might be split into a 3-hour block and a 2-hour block
 );
@@ -355,6 +359,9 @@ COMMENT ON COLUMN course_block_assignment.teacher_id IS 'Assigned teacher (null 
 COMMENT ON COLUMN course_block_assignment.block_timeslot_id IS 'Assigned block timeslot (null until solver assigns)';
 COMMENT ON COLUMN course_block_assignment.room_name IS 'Assigned room (null until solver assigns)';
 COMMENT ON COLUMN course_block_assignment.pinned IS 'If TRUE, Timefold solver must not modify this assignment';
+COMMENT ON COLUMN course_block_assignment.pinned_at IS 'When this row was last pinned (a false->true transition) - NULL if never pinned, or unpinned since. Not a general last-write timestamp; editing other fields on an already-pinned row leaves this untouched.';
+COMMENT ON COLUMN course_block_assignment.pinned_by IS 'Username that performed the pinning write, for pin_source=USER - NULL for pin_source=SYSTEM (no human account initiated it) and NULL when not currently pinned.';
+COMMENT ON COLUMN course_block_assignment.pin_source IS 'USER - pinned through a person''s write (Assignments page, the Timetable grid''s move/pin editor, or a create). SYSTEM - pinned automatically by BlockGenerationService.tryPinExclusiveTeacherBlocks() at block-generation time. NULL when not currently pinned.';
 
 -- ============================================================================
 -- UTILITY VIEW FOR BLOCK SCHEDULE

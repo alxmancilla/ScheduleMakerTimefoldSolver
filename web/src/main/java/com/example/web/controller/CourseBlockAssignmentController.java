@@ -22,12 +22,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -95,8 +98,10 @@ public class CourseBlockAssignmentController {
         }
         CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
+        boolean wasPinned = Boolean.TRUE.equals(assignment.getPinned());
         assignment.setBlockTimeslotId(request.getBlockTimeslotId());
         assignment.setPinned(request.isPinned());
+        stampPinProvenance(assignment, wasPinned, currentUsername());
         return assignmentRepository.save(assignment);
     }
 
@@ -139,7 +144,7 @@ public class CourseBlockAssignmentController {
         }
         CourseBlockAssignmentEntity assignment = new CourseBlockAssignmentEntity();
         assignment.setId(request.getId());
-        applyFields(assignment, request);
+        applyFields(assignment, request, false, currentUsername());
         CourseBlockAssignmentEntity saved = assignmentRepository.save(assignment);
         groupCourseDefaultTeacherSyncService.sync(saved.getGroupId(), saved.getCourseId(), saved.getTeacherId());
         return saved;
@@ -150,7 +155,8 @@ public class CourseBlockAssignmentController {
             @Valid @RequestBody CourseBlockAssignmentDTO request) {
         CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
-        applyFields(assignment, request);
+        boolean wasPinned = Boolean.TRUE.equals(assignment.getPinned());
+        applyFields(assignment, request, wasPinned, currentUsername());
         CourseBlockAssignmentEntity saved = assignmentRepository.save(assignment);
         groupCourseDefaultTeacherSyncService.sync(saved.getGroupId(), saved.getCourseId(), saved.getTeacherId());
         return saved;
@@ -164,7 +170,8 @@ public class CourseBlockAssignmentController {
         return ResponseEntity.noContent().build();
     }
 
-    private void applyFields(CourseBlockAssignmentEntity assignment, CourseBlockAssignmentDTO request) {
+    private void applyFields(CourseBlockAssignmentEntity assignment, CourseBlockAssignmentDTO request,
+            boolean wasPinned, String username) {
         assignment.setGroupId(request.getGroupId());
         assignment.setCourseId(request.getCourseId());
         assignment.setBlockLength(request.getBlockLength());
@@ -180,6 +187,52 @@ public class CourseBlockAssignmentController {
         if (Boolean.TRUE.equals(assignment.getPinned()) && assignment.getRoomName() == null) {
             throw new IllegalArgumentException(
                     "Cannot pin assignment '" + assignment.getId() + "' without a room: pinned blocks must have roomName set.");
+        }
+        stampPinProvenance(assignment, wasPinned, username);
+    }
+
+    /**
+     * Stamps pinnedAt/pinnedBy/pinSource=USER whenever `pinned` flips
+     * false->true through a user-facing write (create, the general update,
+     * or move - see the three call sites), and clears all three back to
+     * null when it flips true->false, since they stop meaning anything once
+     * unpinned. Left untouched when `pinned` doesn't change across the edit
+     * (e.g. changing room while already pinned shouldn't reset "when was
+     * this pinned"). The one pin source this deliberately never covers is
+     * SYSTEM - BlockGenerationService.tryPinExclusiveTeacherBlocks() saves
+     * directly through the repository, never through this controller, and
+     * stamps its own provenance the same way, with no username.
+     */
+    /**
+     * The authenticated caller's username, for pin provenance (pinnedBy).
+     * Read from SecurityContextHolder directly rather than via an injected
+     * Authentication method parameter - Spring MVC's built-in resolver for a
+     * plain Authentication parameter goes through
+     * HttpServletRequest.getUserPrincipal(), which needs the security filter
+     * chain to have actually run to be populated. Reading
+     * SecurityContextHolder directly works identically in production
+     * (SecurityConfig's own chain populates it before any controller runs)
+     * and in a @WebMvcTest slice that stubs authentication via
+     * @WithMockUser without running the filter chain at all (confirmed
+     * live - the parameter-injection approach 500'd with a NullPointerException
+     * in exactly that slice, since CourseBlockAssignmentControllerTest
+     * deliberately disables filters to focus on business-logic assertions).
+     */
+    private String currentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
+    }
+
+    private void stampPinProvenance(CourseBlockAssignmentEntity assignment, boolean wasPinned, String username) {
+        boolean isPinned = Boolean.TRUE.equals(assignment.getPinned());
+        if (!wasPinned && isPinned) {
+            assignment.setPinnedAt(LocalDateTime.now());
+            assignment.setPinnedBy(username);
+            assignment.setPinSource("USER");
+        } else if (wasPinned && !isPinned) {
+            assignment.setPinnedAt(null);
+            assignment.setPinnedBy(null);
+            assignment.setPinSource(null);
         }
     }
 

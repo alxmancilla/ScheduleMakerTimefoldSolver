@@ -291,6 +291,19 @@ function Assignments() {
     return tch ? `${tch.name} ${tch.lastName}` : teacherId;
   };
 
+  // Who/when/how this row was pinned (added 2026-09-07: pinnedAt/pinnedBy/
+  // pinSource on the assignment, stamped server-side - see
+  // CourseBlockAssignmentController.stampPinProvenance). Falls back to a
+  // bare "pinned" label for a row pinned before this existed (all three
+  // fields null even though pinned=true).
+  const pinProvenanceLabel = (assignment) => {
+    if (!assignment.pinnedAt) return t('assignments.table.pinnedNoProvenance');
+    const date = assignment.pinnedAt.replace('T', ' ').split('.')[0];
+    return assignment.pinSource === 'SYSTEM'
+      ? t('assignments.table.pinnedBySystem', { date })
+      : t('assignments.table.pinnedByUser', { username: assignment.pinnedBy, date });
+  };
+
   const filteredAssignments = assignments.filter(a => {
     if (filter === 'assigned' && a.blockTimeslotId == null) return false;
     if (filter === 'unassigned' && a.blockTimeslotId != null) return false;
@@ -610,7 +623,8 @@ function Assignments() {
                 <td>{teacherDisplay(assignment.teacherId)}</td>
                 <td>{timeslotDisplay(assignment.blockTimeslotId)}</td>
                 <td>{assignment.roomName || '-'}</td>
-                <td aria-label={assignment.pinned ? t('common.yes') : t('common.no')}>
+                <td aria-label={assignment.pinned ? pinProvenanceLabel(assignment) : t('common.no')}
+                    title={assignment.pinned ? pinProvenanceLabel(assignment) : undefined}>
                   {assignment.pinned ? <span aria-hidden="true">📌</span> : ''}
                 </td>
                 <td>

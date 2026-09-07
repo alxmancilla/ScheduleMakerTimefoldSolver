@@ -653,6 +653,13 @@ public class BlockGenerationServiceTest {
         assertEquals(Boolean.TRUE, finalState.getPinned());
         assertEquals("TS_MON_7_2", finalState.getBlockTimeslotId());
         assertEquals("ROOM1", finalState.getRoomName());
+        // Pin provenance: this heuristic pins the block itself, with no user
+        // account to attribute it to - contrast a person's own pin via the
+        // Assignments page or the Timetable grid editor (pinSource=USER,
+        // pinnedBy=<username> - see CourseBlockAssignmentControllerTest).
+        assertEquals("SYSTEM", finalState.getPinSource());
+        assertEquals(null, finalState.getPinnedBy());
+        assertTrue(finalState.getPinnedAt() != null);
     }
 
     @Test

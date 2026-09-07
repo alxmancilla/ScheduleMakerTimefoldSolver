@@ -1,6 +1,7 @@
 package com.example.web.service;
 
 import com.example.common.BlockTimingMath;
+import java.time.LocalDateTime;
 import com.example.web.entity.BlockTimeslotEntity;
 import com.example.web.entity.ComponentBlockRuleEntity;
 import com.example.web.entity.CourseBlockAssignmentEntity;
@@ -540,6 +541,13 @@ public class BlockGenerationService {
             CourseBlockAssignmentEntity block = blocks.get(i);
             block.setBlockTimeslotId(resolvedTimeslots.get(i).getId());
             block.setPinned(true);
+            // SYSTEM provenance - this heuristic pins the block itself, with
+            // no user account to attribute it to (contrast the USER-sourced
+            // stamping in CourseBlockAssignmentController for a person's own
+            // pin, via the Assignments page or the Timetable grid editor).
+            block.setPinnedAt(LocalDateTime.now());
+            block.setPinnedBy(null);
+            block.setPinSource("SYSTEM");
             assignmentRepository.save(block);
         }
     }

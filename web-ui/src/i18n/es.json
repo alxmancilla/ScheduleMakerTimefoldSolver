@@ -371,7 +371,10 @@
       "teacher": "Maestro",
       "schedule": "Horario",
       "room": "Aula",
-      "pinned": "Fijada"
+      "pinned": "Fijada",
+      "pinnedByUser": "Fijado por {{username}} el {{date}}",
+      "pinnedBySystem": "Fijado automáticamente por el sistema el {{date}}",
+      "pinnedNoProvenance": "Fijado (antes de registrar el historial de fijación)"
     },
     "savedMessage": "Asignación guardada",
     "deletedMessage": "Asignación eliminada",

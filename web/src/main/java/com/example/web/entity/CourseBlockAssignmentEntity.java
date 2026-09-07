@@ -23,6 +23,18 @@ public class CourseBlockAssignmentEntity {
     @Column(name = "pinned")
     private Boolean pinned = false;
 
+    /** When this row was last pinned (a false->true transition) - null if never pinned, or unpinned since. */
+    @Column(name = "pinned_at")
+    private LocalDateTime pinnedAt;
+
+    /** Username that pinned this row, for pinSource=USER - null for SYSTEM and null when not currently pinned. */
+    @Column(name = "pinned_by", length = 100)
+    private String pinnedBy;
+
+    /** "USER" (a person's write) or "SYSTEM" (BlockGenerationService.tryPinExclusiveTeacherBlocks) - null when not currently pinned. */
+    @Column(name = "pin_source", length = 10)
+    private String pinSource;
+
     @Column(name = "teacher_id", length = 100)
     private String teacherId;
 
@@ -98,6 +110,30 @@ public class CourseBlockAssignmentEntity {
 
     public void setPinned(Boolean pinned) {
         this.pinned = pinned;
+    }
+
+    public LocalDateTime getPinnedAt() {
+        return pinnedAt;
+    }
+
+    public void setPinnedAt(LocalDateTime pinnedAt) {
+        this.pinnedAt = pinnedAt;
+    }
+
+    public String getPinnedBy() {
+        return pinnedBy;
+    }
+
+    public void setPinnedBy(String pinnedBy) {
+        this.pinnedBy = pinnedBy;
+    }
+
+    public String getPinSource() {
+        return pinSource;
+    }
+
+    public void setPinSource(String pinSource) {
+        this.pinSource = pinSource;
     }
 
     public String getTeacherId() {
