@@ -784,7 +784,9 @@ function Courses() {
                   <td>{tpl.preferredRoomName || '-'}</td>
                   <td>{tpl.preferredDay ? t(`common.days.${DAY_KEYS[tpl.preferredDay]}`) : '-'}</td>
                   <td>{timeslotDisplay(tpl.preferredTimeslotId)}</td>
-                  <td>{tpl.pinAssignment ? '📌' : ''}</td>
+                  <td aria-label={tpl.pinAssignment ? t('common.yes') : t('common.no')}>
+                    {tpl.pinAssignment ? <span aria-hidden="true">📌</span> : ''}
+                  </td>
                   <td>
                     <WriteOnly>
                       <button className="btn btn-primary" onClick={() => handleEditTemplate(tpl)} style={{ marginRight: '5px' }}>

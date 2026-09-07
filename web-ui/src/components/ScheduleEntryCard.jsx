@@ -58,7 +58,7 @@ function ScheduleEntryCard({ entry, hasConflict = false, showTeacher = true, fil
       </div>
       {entry.pinned && (
         <div style={{ color: 'var(--color-danger-text)', fontSize: '10px', marginTop: '2px' }}>
-          📌 {t('schedule.pinnedLabel')}
+          <span aria-hidden="true">📌</span> {t('schedule.pinnedLabel')}
         </div>
       )}
     </div>
