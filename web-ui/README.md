@@ -72,10 +72,11 @@ README).
   pinned-assignment highlighting; below a phone-width breakpoint it switches to a stacked
   day-by-day list instead (a table this wide isn't readable scrolled horizontally on a phone).
   (The old flat List view was removed — it duplicated the same data with no filtering/sorting
-  advantage.) A pinned card's 📌 line carries the same who/when/how tooltip as the Assignments
+  advantage.) A pinned card's marker carries the same who/when/how tooltip as the Assignments
   table (added 2026-09-07) — "Pinned by _x_ on _date_", or "pinned automatically by the system"
   for a `BlockGenerationService`-pinned block; blank-of-history for a block pinned before
-  provenance tracking, and absent entirely for a past run's snapshot.
+  provenance tracking, and absent entirely for a past run's snapshot. The marker itself is 🤖
+  for a system pin and 📌 for a person's, so the two read apart without hovering.
 - **Interactive editing** (`SCHEDULER`/`ADMIN`, opt-in): a confirm-protected "Enable schedule
   editing" toggle (off by default, resets every visit) makes each block clickable, opening a
   move/pin editor that validates the candidate change live against hard constraints
@@ -126,9 +127,10 @@ README).
 #### Course Block Assignments
 - Group, course, block length, teacher, timeslot, room, pinned status; filter by All /
   Assigned / Unassigned / Pinned
-- The pinned icon's tooltip shows who pinned it and when (added 2026-09-07) - a person's
-  username, or "pinned automatically by the system" for a block `BlockGenerationService`
-  pinned itself at generation time (see `tryPinExclusiveTeacherBlocks` in the root README)
+- The pinned marker is 🤖 for a system pin, 📌 for a person's; its tooltip shows who pinned it
+  and when (added 2026-09-07) - a person's username, or "pinned automatically by the system"
+  for a block `BlockGenerationService` pinned itself at generation time (see
+  `tryPinExclusiveTeacherBlocks` in the root README)
 
 ### Tools (any authenticated role; Import/Export and Run Validation need `WRITER`/`SCHEDULER`/`ADMIN`)
 

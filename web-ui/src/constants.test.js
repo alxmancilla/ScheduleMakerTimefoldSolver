@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatHour, formatPinProvenance, buildDayWindows, groupByConstraint, buildViolationsByAssignment, roomMatchesType, teacherQualifiedFor } from './constants';
+import { formatHour, formatPinProvenance, pinIcon, buildDayWindows, groupByConstraint, buildViolationsByAssignment, roomMatchesType, teacherQualifiedFor } from './constants';
 
 describe('formatHour', () => {
   test('zero-pads a single-digit hour', () => {
@@ -32,6 +32,18 @@ describe('formatPinProvenance', () => {
 
   test('tolerates a null/undefined row', () => {
     expect(formatPinProvenance(null, t)).toBe('common.pinProvenance.noHistory');
+  });
+});
+
+describe('pinIcon', () => {
+  test('a SYSTEM pin gets the robot marker', () => {
+    expect(pinIcon({ pinSource: 'SYSTEM' })).toBe('🤖');
+  });
+
+  test('a USER pin, a legacy pin (no pinSource), and a null row all get the pushpin', () => {
+    expect(pinIcon({ pinSource: 'USER' })).toBe('📌');
+    expect(pinIcon({ pinned: true })).toBe('📌');
+    expect(pinIcon(null)).toBe('📌');
   });
 });
 

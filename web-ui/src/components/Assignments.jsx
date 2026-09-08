@@ -8,7 +8,7 @@ import {
 import ScheduleEditOnly from '../auth/ScheduleEditOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-import { ROOM_TYPES, formatHour, formatPinProvenance, roomMatchesType, teacherQualifiedFor } from '../constants';
+import { ROOM_TYPES, formatHour, formatPinProvenance, pinIcon, roomMatchesType, teacherQualifiedFor } from '../constants';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const BLOCK_LENGTHS = [1, 2, 3, 4];
@@ -616,7 +616,7 @@ function Assignments() {
                 <td>{assignment.roomName || '-'}</td>
                 <td aria-label={assignment.pinned ? pinProvenanceLabel(assignment) : t('common.no')}
                     title={assignment.pinned ? pinProvenanceLabel(assignment) : undefined}>
-                  {assignment.pinned ? <span aria-hidden="true">📌</span> : ''}
+                  {assignment.pinned ? <span aria-hidden="true">{pinIcon(assignment)}</span> : ''}
                 </td>
                 <td>
                   <ScheduleEditOnly>

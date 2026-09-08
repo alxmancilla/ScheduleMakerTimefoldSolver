@@ -29,6 +29,14 @@ export function formatPinProvenance(row, t) {
     : t('common.pinProvenance.byUser', { username: row.pinnedBy, date });
 }
 
+/**
+ * The pin marker to show at a glance: 🤖 for a block the solver's
+ * block-generation heuristic auto-pinned (pinSource === 'SYSTEM'), 📌 for a
+ * person's pin or one predating provenance tracking. formatPinProvenance
+ * still carries the who/when detail in the tooltip.
+ */
+export const pinIcon = (row) => (row?.pinSource === 'SYSTEM' ? '🤖' : '📌');
+
 // Mirrors Room.satisfiesRequirement() (engine domain model, backed by
 // common/RoomTypeCompatibility.java): a room satisfies a requirement of its
 // own type, and a Mixed room additionally satisfies Standard and
