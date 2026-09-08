@@ -25,6 +25,11 @@
       "friday": "Friday"
     },
     "confirm": "Confirm",
+    "pinProvenance": {
+      "byUser": "Pinned by {{username}} on {{date}}",
+      "bySystem": "Pinned automatically by the system on {{date}}",
+      "noHistory": "Pinned (before pin history was tracked)"
+    },
     "pagination": {
       "showing": "Showing {{start}}-{{end}} of {{total}}",
       "previous": "< Previous",
@@ -371,10 +376,7 @@
       "teacher": "Teacher",
       "schedule": "Schedule",
       "room": "Room",
-      "pinned": "Pinned",
-      "pinnedByUser": "Pinned by {{username}} on {{date}}",
-      "pinnedBySystem": "Pinned automatically by the system on {{date}}",
-      "pinnedNoProvenance": "Pinned (before pin history was tracked)"
+      "pinned": "Pinned"
     },
     "savedMessage": "Assignment saved",
     "deletedMessage": "Assignment deleted",

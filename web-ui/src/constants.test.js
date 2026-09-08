@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { formatHour, buildDayWindows, groupByConstraint, buildViolationsByAssignment, roomMatchesType, teacherQualifiedFor } from './constants';
+import { formatHour, formatPinProvenance, buildDayWindows, groupByConstraint, buildViolationsByAssignment, roomMatchesType, teacherQualifiedFor } from './constants';
 
 describe('formatHour', () => {
   test('zero-pads a single-digit hour', () => {
@@ -8,6 +8,30 @@ describe('formatHour', () => {
 
   test('leaves a two-digit hour as-is', () => {
     expect(formatHour(14)).toBe('14:00');
+  });
+});
+
+describe('formatPinProvenance', () => {
+  // Echo the interpolation so the assertions don't depend on the actual copy.
+  const t = (key, opts) => (opts ? `${key}:${JSON.stringify(opts)}` : key);
+
+  test('a USER pin names the user and the date', () => {
+    expect(formatPinProvenance({ pinnedAt: '2026-09-07T14:18:49.123', pinnedBy: 'scheduler1', pinSource: 'USER' }, t))
+      .toBe('common.pinProvenance.byUser:{"username":"scheduler1","date":"2026-09-07 14:18:49"}');
+  });
+
+  test('a SYSTEM pin uses the system wording with no username', () => {
+    expect(formatPinProvenance({ pinnedAt: '2026-09-07T14:18:49', pinnedBy: null, pinSource: 'SYSTEM' }, t))
+      .toBe('common.pinProvenance.bySystem:{"date":"2026-09-07 14:18:49"}');
+  });
+
+  test('a row pinned before provenance tracking (no pinnedAt) falls back to the no-history label', () => {
+    expect(formatPinProvenance({ pinned: true, pinnedAt: null, pinnedBy: null, pinSource: null }, t))
+      .toBe('common.pinProvenance.noHistory');
+  });
+
+  test('tolerates a null/undefined row', () => {
+    expect(formatPinProvenance(null, t)).toBe('common.pinProvenance.noHistory');
   });
 });
 

@@ -4,6 +4,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Column;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import org.hibernate.annotations.Immutable;
 
 /**
@@ -26,6 +27,14 @@ public class CourseBlockAssignmentCurrentEntity {
     public CourseBlockAssignmentCurrentEntity(String id, String groupId, String courseId, Integer blockLength,
             Boolean pinned, String teacherId, String blockTimeslotId, String roomName, String satisfiesRoomType,
             String preferredRoomHint) {
+        this(id, groupId, courseId, blockLength, pinned, teacherId, blockTimeslotId, roomName, satisfiesRoomType,
+                preferredRoomHint, null, null, null);
+    }
+
+    /** For tests only - the overload that also carries pin provenance. */
+    public CourseBlockAssignmentCurrentEntity(String id, String groupId, String courseId, Integer blockLength,
+            Boolean pinned, String teacherId, String blockTimeslotId, String roomName, String satisfiesRoomType,
+            String preferredRoomHint, LocalDateTime pinnedAt, String pinnedBy, String pinSource) {
         this.id = id;
         this.groupId = groupId;
         this.courseId = courseId;
@@ -36,6 +45,9 @@ public class CourseBlockAssignmentCurrentEntity {
         this.roomName = roomName;
         this.satisfiesRoomType = satisfiesRoomType;
         this.preferredRoomHint = preferredRoomHint;
+        this.pinnedAt = pinnedAt;
+        this.pinnedBy = pinnedBy;
+        this.pinSource = pinSource;
     }
 
     @Id
@@ -53,6 +65,15 @@ public class CourseBlockAssignmentCurrentEntity {
 
     @Column(name = "pinned")
     private Boolean pinned;
+
+    @Column(name = "pinned_at")
+    private LocalDateTime pinnedAt;
+
+    @Column(name = "pinned_by", length = 100)
+    private String pinnedBy;
+
+    @Column(name = "pin_source", length = 10)
+    private String pinSource;
 
     @Column(name = "teacher_id", length = 100)
     private String teacherId;
@@ -87,6 +108,18 @@ public class CourseBlockAssignmentCurrentEntity {
 
     public Boolean getPinned() {
         return pinned;
+    }
+
+    public LocalDateTime getPinnedAt() {
+        return pinnedAt;
+    }
+
+    public String getPinnedBy() {
+        return pinnedBy;
+    }
+
+    public String getPinSource() {
+        return pinSource;
     }
 
     public String getTeacherId() {

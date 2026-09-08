@@ -211,6 +211,9 @@ public class ScheduleController {
                                 entry.setGroupName(group != null ? group.getName() : null);
                                 entry.setGroupId(group != null ? group.getId() : null);
                                 entry.setPinned(assignment.pinned());
+                                entry.setPinnedAt(assignment.pinnedAt());
+                                entry.setPinnedBy(assignment.pinnedBy());
+                                entry.setPinSource(assignment.pinSource());
                                 entry.setCourseId(assignment.courseId());
                                 entry.setSatisfiesRoomType(assignment.satisfiesRoomType());
 
@@ -232,17 +235,27 @@ public class ScheduleController {
          * case, or a specific run's own frozen snapshot otherwise).
          */
         private record ResolvedAssignment(String id, String groupId, String courseId, String teacherId,
-                        String roomName, String blockTimeslotId, Boolean pinned, String satisfiesRoomType) {
+                        String roomName, String blockTimeslotId, Boolean pinned, String satisfiesRoomType,
+                        java.time.LocalDateTime pinnedAt, String pinnedBy, String pinSource) {
 
                 static ResolvedAssignment fromCurrent(CourseBlockAssignmentCurrentEntity a) {
                         return new ResolvedAssignment(a.getId(), a.getGroupId(), a.getCourseId(), a.getTeacherId(),
-                                        a.getRoomName(), a.getBlockTimeslotId(), a.getPinned(), a.getSatisfiesRoomType());
+                                        a.getRoomName(), a.getBlockTimeslotId(), a.getPinned(), a.getSatisfiesRoomType(),
+                                        a.getPinnedAt(), a.getPinnedBy(), a.getPinSource());
                 }
 
+                /**
+                 * A historical run's frozen schedule_run_result snapshot carries no pin
+                 * provenance (the columns are only on the live course_block_assignment /
+                 * its current-view, added 2026-09-07) - a past run shows the pin state it
+                 * had at solve time but not who/when/how, same "no data for older runs"
+                 * fallback as the rest of this feature. Schedule editing is disabled for a
+                 * past run anyway.
+                 */
                 static ResolvedAssignment fromRunResult(ScheduleRunResultEntity r) {
                         return new ResolvedAssignment(r.getAssignmentId(), r.getGroupId(), r.getCourseId(),
                                         r.getTeacherId(), r.getRoomName(), r.getBlockTimeslotId(), r.getPinned(),
-                                        r.getSatisfiesRoomType());
+                                        r.getSatisfiesRoomType(), null, null, null);
                 }
         }
 }

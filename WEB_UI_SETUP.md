@@ -330,6 +330,12 @@ resolves to the most recent solver run); a specific `runId` instead reads that r
 | `GET /schedule/view/teacher/{teacherId}` | `READER`+ | Schedule for one teacher |
 | `GET /schedule/view/room/{roomName}` | `READER`+ | Schedule for one room |
 | `GET /schedule/view/me` | any (incl. `TEACHER`) | The logged-in `TEACHER`'s own schedule, resolved server-side via `app_user.teacher_id` |
+
+Each `/view*` entry also carries `pinnedAt`/`pinnedBy`/`pinSource` (added 2026-09-07) for a
+pinned block — same three fields as the assignments endpoints above, sourced from
+`course_block_assignment_current` (so `null` for a historical `?runId=` snapshot, which predates
+the columns). The Timetable grid card and its move/pin editor show this as a "Pinned by _x_ on
+_date_" / "Pinned automatically by the system on _date_" caption.
 | `GET /schedule/violations` | `SCHEDULER`/`ADMIN` | Persisted hard/soft constraint violations for a run (`schedule_run_violation`, from `BlockScheduleAnalyzer`'s detailed analysis at solve time), pre-split into `{runId, hard, soft}` — each entry `{constraintName, description, assignmentIds}`. `assignmentIds` (added 2026-09-07, from `schedule_run_violation_assignment`) links the violation back to the specific `course_block_assignment` id(s) it's about (one for a single-block check, two for a pairwise check like a double-booking), letting the Schedule grid badge/highlight the exact card(s) instead of only listing the violation separately; empty for a run predating that feature. No `runId` resolves to the most recent run. Narrowed from `READER`+ to `SCHEDULER`/`ADMIN` on 2026-09-07, per explicit request - constraint violations are a scheduling concern, not general domain data every role should see. |
 
 ### Timeslots

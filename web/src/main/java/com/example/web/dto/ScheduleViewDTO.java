@@ -1,5 +1,6 @@
 package com.example.web.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class ScheduleViewDTO {
@@ -20,6 +21,9 @@ public class ScheduleViewDTO {
         private String groupName;
         private String groupId;
         private Boolean pinned;
+        private LocalDateTime pinnedAt;
+        private String pinnedBy;
+        private String pinSource;
         private String courseId;
         private String satisfiesRoomType;
 
@@ -111,6 +115,30 @@ public class ScheduleViewDTO {
 
         public void setPinned(Boolean pinned) {
             this.pinned = pinned;
+        }
+
+        public LocalDateTime getPinnedAt() {
+            return pinnedAt;
+        }
+
+        public void setPinnedAt(LocalDateTime pinnedAt) {
+            this.pinnedAt = pinnedAt;
+        }
+
+        public String getPinnedBy() {
+            return pinnedBy;
+        }
+
+        public void setPinnedBy(String pinnedBy) {
+            this.pinnedBy = pinnedBy;
+        }
+
+        public String getPinSource() {
+            return pinSource;
+        }
+
+        public void setPinSource(String pinSource) {
+            this.pinSource = pinSource;
         }
 
         public String getCourseId() {

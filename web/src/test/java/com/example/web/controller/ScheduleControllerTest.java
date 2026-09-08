@@ -122,6 +122,53 @@ public class ScheduleControllerTest {
     }
 
     @Test
+    public void getScheduleView_carriesPinProvenanceThrough() throws Exception {
+        // The Timetable grid card / move editor show who/when/how a block was
+        // pinned - the fields have to survive the current-view -> ResolvedAssignment
+        // -> ScheduleEntry hop, same as satisfiesRoomType above.
+        CourseBlockAssignmentCurrentEntity a = new CourseBlockAssignmentCurrentEntity(
+                "a1", "G1", "C1", 1, true, null, "TS1", "R1", null, null,
+                LocalDateTime.of(2026, 9, 7, 14, 18, 49), "scheduler1", "USER");
+        when(assignmentCurrentRepository.findAll()).thenReturn(List.of(a));
+        when(timeslotRepository.findAll()).thenReturn(List.of(timeslot("TS1")));
+        when(courseRepository.findAll()).thenReturn(List.of(course("C1", "Math")));
+        when(teacherRepository.findAll()).thenReturn(List.of());
+        when(roomRepository.findAll()).thenReturn(List.of());
+        when(groupRepository.findAll()).thenReturn(List.of());
+        when(assignmentRepository.findUnassignedBlocks()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/schedule/view"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].pinned").value(true))
+                .andExpect(jsonPath("$.entries[0].pinnedBy").value("scheduler1"))
+                .andExpect(jsonPath("$.entries[0].pinSource").value("USER"))
+                .andExpect(jsonPath("$.entries[0].pinnedAt").value("2026-09-07T14:18:49"));
+    }
+
+    @Test
+    public void getScheduleView_withRunId_hasNoPinProvenance() throws Exception {
+        // A historical run's frozen snapshot never carried provenance - it
+        // resolves to null here, not an error (same "no data for older runs"
+        // fallback as the rest of the feature).
+        ScheduleRunResultEntity snapshot = new ScheduleRunResultEntity(
+                5, "a1", "TS1", "G1", "C1", 1, true, "T1", "R1", null, null);
+        when(scheduleRunResultRepository.findByScheduleRunId(5)).thenReturn(List.of(snapshot));
+        when(timeslotRepository.findAll()).thenReturn(List.of(timeslot("TS1")));
+        when(courseRepository.findAll()).thenReturn(List.of(course("C1", "Math")));
+        when(teacherRepository.findAll()).thenReturn(List.of(new TeacherEntity("T1", "A", "B", 40)));
+        when(roomRepository.findAll()).thenReturn(List.of());
+        when(groupRepository.findAll()).thenReturn(List.of());
+        when(assignmentRepository.findUnassignedBlocks()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/schedule/view").param("runId", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[0].pinned").value(true))
+                .andExpect(jsonPath("$.entries[0].pinnedAt").doesNotExist())
+                .andExpect(jsonPath("$.entries[0].pinnedBy").doesNotExist())
+                .andExpect(jsonPath("$.entries[0].pinSource").doesNotExist());
+    }
+
+    @Test
     public void getScheduleView_withRunId_readsFrozenSnapshotNotLiveTable() throws Exception {
         // Run 5's snapshot says teacher T-OLD taught this block - even though the
         // live course_block_assignment table (never consulted for this path) might

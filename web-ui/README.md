@@ -72,7 +72,10 @@ README).
   pinned-assignment highlighting; below a phone-width breakpoint it switches to a stacked
   day-by-day list instead (a table this wide isn't readable scrolled horizontally on a phone).
   (The old flat List view was removed — it duplicated the same data with no filtering/sorting
-  advantage.)
+  advantage.) A pinned card's 📌 line carries the same who/when/how tooltip as the Assignments
+  table (added 2026-09-07) — "Pinned by _x_ on _date_", or "pinned automatically by the system"
+  for a `BlockGenerationService`-pinned block; blank-of-history for a block pinned before
+  provenance tracking, and absent entirely for a past run's snapshot.
 - **Interactive editing** (`SCHEDULER`/`ADMIN`, opt-in): a confirm-protected "Enable schedule
   editing" toggle (off by default, resets every visit) makes each block clickable, opening a
   move/pin editor that validates the candidate change live against hard constraints

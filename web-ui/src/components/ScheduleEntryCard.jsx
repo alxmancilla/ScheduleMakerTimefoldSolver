@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatHour } from '../constants';
+import { formatHour, formatPinProvenance } from '../constants';
 
 /**
  * One schedule entry's card, shared by Schedule.jsx and MySchedule.jsx's
@@ -100,7 +100,11 @@ function ScheduleEntryCard({
         {formatHour(entry.startHour)} - {formatHour(entry.startHour + entry.lengthHours)} ({entry.lengthHours}h)
       </div>
       {entry.pinned && (
-        <div style={{ color: 'var(--color-danger-text)', fontSize: '10px', marginTop: '2px' }}>
+        <div
+          title={formatPinProvenance(entry, t)}
+          aria-label={formatPinProvenance(entry, t)}
+          style={{ color: 'var(--color-danger-text)', fontSize: '10px', marginTop: '2px' }}
+        >
           <span aria-hidden="true">📌</span> {t('schedule.pinnedLabel')}
         </div>
       )}

@@ -1057,7 +1057,9 @@ COMMENT ON COLUMN schedule_run_violation_assignment.assignment_id IS 'The assign
 -- pinned/latest-run rule itself. satisfies_room_type/preferred_room_hint are
 -- NOT resolved from the latest run - they aren't planning variables, so the
 -- raw column (the current input) is always the right value, not a solve
--- snapshot that could go stale relative to a later edit.
+-- snapshot that could go stale relative to a later edit. Same for the pin
+-- provenance columns (pinned_at/pinned_by/pin_source) - they describe the
+-- raw input row's own pin, only ever set while pinned = true.
 CREATE OR REPLACE VIEW course_block_assignment_current AS
 SELECT
     cba.id,
@@ -1065,6 +1067,9 @@ SELECT
     cba.course_id,
     cba.block_length,
     cba.pinned,
+    cba.pinned_at,
+    cba.pinned_by,
+    cba.pin_source,
     cba.teacher_id,
     CASE WHEN cba.pinned THEN cba.block_timeslot_id ELSE latest.block_timeslot_id END AS block_timeslot_id,
     CASE WHEN cba.pinned THEN cba.room_name ELSE latest.room_name END AS room_name,

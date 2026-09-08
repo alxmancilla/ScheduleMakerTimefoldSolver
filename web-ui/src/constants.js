@@ -13,6 +13,22 @@ export const ROOM_TYPES = [
 /** Zero-padded HH:00, e.g. formatHour(7) -> "07:00", formatHour(14) -> "14:00". */
 export const formatHour = (hour) => `${String(hour).padStart(2, '0')}:00`;
 
+// Human-readable "who/when/how this row was pinned" line, shared by the
+// Assignments table, the Timetable grid card, and the move/pin editor - all
+// three read the same pinnedAt/pinnedBy/pinSource fields (stamped server-side
+// by CourseBlockAssignmentController.stampPinProvenance / SYSTEM pins by
+// BlockGenerationService.tryPinExclusiveTeacherBlocks). A row pinned before
+// provenance tracking existed (2026-09-07) has pinned=true but all three
+// fields null - it still gets a label, just the "no history" one. `t` is
+// passed in rather than imported so this stays a plain pure function.
+export function formatPinProvenance(row, t) {
+  if (!row?.pinnedAt) return t('common.pinProvenance.noHistory');
+  const date = row.pinnedAt.replace('T', ' ').split('.')[0];
+  return row.pinSource === 'SYSTEM'
+    ? t('common.pinProvenance.bySystem', { date })
+    : t('common.pinProvenance.byUser', { username: row.pinnedBy, date });
+}
+
 // Mirrors Room.satisfiesRequirement() (engine domain model, backed by
 // common/RoomTypeCompatibility.java): a room satisfies a requirement of its
 // own type, and a Mixed room additionally satisfies Standard and

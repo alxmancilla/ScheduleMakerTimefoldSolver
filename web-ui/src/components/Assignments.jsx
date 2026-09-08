@@ -8,7 +8,7 @@ import {
 import ScheduleEditOnly from '../auth/ScheduleEditOnly';
 import { useToast } from '../ui/ToastContext';
 import { useConfirm } from '../ui/ConfirmContext';
-import { ROOM_TYPES, formatHour, roomMatchesType, teacherQualifiedFor } from '../constants';
+import { ROOM_TYPES, formatHour, formatPinProvenance, roomMatchesType, teacherQualifiedFor } from '../constants';
 import { usePagination, Pagination, DEFAULT_PAGE_SIZE } from '../ui/Pagination';
 
 const BLOCK_LENGTHS = [1, 2, 3, 4];
@@ -291,18 +291,9 @@ function Assignments() {
     return tch ? `${tch.name} ${tch.lastName}` : teacherId;
   };
 
-  // Who/when/how this row was pinned (added 2026-09-07: pinnedAt/pinnedBy/
-  // pinSource on the assignment, stamped server-side - see
-  // CourseBlockAssignmentController.stampPinProvenance). Falls back to a
-  // bare "pinned" label for a row pinned before this existed (all three
-  // fields null even though pinned=true).
-  const pinProvenanceLabel = (assignment) => {
-    if (!assignment.pinnedAt) return t('assignments.table.pinnedNoProvenance');
-    const date = assignment.pinnedAt.replace('T', ' ').split('.')[0];
-    return assignment.pinSource === 'SYSTEM'
-      ? t('assignments.table.pinnedBySystem', { date })
-      : t('assignments.table.pinnedByUser', { username: assignment.pinnedBy, date });
-  };
+  // Who/when/how this row was pinned - see formatPinProvenance (constants.js),
+  // shared with the Timetable grid card and the move/pin editor.
+  const pinProvenanceLabel = (assignment) => formatPinProvenance(assignment, t);
 
   const filteredAssignments = assignments.filter(a => {
     if (filter === 'assigned' && a.blockTimeslotId == null) return false;

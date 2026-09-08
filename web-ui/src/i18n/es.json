@@ -25,6 +25,11 @@
       "friday": "Viernes"
     },
     "confirm": "Confirmar",
+    "pinProvenance": {
+      "byUser": "Fijado por {{username}} el {{date}}",
+      "bySystem": "Fijado automáticamente por el sistema el {{date}}",
+      "noHistory": "Fijado (antes de registrar el historial de fijación)"
+    },
     "pagination": {
       "showing": "Mostrando {{start}}-{{end}} de {{total}}",
       "previous": "< Anterior",
@@ -371,10 +376,7 @@
       "teacher": "Maestro",
       "schedule": "Horario",
       "room": "Aula",
-      "pinned": "Fijada",
-      "pinnedByUser": "Fijado por {{username}} el {{date}}",
-      "pinnedBySystem": "Fijado automáticamente por el sistema el {{date}}",
-      "pinnedNoProvenance": "Fijado (antes de registrar el historial de fijación)"
+      "pinned": "Fijada"
     },
     "savedMessage": "Asignación guardada",
     "deletedMessage": "Asignación eliminada",

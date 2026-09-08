@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { moveAssignment, validateAssignmentMove, getAssignment, updateAssignment, getRooms, getTeachers } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../ui/ToastContext';
-import { formatHour, roomMatchesType, teacherQualifiedFor } from '../constants';
+import { formatHour, formatPinProvenance, roomMatchesType, teacherQualifiedFor } from '../constants';
 
 const DAY_KEY_BY_NUMBER = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri' };
 const VALIDATE_DEBOUNCE_MS = 300;
@@ -262,6 +262,11 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
             />
             {t('schedule.moveEditor.pinned')}
           </label>
+          {entry.pinned && (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+              {formatPinProvenance(entry, t)}
+            </p>
+          )}
           {pinBlocked && !pinned && (
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
               {t('schedule.moveEditor.pinBlockedNoRoom')}
