@@ -233,6 +233,17 @@ public class CourseBlockAssignmentController {
             assignment.setPinnedAt(null);
             assignment.setPinnedBy(null);
             assignment.setPinSource(null);
+            // The timeslot goes with them (added 2026-09-08). block_timeslot_id
+            // is only ever meaningful for a pinned row - course_block_assignment
+            // is pure solver input, and course_block_assignment_current resolves
+            // an unpinned row to the latest run's placement, ignoring this column
+            // entirely. Leaving it set on unpin left dead data that misrepresents
+            // the row: found exactly one such row in production (1A-ARH_1001_0,
+            // still holding block_87 from a pin/unpin round-trip a day earlier),
+            // and it only came to light because regenerating the block cleared
+            // it. Cleared here, alongside provenance and on the same true->false
+            // transition, so "has a timeslot" keeps matching "is pinned".
+            assignment.setBlockTimeslotId(null);
         }
     }
 

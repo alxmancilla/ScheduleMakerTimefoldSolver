@@ -380,7 +380,12 @@ public class CourseBlockAssignmentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pinSource").doesNotExist())
                 .andExpect(jsonPath("$.pinnedBy").doesNotExist())
-                .andExpect(jsonPath("$.pinnedAt").doesNotExist());
+                .andExpect(jsonPath("$.pinnedAt").doesNotExist())
+                // The timeslot goes with the provenance: block_timeslot_id is only
+                // meaningful for a pinned row, so leaving it behind on unpin left
+                // dead data (found in production on 1A-ARH_1001_0 - see
+                // stampPinProvenance).
+                .andExpect(jsonPath("$.blockTimeslotId").doesNotExist());
     }
 
     @Test
