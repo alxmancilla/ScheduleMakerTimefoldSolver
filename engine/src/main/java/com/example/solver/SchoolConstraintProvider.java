@@ -564,6 +564,11 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // the pinned block's own teaching hours as idle time.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getTeacher(), CourseBlockAssignment::getTeacher),
+                        // Same DAY too (added 2026-09-08) - see the identical note on the
+                        // group idle-gap constraints below; without it this one was likewise
+                        // contributing exactly 0 to the solver score on real data.
+                        Joiners.equal((a1, a2) -> dayOfWeekOrNull(a1),
+                                SchoolConstraintProvider::dayOfWeekOrNull),
                         Joiners.filtering((a1, a2, mid) -> mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
                 .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize teacher idle gaps (availability-aware)")),
@@ -645,6 +650,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // reason the semester case is scoped this way - see the javadoc above.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
+                        // Same DAY too (added 2026-09-08). BlockScheduleMath.liesBetween
+                        // compares raw start hours and knows nothing about days, so without
+                        // this a block of the same group on a DIFFERENT day whose start hour
+                        // merely falls inside the gap span counted as an intervening block
+                        // and killed the pair. With ~23 blocks per group spread over 5 days
+                        // x hours 7-15, nearly every span contained one: measured on the live
+                        // dataset, all 549 gap pairs were annihilated, so this constraint
+                        // contributed exactly 0 to the solver score. See the class javadoc on
+                        // why day-equality is the caller's job, not liesBetween's.
+                        Joiners.equal((a1, a2) -> dayOfWeekOrNull(a1),
+                                SchoolConstraintProvider::dayOfWeekOrNull),
                         Joiners.filtering((a1, a2, mid) -> mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
                 .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize first-semester group idle gaps")),
@@ -675,6 +691,17 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 // (fixed 2026-09-08; see minimizeSemesterOneGroupIdleGaps' javadoc).
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
+                        // Same DAY too (added 2026-09-08). BlockScheduleMath.liesBetween
+                        // compares raw start hours and knows nothing about days, so without
+                        // this a block of the same group on a DIFFERENT day whose start hour
+                        // merely falls inside the gap span counted as an intervening block
+                        // and killed the pair. With ~23 blocks per group spread over 5 days
+                        // x hours 7-15, nearly every span contained one: measured on the live
+                        // dataset, all 549 gap pairs were annihilated, so this constraint
+                        // contributed exactly 0 to the solver score. See the class javadoc on
+                        // why day-equality is the caller's job, not liesBetween's.
+                        Joiners.equal((a1, a2) -> dayOfWeekOrNull(a1),
+                                SchoolConstraintProvider::dayOfWeekOrNull),
                         Joiners.filtering((a1, a2, mid) -> mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
                 .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize group idle gaps")),

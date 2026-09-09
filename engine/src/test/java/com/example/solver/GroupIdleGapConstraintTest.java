@@ -113,6 +113,37 @@ public class GroupIdleGapConstraintTest {
         assertEquals(0, groupIdleGapScore(schedule));
     }
 
+    /**
+     * Regression for the bug that made every idle-gap constraint contribute
+     * exactly 0 on real data (fixed 2026-09-08). The ifNotExists adjacency check
+     * joined only on group, never on day-of-week, while
+     * BlockScheduleMath.liesBetween compares raw start hours and knows nothing
+     * about days. So a block of the same group on a DIFFERENT day, whose start
+     * hour merely fell inside the gap span, counted as an intervening block and
+     * annihilated the pair. With ~23 blocks per group over 5 days x hours 7-15
+     * nearly every span contained one: on the live dataset all 549 candidate
+     * gap pairs were killed, and the constraint scored 0 while the analyzer
+     * (which groups by (group, day) explicitly) correctly reported 22 hours.
+     *
+     * <p>Every pre-existing test missed this because its fixture put all blocks
+     * on a single day, where the missing day-joiner cannot bite.
+     */
+    @Test
+    public void aBlockOnAnotherDayDoesNotBreakAdjacency() {
+        // Monday 7-8 and 10-11: a real 2-hour gap (8->10).
+        // Tuesday 9-10 starts at hour 9, which falls inside that 8..10 span but is
+        // a different day entirely - it must not suppress the Monday penalty.
+        CourseBlockAssignment tuesdayDecoy = new CourseBlockAssignment("T1", GROUP, COURSE_B, 1);
+        tuesdayDecoy.setTimeslot(new BlockTimeslot("slot-T1", DayOfWeek.TUESDAY, 9, 1));
+        tuesdayDecoy.setPinned(false);
+
+        SchoolSchedule schedule = scheduleWith(
+                block("A1", COURSE_A, 7, 1),
+                block("A2", COURSE_B, 10, 1),
+                tuesdayDecoy);
+        assertEquals(-2 * WEIGHT, groupIdleGapScore(schedule));
+    }
+
     /** Sanity check that the fixture can produce a nonzero score at all, per day. */
     @Test
     public void gapsAreCountedPerDayNotAcrossDays() {
