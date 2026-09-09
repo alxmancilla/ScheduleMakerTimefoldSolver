@@ -4,10 +4,36 @@
 -- This script loads demo data for BLOCK-BASED scheduling
 -- 
 -- STRATEGY:
--- - BASICAS courses: Multiple 1-hour blocks (flexibility for scheduling)
--- - Non-BASICAS courses: Larger blocks of 3-4 hours (minimize fragmentation)
+-- - Core courses: Multiple 1-hour blocks (flexibility for scheduling)
+-- - Non-Core courses: Larger blocks of 3-4 hours (minimize fragmentation)
 --
 -- Created: 2026-02-08
+-- Updated 2026-09-08 - this file had gone stale relative to three schema
+-- changes since it was written, and stopped loading cleanly:
+--   1. Room-type values: the original Spanish (estándar/taller/centro de
+--      cómputo/mixto) -> the current English ones (Standard/Specialized -
+--      Workshop/Specialized - Computer Lab/Mixed). See
+--      database/schema_block_scheduling.sql's room_type seed and CLAUDE.md's
+--      Room Assignment section for the renaming history.
+--   2. course.component (free-text program codes: BASICAS/TADRH/TEM/TCIA/
+--      TPIAL/TCS/TPROG/TIA/TEC) -> course.designation, whose only valid
+--      values are Core/Elective/Dual/Specialized. Mapped BASICAS -> Core
+--      (general education) and the 8 technical-program codes ->
+--      Specialized, matching how designation is actually used in this
+--      project's live dataset (Core/Specialized are the common values;
+--      nothing here reads as Dual or Elective). student_group.
+--      preferred_room_name (dropped from the schema) -> one group_room_range
+--      row per group (same room, Standard type) - see CLAUDE.md's Dynamic
+--      Room Assignment section for both renames.
+--   3. The "PINNED ASSIGNMENTS" UPDATE statements only ever set teacher_id,
+--      never room_name/block_timeslot_id - already a logically incoherent
+--      "pinned" state even under the old schema, now rejected outright by
+--      check_block_assignment_pinned_requires_room/_timeslot. Dropped
+--      pinned=TRUE, kept teacher_id: these become ordinary movable blocks
+--      with a pre-assigned teacher (teacher is always fixed input in this
+--      domain model regardless of pinned status - see CLAUDE.md).
+-- Verified by loading this file (after schema_block_scheduling.sql) into a
+-- throwaway database from scratch: clean load, exit 0.
 -- ============================================================================
 
 -- Set client encoding to UTF-8 for proper handling of special characters
@@ -21,6 +47,7 @@ DELETE FROM block_timeslot;
 DELETE FROM group_course;
 DELETE FROM teacher_qualification;
 DELETE FROM teacher_availability;
+DELETE FROM group_room_range;
 DELETE FROM student_group;
 DELETE FROM room;
 DELETE FROM course;
@@ -30,112 +57,112 @@ DELETE FROM teacher;
 -- ROOMS
 -- ============================================================================
 INSERT INTO room (name, building, type, created_at, updated_at) VALUES
-	 ('AULA 1','EDIFICIO 1','estándar',NOW(),NOW()),
-	 ('AULA 2','EDIFICIO 1','estándar',NOW(),NOW()),
-	 ('AULA 3','EDIFICIO 1','estándar',NOW(),NOW()),
-	 ('AULA 4','EDIFICIO 1','taller',NOW(),NOW()),
-	 ('AULA 5','EDIFICIO 1','estándar',NOW(),NOW()),
-	 ('AULA 6','EDIFICIO 1','estándar',NOW(),NOW()),
-	 ('AULA 7','EDIFICIO 2','estándar',NOW(),NOW()),
-	 ('AULA 8','EDIFICIO 2','estándar',NOW(),NOW()),
-	 ('AULA 9','EDIFICIO 2','estándar',NOW(),NOW()),
-	 ('AULA 10','EDIFICIO 2','estándar',NOW(),NOW()),
-	 ('AULA 11','EDIFICIO 2','estándar',NOW(),NOW()),
-	 ('AULA 12','EDIFICIO 2','estándar',NOW(),NOW()),
-	 ('AULA 13','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 14','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 15','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 16','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 17','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 18','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 19','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 20','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 21','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 22','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('AULA 23','EDIFICIO 3','estándar',NOW(),NOW()),
-	 ('TEM 1','TALLER ELECTROMECANICA','mixto',NOW(),NOW()),
-	 ('TEM 2','TALLER ELECTROMECANICA','mixto',NOW(),NOW()),
-	 ('TEM 3','TALLER ELECTROMECANICA','mixto',NOW(),NOW()),
-	 ('TE 1','TALLER ELECTRONICA','mixto',NOW(),NOW()),
-	 ('CC 1','CENTRO DE COMPUTO','centro de cómputo',NOW(),NOW()),
-	 ('CC 2','CENTRO DE COMPUTO','centro de cómputo',NOW(),NOW()),
-	 ('CC 3','CENTRO DE COMPUTO','centro de cómputo',NOW(),NOW()),
-	 ('LQ 1','EDIFICIO 2','mixto',NOW(),NOW()),
-	 ('LMICRO','EDIFICIO 2','mixto',NOW(),NOW());
+	 ('AULA 1','EDIFICIO 1','Standard',NOW(),NOW()),
+	 ('AULA 2','EDIFICIO 1','Standard',NOW(),NOW()),
+	 ('AULA 3','EDIFICIO 1','Standard',NOW(),NOW()),
+	 ('AULA 4','EDIFICIO 1','Specialized - Workshop',NOW(),NOW()),
+	 ('AULA 5','EDIFICIO 1','Standard',NOW(),NOW()),
+	 ('AULA 6','EDIFICIO 1','Standard',NOW(),NOW()),
+	 ('AULA 7','EDIFICIO 2','Standard',NOW(),NOW()),
+	 ('AULA 8','EDIFICIO 2','Standard',NOW(),NOW()),
+	 ('AULA 9','EDIFICIO 2','Standard',NOW(),NOW()),
+	 ('AULA 10','EDIFICIO 2','Standard',NOW(),NOW()),
+	 ('AULA 11','EDIFICIO 2','Standard',NOW(),NOW()),
+	 ('AULA 12','EDIFICIO 2','Standard',NOW(),NOW()),
+	 ('AULA 13','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 14','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 15','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 16','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 17','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 18','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 19','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 20','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 21','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 22','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('AULA 23','EDIFICIO 3','Standard',NOW(),NOW()),
+	 ('TEM 1','TALLER ELECTROMECANICA','Mixed',NOW(),NOW()),
+	 ('TEM 2','TALLER ELECTROMECANICA','Mixed',NOW(),NOW()),
+	 ('TEM 3','TALLER ELECTROMECANICA','Mixed',NOW(),NOW()),
+	 ('TE 1','TALLER ELECTRONICA','Mixed',NOW(),NOW()),
+	 ('CC 1','CENTRO DE COMPUTO','Specialized - Computer Lab',NOW(),NOW()),
+	 ('CC 2','CENTRO DE COMPUTO','Specialized - Computer Lab',NOW(),NOW()),
+	 ('CC 3','CENTRO DE COMPUTO','Specialized - Computer Lab',NOW(),NOW()),
+	 ('LQ 1','EDIFICIO 2','Mixed',NOW(),NOW()),
+	 ('LMICRO','EDIFICIO 2','Mixed',NOW(),NOW());
 
 -- ============================================================================
 -- COURSES
 -- ============================================================================
 -- Semester II courses
-INSERT INTO course (id, name, abbreviation,room_requirement,required_hours_per_week,semester,component,created_at,updated_at,active) VALUES
-	 ('1','PENSAMIENTO MATEMATICO II','PENSAM. MATEM. II','estándar',4,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('2','INGLES II','INGLES  II','estándar',3,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('3','CIENCIAS NATURALES, EXPERIMENTALES Y TECNOLOGIA II. EL PODER DE LA ENERGIA.','CIEN NAT II','estándar',4,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('4','LENGUA Y COMUNICACION II','LENGUA Y COM II','estándar',3,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('5','CIENCIAS SOCIALES II','CIEN SOC II','estándar',2,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('6','CULTURA DIGITAL II','CUL DIG II','estándar',2,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('7','TUTORIAS II','TUTORIAS II','estándar',1,2,'BASICAS',NOW(),NOW(),TRUE),
-	 ('8','EJECUTA PROCEDIMIENTOS ADMINISTRATIVOS DEL AREA DE RECURSOS HUMANOS','EJEC. PROC. ADM. A.R.H.','estándar',10,2,'TADRH',NOW(),NOW(),TRUE),
-	 ('9','GESTIONA DOCUMENTACION DEL AREA DE RECURSOS HUMANOS','GEST. DOC. A.R.H.','estándar',7,2,'TADRH',NOW(),NOW(),TRUE),
-	 ('10','DISEÑA PLANOS Y DIAGRAMAS ELECTRICOS Y ELECTRONICOS DE SISTEMAS ELECTROMECANICOS','DIS. PLA. DIAG. ELEC.SIST. ELEC.','mixto',4,2,'TEM',NOW(),NOW(),TRUE),
-	 ('11','REALIZA INSTALACIONES ELECTRICAS EN EQUIPOS ELECTROMECANICOS','REAL. INST. ELEC. EQU. ELEC.','mixto',9,2,'TEM',NOW(),NOW(),TRUE),
-	 ('12','REALIZA INSTALACIONES DE CIRCUITOS ELECTRONICOS EN SISTEMAS ELECTROMECANICOS','REAL. INST. CIR. ELEC. SIST. ELEC.','mixto',4,2,'TEM',NOW(),NOW(),TRUE),
-	 ('13','AUXILIA EN PROCEDIMIENTOS ADMINISTRATIVOS Y NORMATIVOS PARA IMPORTACIONES Y EXPORTACIONES DE MERCANCIAS','AUX. PROC.ADM. Y NOR. PARA IMPO. Y EXPOR. DE MERC.','estándar',10,2,'TCIA',NOW(),NOW(),TRUE),
-	 ('14','VERIFICA LA DOCUMENTACION PARA LA IMPORTACION Y EXPORTACION DE MERCANCIAS','VER. LA DOC. PARA LA IMPOR. Y EXPORTACIÓN DE MERC.','estándar',7,2,'TCIA',NOW(),NOW(),TRUE),
-	 ('15','REALIZA ANALISIS FISICOS Y QUIMICOS A LA MATERIA PRIMA','REA. ANA. FÍS. QUI. MAT. PRIMA','mixto',8,2,'TPIAL',NOW(),NOW(),TRUE),
-	 ('16','REALIZA ANALISIS MICROBIOLOGICOS A LA MATERIA PRIMA','REA. ANA. MICRO. MAT. PRIMA','mixto',9,2,'TPIAL',NOW(),NOW(),TRUE),
-	 ('17','DISEÑA ALGORITMOS DE PROBLEMAS DE SEGURIDAD','DIS. ALGO.DE PROB. DE SEG.','centro de cómputo',6,2,'TCS',NOW(),NOW(),TRUE),
-	 ('18','IMPLEMENTA SCRIPTS EN UN LENGUAJE DE PROGRAMACION PARA SOL DE PROB DE SEGURIDAD','IMPLE. SCRI. EN LENG. DE PROG. PARA LA SOL. DE PROB. DE SEG.','centro de cómputo',11,2,'TCS',NOW(),NOW(),TRUE),
-	 ('19','DISEÑA SOFTWARE DE SISTEMAS INFORMATICOS','DIS. SOF. SIST. INFO.','centro de cómputo',5,2,'TPROG',NOW(),NOW(),TRUE),
-	 ('20','CODIFICA SOFTWARE DE SISTEMAS INFORMATICOS','COD. SOF. SIST. INFO.','centro de cómputo',7,2,'TPROG',NOW(),NOW(),TRUE),
-	 ('21','IMPLEMENTA SOFTWARE DE SISTEMAS INFORMATICOS','IMP. SOF. SIST. INFO.','centro de cómputo',5,2,'TPROG',NOW(),NOW(),TRUE),
-	 ('22','DESARROLLA ALGORITMOS PARA SOLUCIONAR PROBLEMAS','DES. ALG. PARA  SOLU. PROB.','centro de cómputo',9,2,'TIA',NOW(),NOW(),TRUE),
-	 ('23','ELABORA PROYECTOS CON PROGRAMACION LOGICA','ELAB. PROY. CON PROG. LOGICA','centro de cómputo',8,2,'TIA',NOW(),NOW(),TRUE);
+INSERT INTO course (id, name, abbreviation,room_requirement,required_hours_per_week,semester,designation,created_at,updated_at,active) VALUES
+	 ('1','PENSAMIENTO MATEMATICO II','PENSAM. MATEM. II','Standard',4,2,'Core',NOW(),NOW(),TRUE),
+	 ('2','INGLES II','INGLES  II','Standard',3,2,'Core',NOW(),NOW(),TRUE),
+	 ('3','CIENCIAS NATURALES, EXPERIMENTALES Y TECNOLOGIA II. EL PODER DE LA ENERGIA.','CIEN NAT II','Standard',4,2,'Core',NOW(),NOW(),TRUE),
+	 ('4','LENGUA Y COMUNICACION II','LENGUA Y COM II','Standard',3,2,'Core',NOW(),NOW(),TRUE),
+	 ('5','CIENCIAS SOCIALES II','CIEN SOC II','Standard',2,2,'Core',NOW(),NOW(),TRUE),
+	 ('6','CULTURA DIGITAL II','CUL DIG II','Standard',2,2,'Core',NOW(),NOW(),TRUE),
+	 ('7','TUTORIAS II','TUTORIAS II','Standard',1,2,'Core',NOW(),NOW(),TRUE),
+	 ('8','EJECUTA PROCEDIMIENTOS ADMINISTRATIVOS DEL AREA DE RECURSOS HUMANOS','EJEC. PROC. ADM. A.R.H.','Standard',10,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('9','GESTIONA DOCUMENTACION DEL AREA DE RECURSOS HUMANOS','GEST. DOC. A.R.H.','Standard',7,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('10','DISEÑA PLANOS Y DIAGRAMAS ELECTRICOS Y ELECTRONICOS DE SISTEMAS ELECTROMECANICOS','DIS. PLA. DIAG. ELEC.SIST. ELEC.','Mixed',4,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('11','REALIZA INSTALACIONES ELECTRICAS EN EQUIPOS ELECTROMECANICOS','REAL. INST. ELEC. EQU. ELEC.','Mixed',9,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('12','REALIZA INSTALACIONES DE CIRCUITOS ELECTRONICOS EN SISTEMAS ELECTROMECANICOS','REAL. INST. CIR. ELEC. SIST. ELEC.','Mixed',4,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('13','AUXILIA EN PROCEDIMIENTOS ADMINISTRATIVOS Y NORMATIVOS PARA IMPORTACIONES Y EXPORTACIONES DE MERCANCIAS','AUX. PROC.ADM. Y NOR. PARA IMPO. Y EXPOR. DE MERC.','Standard',10,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('14','VERIFICA LA DOCUMENTACION PARA LA IMPORTACION Y EXPORTACION DE MERCANCIAS','VER. LA DOC. PARA LA IMPOR. Y EXPORTACIÓN DE MERC.','Standard',7,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('15','REALIZA ANALISIS FISICOS Y QUIMICOS A LA MATERIA PRIMA','REA. ANA. FÍS. QUI. MAT. PRIMA','Mixed',8,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('16','REALIZA ANALISIS MICROBIOLOGICOS A LA MATERIA PRIMA','REA. ANA. MICRO. MAT. PRIMA','Mixed',9,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('17','DISEÑA ALGORITMOS DE PROBLEMAS DE SEGURIDAD','DIS. ALGO.DE PROB. DE SEG.','Specialized - Computer Lab',6,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('18','IMPLEMENTA SCRIPTS EN UN LENGUAJE DE PROGRAMACION PARA SOL DE PROB DE SEGURIDAD','IMPLE. SCRI. EN LENG. DE PROG. PARA LA SOL. DE PROB. DE SEG.','Specialized - Computer Lab',11,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('19','DISEÑA SOFTWARE DE SISTEMAS INFORMATICOS','DIS. SOF. SIST. INFO.','Specialized - Computer Lab',5,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('20','CODIFICA SOFTWARE DE SISTEMAS INFORMATICOS','COD. SOF. SIST. INFO.','Specialized - Computer Lab',7,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('21','IMPLEMENTA SOFTWARE DE SISTEMAS INFORMATICOS','IMP. SOF. SIST. INFO.','Specialized - Computer Lab',5,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('22','DESARROLLA ALGORITMOS PARA SOLUCIONAR PROBLEMAS','DES. ALG. PARA  SOLU. PROB.','Specialized - Computer Lab',9,2,'Specialized',NOW(),NOW(),TRUE),
+	 ('23','ELABORA PROYECTOS CON PROGRAMACION LOGICA','ELAB. PROY. CON PROG. LOGICA','Specialized - Computer Lab',8,2,'Specialized',NOW(),NOW(),TRUE);
 
 -- Semester IV courses
-INSERT INTO course (id, name, abbreviation,room_requirement,required_hours_per_week,semester,component,created_at,updated_at,active) VALUES
-	 ('24','TEMAS SELECTOS DE MATEMATICAS I','TEM. SEL. MAT. I','estándar',4,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('25','INGLES IV','INGLES IV','estándar',3,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('26','CONCIENCIA HISTORICA I','CON. HIST. I','estándar',3,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('27','REACCIONES QUIMICAS: CONSERVACION DE LA MATERIA EN LA FORMACION DE NUEVAS SUSTANCIAS','REACCIONES QUÍMICAS','estándar',4,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('28','CIENCIAS SOCIALES III','CIEN. SOC. III','estándar',2,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('29','RECURSOS SOCIOEMOCIONALES IV','REC. SOCIOEMO. IV','estándar',1,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('30','TUTORIAS IV','TUTORIAS IV','estándar',1,4,'BASICAS',NOW(),NOW(),TRUE),
-	 ('31','GESTIONA LOS PROCESOS DE CAPACITACION PARA EL DESARROLLO DEL TALENTO HUMANO','GES. PROC. CAP. DES. T.H.','estándar',10,4,'TADRH',NOW(),NOW(),TRUE),
-	 ('32','PROMUEVE CONDICIONES DE TRABAJO SALUDABLES EN LA ORGANIZACION','PROM. CON. TRAB. SAL. ORG.','estándar',7,4,'TADRH',NOW(),NOW(),TRUE),
-	 ('33','REALIZA ANALISIS FISICOS, QUIMICOS Y MICROBIOLOGICOS EN CARNES Y SUS DERIVADOS','REAL. ANALISIS FÍS. QUÍ. MICRO.','mixto',6,4,'TPIAL',NOW(),NOW(),TRUE),
-	 ('34','TRANSFORMA CARNE Y SUS DERIVADOS EN PRODUCTOS ALIMENTICIOS','REAL. PROC. TRANS. CARNICOS','taller',11,4,'TPIAL',NOW(),NOW(),TRUE),
-	 ('35','MAQUINA PIEZAS MECANICAS EN TORNO Y FRESADORA CONVENCIONAL','MAQ. PZAS MEC. TOR FRES CONV.','mixto',6,4,'TEM',NOW(),NOW(),TRUE),
-	 ('36','MAQUINA PIEZAS MECANICAS EN TORNO Y FRESADORA CNC','MAQ. PZAS MEC. TOR FRES CNC.','mixto',6,4,'TEM',NOW(),NOW(),TRUE),
-	 ('37','CONSTRUYE ESTRUCTURAS METALICAS PARA LA INDUSTRIA','CON. EST. MET. INDUS.','mixto',5,4,'TEM',NOW(),NOW(),TRUE),
-	 ('38','REALIZA MANTENIMIENTO A SISTEMAS ELECTRICOS DE POTENCIA','RLZA. MANTO. A SIST. ELEC. DE POTENCIA','mixto',7,4,'TEC',NOW(),NOW(),TRUE),
-	 ('39','PROGRAMA PLC PARA SISTEMAS AUTOMATIZADOS','PROG. PLC PARA SIS. AUTO.','mixto',10,4,'TEC',NOW(),NOW(),TRUE),
-	 ('40','IMPLEMENTA BASE DE DATOS RELACIONALES EN UN SISTEMA DE INFORMACION','IMP. BAS. DATOS REL. SIST. INF.','centro de cómputo',9,4,'TPROG',NOW(),NOW(),TRUE),
-	 ('41','IMPLEMENTA BASE DE DATOS NO RELACIONALES EN UN SISTEMA DE INFORMACION','IMP. BAS. DATOS NO REL. SIST. INF.','centro de cómputo',8,4,'TPROG',NOW(),NOW(),TRUE),
-	 ('42','DETECTA VULNERABILIDADES EN SISTEMAS INFORMATICOS','DET. VULN. SIST. INFO.','centro de cómputo',10,4,'TCS',NOW(),NOW(),TRUE),
-	 ('43','CORRIGE VULNERABILIDADES EN SISTEMAS INFORMATICOS','CORRIGE VULN. SIST. INFO.','centro de cómputo',8,4,'TCS',NOW(),NOW(),TRUE);
+INSERT INTO course (id, name, abbreviation,room_requirement,required_hours_per_week,semester,designation,created_at,updated_at,active) VALUES
+	 ('24','TEMAS SELECTOS DE MATEMATICAS I','TEM. SEL. MAT. I','Standard',4,4,'Core',NOW(),NOW(),TRUE),
+	 ('25','INGLES IV','INGLES IV','Standard',3,4,'Core',NOW(),NOW(),TRUE),
+	 ('26','CONCIENCIA HISTORICA I','CON. HIST. I','Standard',3,4,'Core',NOW(),NOW(),TRUE),
+	 ('27','REACCIONES QUIMICAS: CONSERVACION DE LA MATERIA EN LA FORMACION DE NUEVAS SUSTANCIAS','REACCIONES QUÍMICAS','Standard',4,4,'Core',NOW(),NOW(),TRUE),
+	 ('28','CIENCIAS SOCIALES III','CIEN. SOC. III','Standard',2,4,'Core',NOW(),NOW(),TRUE),
+	 ('29','RECURSOS SOCIOEMOCIONALES IV','REC. SOCIOEMO. IV','Standard',1,4,'Core',NOW(),NOW(),TRUE),
+	 ('30','TUTORIAS IV','TUTORIAS IV','Standard',1,4,'Core',NOW(),NOW(),TRUE),
+	 ('31','GESTIONA LOS PROCESOS DE CAPACITACION PARA EL DESARROLLO DEL TALENTO HUMANO','GES. PROC. CAP. DES. T.H.','Standard',10,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('32','PROMUEVE CONDICIONES DE TRABAJO SALUDABLES EN LA ORGANIZACION','PROM. CON. TRAB. SAL. ORG.','Standard',7,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('33','REALIZA ANALISIS FISICOS, QUIMICOS Y MICROBIOLOGICOS EN CARNES Y SUS DERIVADOS','REAL. ANALISIS FÍS. QUÍ. MICRO.','Mixed',6,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('34','TRANSFORMA CARNE Y SUS DERIVADOS EN PRODUCTOS ALIMENTICIOS','REAL. PROC. TRANS. CARNICOS','Specialized - Workshop',11,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('35','MAQUINA PIEZAS MECANICAS EN TORNO Y FRESADORA CONVENCIONAL','MAQ. PZAS MEC. TOR FRES CONV.','Mixed',6,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('36','MAQUINA PIEZAS MECANICAS EN TORNO Y FRESADORA CNC','MAQ. PZAS MEC. TOR FRES CNC.','Mixed',6,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('37','CONSTRUYE ESTRUCTURAS METALICAS PARA LA INDUSTRIA','CON. EST. MET. INDUS.','Mixed',5,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('38','REALIZA MANTENIMIENTO A SISTEMAS ELECTRICOS DE POTENCIA','RLZA. MANTO. A SIST. ELEC. DE POTENCIA','Mixed',7,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('39','PROGRAMA PLC PARA SISTEMAS AUTOMATIZADOS','PROG. PLC PARA SIS. AUTO.','Mixed',10,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('40','IMPLEMENTA BASE DE DATOS RELACIONALES EN UN SISTEMA DE INFORMACION','IMP. BAS. DATOS REL. SIST. INF.','Specialized - Computer Lab',9,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('41','IMPLEMENTA BASE DE DATOS NO RELACIONALES EN UN SISTEMA DE INFORMACION','IMP. BAS. DATOS NO REL. SIST. INF.','Specialized - Computer Lab',8,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('42','DETECTA VULNERABILIDADES EN SISTEMAS INFORMATICOS','DET. VULN. SIST. INFO.','Specialized - Computer Lab',10,4,'Specialized',NOW(),NOW(),TRUE),
+	 ('43','CORRIGE VULNERABILIDADES EN SISTEMAS INFORMATICOS','CORRIGE VULN. SIST. INFO.','Specialized - Computer Lab',8,4,'Specialized',NOW(),NOW(),TRUE);
 
 -- Semester VI courses
-INSERT INTO course (id, name, abbreviation,room_requirement,required_hours_per_week,semester,component,created_at,updated_at,active) VALUES
-	 ('44','TEMAS SELECTOS DE MATEMATICAS III','TEM. SEL. MAT. III','estándar',5,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('45','HUMANIDADES III','HUMANIDADES III','estándar',3,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('46','ORGANISMOS: ESTRUCTURAS Y PROCESOS. HERENCIA Y EVOLUCIÓN BIOLÓGICA','ORGANISMOS','estándar',4,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('47','INTERACCIONES HUMANAS CON LA NATURALEZA','INTERACCIONES','estándar',4,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('48','HUMANISMO Y PENSAMIENTO FILOSÓFICO EN MÉXICO','HUMANISMO Y PENS. FIL.','estándar',3,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('49','CONCIENCIA HISTÓRICA. LA REALIDAD ACTUAL EN PERSPECTIVA HISTORICA.','CONCIENCIA HISTÓRICA','estándar',3,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('50','RECURSOS SOCIOEMOCIONALES VI','REC. SOCIOEMO. VI','estándar',1,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('51','TUTORIAS VI','TUTORIAS VI','estándar',1,6,'BASICAS',NOW(),NOW(),TRUE),
-	 ('52','AUXILIA EN EL CÁLCULO DE LA NOMINA ORDINARIA','AUX. CALC. NOM. ORD.','estándar',10,6,'TADRH',NOW(),NOW(),TRUE),
-	 ('53','AUXILIA EN EL CÁLCULO DE LA NOMINA EXTRAORDINARIA','AUX. CALC. NOM. EXT.','estándar',7,6,'TADRH',NOW(),NOW(),TRUE),
-	 ('54','REALIZA LOS ANÁLISIS FÍSICOS, QUÍMICOS Y MICROBIOLÓGICOS DE LOS PRODUCTOS DE CEREALES U OLEAGINOSAS Y PRODUCTOS DERIVADOS','REAL. ANALISIS CEREALES','mixto',6,6,'TPIAL',NOW(),NOW(),TRUE),
-	 ('55','REALIZA LOS PROCESOS DE TRANSFORMACIÓN DE CEREALES Y PRODUCTOS DERIVADOS','REAL. PROC. TRANS. CEREALES','taller',11,6,'TPIAL',NOW(),NOW(),TRUE),
-	 ('56','MANTIENE EQUIPOS HIDRAULICOS','MANT. EQU. HIDR.','mixto',8,6,'TEM',NOW(),NOW(),TRUE),
-	 ('57','MANTIENE EQUIPOS NEUMATICOS','MANT. EQU. NEUM.','mixto',9,6,'TEM',NOW(),NOW(),TRUE),
-	 ('58','INSTALA SISTEMAS ELECTRONICOS INDUSTRIALES AUTOMATIZADOS','INST. SIST. ELEC. IND. AUTO.','mixto',10,6,'TEC',NOW(),NOW(),TRUE),
-	 ('59','INSTALA SISTEMAS ELECTRONICOS DOMOTICOS','INST. SIST. ELEC. DOMO.','mixto',7,6,'TEC',NOW(),NOW(),TRUE),
-	 ('60','MANTIENE EQUIPOS DE REFRIGERACION','MANT. EQU. REFRIG.','mixto',10,6,'TEM',NOW(),NOW(),TRUE),
-	 ('61','DISEÑA APLICACIONES MOVILES MULTIPLATAFORMA','DIS. APLIC. MOV. MULTI.','centro de cómputo',10,6,'TPROG',NOW(),NOW(),TRUE),
-	 ('62','IMPLEMENTA APLICACIONES MOVILES MULTIPLATAFORMA','IMP. APLIC. MOV. MULTI.','centro de cómputo',7,6,'TPROG',NOW(),NOW(),TRUE);
+INSERT INTO course (id, name, abbreviation,room_requirement,required_hours_per_week,semester,designation,created_at,updated_at,active) VALUES
+	 ('44','TEMAS SELECTOS DE MATEMATICAS III','TEM. SEL. MAT. III','Standard',5,6,'Core',NOW(),NOW(),TRUE),
+	 ('45','HUMANIDADES III','HUMANIDADES III','Standard',3,6,'Core',NOW(),NOW(),TRUE),
+	 ('46','ORGANISMOS: ESTRUCTURAS Y PROCESOS. HERENCIA Y EVOLUCIÓN BIOLÓGICA','ORGANISMOS','Standard',4,6,'Core',NOW(),NOW(),TRUE),
+	 ('47','INTERACCIONES HUMANAS CON LA NATURALEZA','INTERACCIONES','Standard',4,6,'Core',NOW(),NOW(),TRUE),
+	 ('48','HUMANISMO Y PENSAMIENTO FILOSÓFICO EN MÉXICO','HUMANISMO Y PENS. FIL.','Standard',3,6,'Core',NOW(),NOW(),TRUE),
+	 ('49','CONCIENCIA HISTÓRICA. LA REALIDAD ACTUAL EN PERSPECTIVA HISTORICA.','CONCIENCIA HISTÓRICA','Standard',3,6,'Core',NOW(),NOW(),TRUE),
+	 ('50','RECURSOS SOCIOEMOCIONALES VI','REC. SOCIOEMO. VI','Standard',1,6,'Core',NOW(),NOW(),TRUE),
+	 ('51','TUTORIAS VI','TUTORIAS VI','Standard',1,6,'Core',NOW(),NOW(),TRUE),
+	 ('52','AUXILIA EN EL CÁLCULO DE LA NOMINA ORDINARIA','AUX. CALC. NOM. ORD.','Standard',10,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('53','AUXILIA EN EL CÁLCULO DE LA NOMINA EXTRAORDINARIA','AUX. CALC. NOM. EXT.','Standard',7,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('54','REALIZA LOS ANÁLISIS FÍSICOS, QUÍMICOS Y MICROBIOLÓGICOS DE LOS PRODUCTOS DE CEREALES U OLEAGINOSAS Y PRODUCTOS DERIVADOS','REAL. ANALISIS CEREALES','Mixed',6,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('55','REALIZA LOS PROCESOS DE TRANSFORMACIÓN DE CEREALES Y PRODUCTOS DERIVADOS','REAL. PROC. TRANS. CEREALES','Specialized - Workshop',11,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('56','MANTIENE EQUIPOS HIDRAULICOS','MANT. EQU. HIDR.','Mixed',8,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('57','MANTIENE EQUIPOS NEUMATICOS','MANT. EQU. NEUM.','Mixed',9,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('58','INSTALA SISTEMAS ELECTRONICOS INDUSTRIALES AUTOMATIZADOS','INST. SIST. ELEC. IND. AUTO.','Mixed',10,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('59','INSTALA SISTEMAS ELECTRONICOS DOMOTICOS','INST. SIST. ELEC. DOMO.','Mixed',7,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('60','MANTIENE EQUIPOS DE REFRIGERACION','MANT. EQU. REFRIG.','Mixed',10,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('61','DISEÑA APLICACIONES MOVILES MULTIPLATAFORMA','DIS. APLIC. MOV. MULTI.','Specialized - Computer Lab',10,6,'Specialized',NOW(),NOW(),TRUE),
+	 ('62','IMPLEMENTA APLICACIONES MOVILES MULTIPLATAFORMA','IMP. APLIC. MOV. MULTI.','Specialized - Computer Lab',7,6,'Specialized',NOW(),NOW(),TRUE);
 
 -- ============================================================================
 -- TEACHERS
@@ -458,27 +485,55 @@ INSERT INTO teacher_qualification (teacher_id,qualification,created_at) VALUES
 -- ============================================================================
 -- STUDENT GROUPS
 -- ============================================================================
-INSERT INTO student_group (id,"name",preferred_room_name,created_at,updated_at) VALUES
-	 ('2AARH','2A ARH ADMINISTRACION DE REC HUMANOS','AULA 7',NOW(),NOW()),
-	 ('2ACIA','2A TCIA COMERCIO INTERNACIONAL Y ADUANAS','AULA 5',NOW(),NOW()),
-	 ('2APIA','2A PIAL PRODUCCION INDUSTRIAL DE ALIMENTOS','AULA 6',NOW(),NOW()),
-	 ('2BPIA','2B PIAL PRODUCCION INDUSTRIAL DE ALIMENTOS','AULA 8',NOW(),NOW()),
-	 ('2ATEM','2A TEM ELECTROMECANICA','AULA 9',NOW(),NOW()),
-	 ('2BTEM','2B TEM ELECTROMECANICA','AULA 10',NOW(),NOW()),
-	 ('2ATCS','2A TCS CIBERSEGURIDAD','AULA 11',NOW(),NOW()),
-	 ('2APRO','2A PRO PROGRAMACION','AULA 12',NOW(),NOW()),
-	 ('2ATIA','2A TIA INTELIGENCIA ARTIFICIAL','AULA 13',NOW(),NOW()),
-	 ('4AARH','4A ARH ADMINISTRACION DE REC HUMANOS','AULA 20',NOW(),NOW()),
-	 ('4APIA','4A PIAL PRODUCCION INDUSTRIAL DE ALIMENTOS','AULA 18',NOW(),NOW()),
-	 ('4ATEM','4A TEM ELECTROMECANICA','AULA 19',NOW(),NOW()),
-	 ('4ATEC','4A TEC ELECTRONICA','AULA 16',NOW(),NOW()),
-	 ('4APRO','4A PRO PROGRAMACION','AULA 15',NOW(),NOW()),
-	 ('4ATCS','4A TCS CIBERSEGURIDAD','AULA 14',NOW(),NOW()),
-	 ('6AARH','6A ARH REC HUMANOS','AULA 17',NOW(),NOW()),
-	 ('6APIA','6A PIAL INDUSTRIALIZACION DE ALIMENTOS','AULA 21',NOW(),NOW()),
-	 ('6ATEM','6A TEM ELECTROMECANICA','AULA 22',NOW(),NOW()),
-	 ('6ATEC','6A TEC ELECTRONICA','AULA 17',NOW(),NOW()),
-	 ('6APRO','6A PRO PROGRAMACION','AULA 23',NOW(),NOW());
+INSERT INTO student_group (id,"name",created_at,updated_at) VALUES
+	 ('2AARH','2A ARH ADMINISTRACION DE REC HUMANOS',NOW(),NOW()),
+	 ('2ACIA','2A TCIA COMERCIO INTERNACIONAL Y ADUANAS',NOW(),NOW()),
+	 ('2APIA','2A PIAL PRODUCCION INDUSTRIAL DE ALIMENTOS',NOW(),NOW()),
+	 ('2BPIA','2B PIAL PRODUCCION INDUSTRIAL DE ALIMENTOS',NOW(),NOW()),
+	 ('2ATEM','2A TEM ELECTROMECANICA',NOW(),NOW()),
+	 ('2BTEM','2B TEM ELECTROMECANICA',NOW(),NOW()),
+	 ('2ATCS','2A TCS CIBERSEGURIDAD',NOW(),NOW()),
+	 ('2APRO','2A PRO PROGRAMACION',NOW(),NOW()),
+	 ('2ATIA','2A TIA INTELIGENCIA ARTIFICIAL',NOW(),NOW()),
+	 ('4AARH','4A ARH ADMINISTRACION DE REC HUMANOS',NOW(),NOW()),
+	 ('4APIA','4A PIAL PRODUCCION INDUSTRIAL DE ALIMENTOS',NOW(),NOW()),
+	 ('4ATEM','4A TEM ELECTROMECANICA',NOW(),NOW()),
+	 ('4ATEC','4A TEC ELECTRONICA',NOW(),NOW()),
+	 ('4APRO','4A PRO PROGRAMACION',NOW(),NOW()),
+	 ('4ATCS','4A TCS CIBERSEGURIDAD',NOW(),NOW()),
+	 ('6AARH','6A ARH REC HUMANOS',NOW(),NOW()),
+	 ('6APIA','6A PIAL INDUSTRIALIZACION DE ALIMENTOS',NOW(),NOW()),
+	 ('6ATEM','6A TEM ELECTROMECANICA',NOW(),NOW()),
+	 ('6ATEC','6A TEC ELECTRONICA',NOW(),NOW()),
+	 ('6APRO','6A PRO PROGRAMACION',NOW(),NOW());
+
+-- student_group.preferred_room_name was replaced by the group_room_range
+-- table (per-room-type curated lists - see CLAUDE.md's Dynamic Room
+-- Assignment section). Each group's old single preferred room is carried
+-- over as a one-row Standard range, preserving the same "this group
+-- defaults to this room" behavior for the room type these AULA rooms
+-- actually are.
+INSERT INTO group_room_range (group_id, room_type, room_name, created_at) VALUES
+	 ('2AARH','Standard','AULA 7',NOW()),
+	 ('2ACIA','Standard','AULA 5',NOW()),
+	 ('2APIA','Standard','AULA 6',NOW()),
+	 ('2BPIA','Standard','AULA 8',NOW()),
+	 ('2ATEM','Standard','AULA 9',NOW()),
+	 ('2BTEM','Standard','AULA 10',NOW()),
+	 ('2ATCS','Standard','AULA 11',NOW()),
+	 ('2APRO','Standard','AULA 12',NOW()),
+	 ('2ATIA','Standard','AULA 13',NOW()),
+	 ('4AARH','Standard','AULA 20',NOW()),
+	 ('4APIA','Standard','AULA 18',NOW()),
+	 ('4ATEM','Standard','AULA 19',NOW()),
+	 ('4ATEC','Standard','AULA 16',NOW()),
+	 ('4APRO','Standard','AULA 15',NOW()),
+	 ('4ATCS','Standard','AULA 14',NOW()),
+	 ('6AARH','Standard','AULA 17',NOW()),
+	 ('6APIA','Standard','AULA 21',NOW()),
+	 ('6ATEM','Standard','AULA 22',NOW()),
+	 ('6ATEC','Standard','AULA 17',NOW()),
+	 ('6APRO','Standard','AULA 23',NOW());
 
 -- ============================================================================
 -- GROUP-COURSE RELATIONSHIPS
@@ -692,10 +747,10 @@ SELECT generate_block_timeslots();
 -- COURSE BLOCK ASSIGNMENTS
 -- ============================================================================
 -- This section creates course_block_assignment records using the strategy:
--- - BASICAS courses: Multiple 1-hour blocks (for flexibility)
--- - Non-BASICAS courses: Larger blocks of 3-4 hours (to minimize fragmentation)
+-- - Core courses: Multiple 1-hour blocks (for flexibility)
+-- - Non-Core courses: Larger blocks of 3-4 hours (to minimize fragmentation)
 --
--- Block decomposition strategy for non-BASICAS:
+-- Block decomposition strategy for non-Core:
 --   3 hrs  -> 1×3
 --   4 hrs  -> 1×4
 --   5 hrs  -> 1×3 + 1×2
@@ -713,7 +768,7 @@ CREATE OR REPLACE FUNCTION generate_course_blocks(
     p_course_id VARCHAR,
     p_course_name VARCHAR,
     p_hours INTEGER,
-    p_component VARCHAR
+    p_designation VARCHAR
 ) RETURNS VOID AS $$
 DECLARE
     v_block_index INTEGER := 0;
@@ -721,7 +776,7 @@ BEGIN
     -- For courses with less than 2 hours: always use 1-hour blocks (maximum flexibility)
     -- For courses with 2+ hours: use optimized block patterns
     IF p_hours < 2 THEN
-        -- Create multiple 1-hour blocks for short courses (regardless of component)
+        -- Create multiple 1-hour blocks for short courses (regardless of designation)
         FOR i IN 0..(p_hours - 1) LOOP
             INSERT INTO course_block_assignment (id, group_id, course_id, block_length, teacher_id, block_timeslot_id, room_name, pinned)
             VALUES (p_group_id || '_' || p_course_id || '_' || i, p_group_id, p_course_id, 1, NULL, NULL, NULL, FALSE);
@@ -792,12 +847,12 @@ DECLARE
 BEGIN
     FOR r IN
         SELECT gc.group_id, c.id AS course_id, c.name AS course_name,
-               c.required_hours_per_week AS hours, c.component
+               c.required_hours_per_week AS hours, c.designation
         FROM group_course gc
         JOIN course c ON gc.course_name = c.name
         ORDER BY gc.group_id, c.id
     LOOP
-        PERFORM generate_course_blocks(r.group_id, r.course_id, r.course_name, r.hours, r.component);
+        PERFORM generate_course_blocks(r.group_id, r.course_id, r.course_name, r.hours, r.designation);
     END LOOP;
 END $$;
 
@@ -805,57 +860,61 @@ END $$;
 DROP FUNCTION IF EXISTS generate_course_blocks(VARCHAR, VARCHAR, VARCHAR, INTEGER, VARCHAR);
 
 -- ============================================================================
--- PINNED ASSIGNMENTS (Pre-assigned courses with specific teachers/rooms/times)
+-- PRE-ASSIGNED TEACHERS (fixed teacher, movable timeslot/room)
 -- ============================================================================
--- These are courses that have been manually scheduled and should not be changed by the solver
+-- These courses have a known teacher decided in advance, matching the domain
+-- model's "teacher is fixed input, timeslot/room are what the solver places"
+-- design (see CLAUDE.md). Not actually pinned (see check_block_assignment_
+-- pinned_requires_room/_timeslot) - this data never carried a specific room
+-- or timeslot, only a teacher, even before those constraints existed.
 
 -- TUTORIAS II assignments (all pinned to specific teachers)
-UPDATE course_block_assignment SET teacher_id='48JBWT', pinned=TRUE WHERE course_id='7' AND group_id='2AARH';
-UPDATE course_block_assignment SET teacher_id='46IUAW', pinned=TRUE WHERE course_id='7' AND group_id='2APIA';
-UPDATE course_block_assignment SET teacher_id='46IUAW', pinned=TRUE WHERE course_id='7' AND group_id='2BPIA';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='7' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='7' AND group_id='2BTEM';
-UPDATE course_block_assignment SET teacher_id='46LDNRS', pinned=TRUE WHERE course_id='7' AND group_id='2ATCS';
-UPDATE course_block_assignment SET teacher_id='48JBWT', pinned=TRUE WHERE course_id='7' AND group_id='2APRO';
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='7' AND group_id='2ATIA';
+UPDATE course_block_assignment SET teacher_id='48JBWT' WHERE course_id='7' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='46IUAW' WHERE course_id='7' AND group_id='2APIA';
+UPDATE course_block_assignment SET teacher_id='46IUAW' WHERE course_id='7' AND group_id='2BPIA';
+UPDATE course_block_assignment SET teacher_id='48PBRAU' WHERE course_id='7' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='48PBRAU' WHERE course_id='7' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='46LDNRS' WHERE course_id='7' AND group_id='2ATCS';
+UPDATE course_block_assignment SET teacher_id='48JBWT' WHERE course_id='7' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD' WHERE course_id='7' AND group_id='2ATIA';
 
 -- GESTIONA DOCUMENTACION assignments
-UPDATE course_block_assignment SET teacher_id='47SVPE', pinned=TRUE WHERE course_id='9' AND group_id='2AARH';
-UPDATE course_block_assignment SET teacher_id='48ABCJ', pinned=TRUE WHERE course_id='9' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='47SVPE' WHERE course_id='9' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='48ABCJ' WHERE course_id='9' AND group_id='2AARH';
 
 -- EJECUTA PROCEDIMIENTOS assignments
-UPDATE course_block_assignment SET teacher_id='47SVPE', pinned=TRUE WHERE course_id='8' AND group_id='2AARH';
+UPDATE course_block_assignment SET teacher_id='47SVPE' WHERE course_id='8' AND group_id='2AARH';
 
 -- AUXILIA/VERIFICA assignments for TCIA
-UPDATE course_block_assignment SET teacher_id='47FRSO', pinned=TRUE WHERE course_id='13' AND group_id='2ACIA';
-UPDATE course_block_assignment SET teacher_id='47FRSO', pinned=TRUE WHERE course_id='14' AND group_id='2ACIA';
+UPDATE course_block_assignment SET teacher_id='47FRSO' WHERE course_id='13' AND group_id='2ACIA';
+UPDATE course_block_assignment SET teacher_id='47FRSO' WHERE course_id='14' AND group_id='2ACIA';
 
 -- REALIZA ANALISIS assignments for PIAL groups
-UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=TRUE WHERE course_id='15' AND group_id='2APIA';
-UPDATE course_block_assignment SET teacher_id='48YESMR', pinned=TRUE WHERE course_id='15' AND group_id='2BPIA';
-UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=TRUE WHERE course_id='16' AND group_id='2APIA';
-UPDATE course_block_assignment SET teacher_id='48SLAMC', pinned=TRUE WHERE course_id='16' AND group_id='2BPIA';
+UPDATE course_block_assignment SET teacher_id='48SLAMC' WHERE course_id='15' AND group_id='2APIA';
+UPDATE course_block_assignment SET teacher_id='48YESMR' WHERE course_id='15' AND group_id='2BPIA';
+UPDATE course_block_assignment SET teacher_id='48SLAMC' WHERE course_id='16' AND group_id='2APIA';
+UPDATE course_block_assignment SET teacher_id='48SLAMC' WHERE course_id='16' AND group_id='2BPIA';
 
 -- TEM assignments
-UPDATE course_block_assignment SET teacher_id='46MASOC', pinned=TRUE WHERE course_id='10' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='46MASOC', pinned=TRUE WHERE course_id='10' AND group_id='2BTEM';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='11' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='48PBRAU', pinned=TRUE WHERE course_id='11' AND group_id='2BTEM';
-UPDATE course_block_assignment SET teacher_id='47CGHV', pinned=TRUE WHERE course_id='12' AND group_id='2ATEM';
-UPDATE course_block_assignment SET teacher_id='47CGHV', pinned=TRUE WHERE course_id='12' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='46MASOC' WHERE course_id='10' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='46MASOC' WHERE course_id='10' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='48PBRAU' WHERE course_id='11' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='48PBRAU' WHERE course_id='11' AND group_id='2BTEM';
+UPDATE course_block_assignment SET teacher_id='47CGHV' WHERE course_id='12' AND group_id='2ATEM';
+UPDATE course_block_assignment SET teacher_id='47CGHV' WHERE course_id='12' AND group_id='2BTEM';
 
 -- TCS assignments
-UPDATE course_block_assignment SET teacher_id='48ISOT', pinned=TRUE WHERE course_id='17' AND group_id='2ATCS';
-UPDATE course_block_assignment SET teacher_id='48HGRO', pinned=TRUE WHERE course_id='18' AND group_id='2ATCS';
+UPDATE course_block_assignment SET teacher_id='48ISOT' WHERE course_id='17' AND group_id='2ATCS';
+UPDATE course_block_assignment SET teacher_id='48HGRO' WHERE course_id='18' AND group_id='2ATCS';
 
 -- TPROG assignments
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='19' AND group_id='2APRO';
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='20' AND group_id='2APRO';
-UPDATE course_block_assignment SET teacher_id='48LFGD', pinned=TRUE WHERE course_id='21' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD' WHERE course_id='19' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD' WHERE course_id='20' AND group_id='2APRO';
+UPDATE course_block_assignment SET teacher_id='48LFGD' WHERE course_id='21' AND group_id='2APRO';
 
 -- TIA assignments
-UPDATE course_block_assignment SET teacher_id='45MVVT', pinned=TRUE WHERE course_id='22' AND group_id='2ATIA';
-UPDATE course_block_assignment SET teacher_id='48ERNE', pinned=TRUE WHERE course_id='23' AND group_id='2ATIA';
+UPDATE course_block_assignment SET teacher_id='45MVVT' WHERE course_id='22' AND group_id='2ATIA';
+UPDATE course_block_assignment SET teacher_id='48ERNE' WHERE course_id='23' AND group_id='2ATIA';
 
 -- ============================================================================
 -- VERIFICATION QUERIES
@@ -892,7 +951,7 @@ SELECT id, name, last_name, max_hours_per_week FROM teacher LIMIT 5;
 
 SELECT '' AS info;
 SELECT 'Sample Courses:' AS info;
-SELECT id, name, room_requirement, required_hours_per_week, component FROM course LIMIT 5;
+SELECT id, name, room_requirement, required_hours_per_week, designation FROM course LIMIT 5;
 
 SELECT '' AS info;
 SELECT 'Sample Block Timeslots:' AS info;
@@ -908,20 +967,20 @@ WHERE cba.block_timeslot_id IS NULL
 LIMIT 10;
 
 SELECT '' AS info;
-SELECT 'Block Assignment Statistics by Component:' AS info;
-SELECT c.component,
+SELECT 'Block Assignment Statistics by Designation:' AS info;
+SELECT c.designation,
        COUNT(*) AS total_blocks,
        SUM(cba.block_length) AS total_hours,
        ROUND(AVG(cba.block_length), 2) AS avg_block_length
 FROM course_block_assignment cba
 JOIN course c ON cba.course_id = c.id
-GROUP BY c.component
-ORDER BY c.component;
+GROUP BY c.designation
+ORDER BY c.designation;
 
 SELECT '' AS info;
-SELECT 'BASICAS vs Non-BASICAS Block Distribution:' AS info;
+SELECT 'Core vs Non-Core Block Distribution:' AS info;
 SELECT
-    CASE WHEN c.component = 'BASICAS' THEN 'BASICAS' ELSE 'Non-BASICAS' END AS course_type,
+    CASE WHEN c.designation = 'Core' THEN 'Core' ELSE 'Non-Core' END AS course_type,
     cba.block_length,
     COUNT(*) AS block_count
 FROM course_block_assignment cba
