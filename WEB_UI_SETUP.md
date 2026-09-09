@@ -388,7 +388,7 @@ doesn't need to browse a menu labeled "Admin" to reach them.
 ### Admin-only (`/api/admin/**`, `ADMIN` role, any HTTP method - except the Scheduler carve-out above)
 | Method & Path | Description |
 |---|---|
-| `POST /admin/blocks/generate` | (Re)generate course block assignments from course/group data |
+| `POST /admin/blocks/generate` | (Re)generate course block assignments from course/group data. Optional body `{pinExclusiveTeacherBlocks}` (default false, body may be omitted entirely): when true, a pairing whose teacher has no other load also gets its blocks placed into that teacher's free hours and pinned. Off by default — a pin is irreversible, skips the solver's constraint checking, and is placed from the teacher's calendar with no regard for the group's other blocks. Availability-aware block *sizing* runs either way. |
 | `GET /admin/reports` | Compliance-snapshot PDF runs (auto-generated after each engine run), distinct from the WRITER-triggered `/api/reports` runs |
 | `GET /admin/reports/{runId}/{filename}` | Download one compliance-snapshot PDF |
 | `GET /admin/users` | List application users |

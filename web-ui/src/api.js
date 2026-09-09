@@ -178,7 +178,10 @@ export const runPreSolveValidation = () => api.post('/validation/run');
 export const getPreSolveValidationStatus = () => api.get('/validation/status');
 
 // Admin: Generate Blocks
-export const generateBlocks = () => api.post('/admin/blocks/generate');
+// pinExclusiveTeacherBlocks defaults to false - see BlockGenerationRequest for why
+// that one behaviour is opt-in (availability-aware shaping is always on regardless).
+export const generateBlocks = (pinExclusiveTeacherBlocks = false) =>
+  api.post('/admin/blocks/generate', { pinExclusiveTeacherBlocks });
 export const clearUnpinnedTimeslots = () => api.post('/admin/blocks/clear-timeslots');
 
 // Admin: compliance-snapshot PDFs (calendario-incumplimientos.pdf),

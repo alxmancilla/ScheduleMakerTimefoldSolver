@@ -10,13 +10,16 @@ function GenerateBlocksTab({ hidden }) {
   const [blockGenResult, setBlockGenResult] = useState(null);
   const [blockGenError, setBlockGenError] = useState(null);
   const [generatingBlocks, setGeneratingBlocks] = useState(false);
+  // Off by default and deliberately not persisted - the pins it creates are
+  // permanent, so each run is an explicit choice rather than a remembered one.
+  const [pinExclusiveTeacherBlocks, setPinExclusiveTeacherBlocks] = useState(false);
 
   const handleGenerateBlocks = async () => {
     setGeneratingBlocks(true);
     setBlockGenError(null);
     setBlockGenResult(null);
     try {
-      const response = await generateBlocks();
+      const response = await generateBlocks(pinExclusiveTeacherBlocks);
       setBlockGenResult(response.data);
     } catch (err) {
       setBlockGenError(err.response?.data?.message || t('settings.generateBlocks.failedPrefix') + err.message);
@@ -62,6 +65,22 @@ function GenerateBlocksTab({ hidden }) {
         <p style={{ marginTop: '8px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
           {t('settings.generateBlocks.description')}
         </p>
+        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          <input
+            id="pinExclusiveTeacherBlocks"
+            type="checkbox"
+            checked={pinExclusiveTeacherBlocks}
+            onChange={(e) => setPinExclusiveTeacherBlocks(e.target.checked)}
+            disabled={generatingBlocks}
+            style={{ marginTop: '3px' }}
+          />
+          <label htmlFor="pinExclusiveTeacherBlocks" style={{ fontSize: '13px' }}>
+            {t('settings.generateBlocks.pinExclusiveTeacherBlocks')}
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '2px' }}>
+              {t('settings.generateBlocks.pinExclusiveTeacherBlocksHint')}
+            </div>
+          </label>
+        </div>
         {blockGenError && <div className="error" role="alert">{blockGenError}</div>}
         {blockGenResult && (
           <div style={{ marginTop: '10px', fontSize: '13px' }}>

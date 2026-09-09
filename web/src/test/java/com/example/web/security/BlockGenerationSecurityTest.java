@@ -62,7 +62,7 @@ public class BlockGenerationSecurityTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     public void admin_canAccess() throws Exception {
-        when(blockGenerationService.generateBlocks())
+        when(blockGenerationService.generateBlocks(false))
                 .thenReturn(new BlockGenerationService.GenerationResult(0, 0, List.of()));
         mockMvc.perform(post("/api/admin/blocks/generate"))
                 .andExpect(status().isOk());

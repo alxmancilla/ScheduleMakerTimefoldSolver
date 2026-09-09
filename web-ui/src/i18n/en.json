@@ -532,6 +532,8 @@
       "view": "View"
     },
     "generateBlocks": {
+      "pinExclusiveTeacherBlocks": "Also pin blocks for teachers with no other classes",
+      "pinExclusiveTeacherBlocksHint": "Off by default. When a teacher's only load is this one group+course, place its blocks straight into their free hours and pin them. Pinned blocks are fixed permanently and skip the solver's checks — and because the slot is chosen from the teacher's calendar alone, it can leave the group idle time the solver can neither move nor detect. Availability-aware block sizing runs either way.",
       "title": "Generate Blocks",
       "button": "Generate Blocks",
       "generating": "Generating…",

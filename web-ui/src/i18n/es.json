@@ -532,6 +532,8 @@
       "view": "Ver"
     },
     "generateBlocks": {
+      "pinExclusiveTeacherBlocks": "Fijar también los bloques de maestros sin otras clases",
+      "pinExclusiveTeacherBlocksHint": "Desactivado por defecto. Cuando la única carga de un maestro es este grupo+materia, coloca sus bloques directamente en sus horas libres y los fija. Los bloques fijados quedan permanentes y omiten las verificaciones del solver; además, como el horario se elige solo con el calendario del maestro, puede dejarle al grupo tiempo muerto que el solver no puede mover ni detectar. El ajuste de tamaño de bloque según disponibilidad se aplica igual.",
       "title": "Generar Bloques",
       "button": "Generar Bloques",
       "generating": "Generando…",

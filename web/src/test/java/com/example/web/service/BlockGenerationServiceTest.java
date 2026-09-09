@@ -615,6 +615,54 @@ public class BlockGenerationServiceTest {
 
     // ---- Scenario 1: auto-pin when the teacher's whole load is this one pairing ----
 
+    /**
+     * The same fixture as exclusiveTeacherWithResolvableRoom_pinsGeneratedBlocks
+     * below, run WITHOUT opting in: everything that would have made pinning
+     * succeed is in place, and it still must not pin. Pinning became opt-in on
+     * 2026-09-08 (see generateBlocks(boolean)) because a pin is irreversible,
+     * skips the solver's constraint checking, and is placed from the teacher's
+     * calendar with no regard for the group's other blocks.
+     */
+    @Test
+    public void exclusiveTeacherWithResolvableRoom_isNotPinnedByDefault() {
+        StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
+        group.addCourse("Mathematics").setDefaultTeacherId("T1");
+        when(studentGroupRepository.findAll()).thenReturn(List.of(group));
+        when(courseRepository.findByName("Mathematics"))
+                .thenReturn(Optional.of(course("C1", "Mathematics", 2, "TEM", "estándar")));
+        when(assignmentRepository.existsByGroupIdAndCourseId("G1", "C1")).thenReturn(false);
+        when(componentBlockRuleRepository.findById("TEM"))
+                .thenReturn(Optional.of(new ComponentBlockRuleEntity("TEM", 2, 2)));
+
+        TeacherEntity teacher = new TeacherEntity("T1", "Ada", "Lovelace", 40);
+        teacher.setRequiredRoomName("ROOM1");
+        teacher.addAvailability(1, 7);
+        teacher.addAvailability(1, 8);
+        when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
+        when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
+
+        // Deliberately no blockTimeslotRepository stub: the pinning path is the
+        // only thing that looks a timeslot up, so Mockito's strict stubbing
+        // would flag it as unnecessary - which is itself proof the path is
+        // never entered.
+
+        // No-arg generateBlocks() is the default path the "Generate Blocks"
+        // button takes with the box unticked.
+        BlockGenerationService.GenerationResult result = service.generateBlocks();
+
+        assertEquals(1, result.getBlocksCreated());
+        assertTrue(result.getWarnings().isEmpty());
+        ArgumentCaptor<CourseBlockAssignmentEntity> captor = ArgumentCaptor.forClass(CourseBlockAssignmentEntity.class);
+        // Only saveBlock's save - no second, pinning save.
+        verify(assignmentRepository, times(1)).save(captor.capture());
+        CourseBlockAssignmentEntity saved = captor.getValue();
+        assertEquals(Boolean.FALSE, saved.getPinned());
+        assertEquals(null, saved.getBlockTimeslotId());
+        assertEquals(null, saved.getPinSource());
+        // Room defaulting is unrelated to pinning and still applies.
+        assertEquals("ROOM1", saved.getRoomName());
+    }
+
     @Test
     public void exclusiveTeacherWithResolvableRoom_pinsGeneratedBlocks() {
         StudentGroupEntity group = new StudentGroupEntity("G1", "Group One");
@@ -642,7 +690,7 @@ public class BlockGenerationServiceTest {
         when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 7, 2))
                 .thenReturn(Optional.of(timeslot));
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(1, result.getBlocksCreated());
         assertTrue(result.getWarnings().isEmpty());
@@ -690,7 +738,7 @@ public class BlockGenerationServiceTest {
         when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 7, 2))
                 .thenReturn(Optional.of(timeslot));
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(1, result.getBlocksCreated());
         assertEquals(1, result.getWarnings().size());
@@ -730,7 +778,7 @@ public class BlockGenerationServiceTest {
         when(blockTimeslotRepository.findByDayOfWeekAndStartHourAndLengthHours(1, 13, 2))
                 .thenReturn(Optional.of(timeslot));
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(1, result.getBlocksCreated());
         assertEquals(1, result.getWarnings().size());
@@ -781,7 +829,7 @@ public class BlockGenerationServiceTest {
         existingSlot.setLengthHours(2);
         when(blockTimeslotRepository.findById("TS_EXISTING")).thenReturn(Optional.of(existingSlot));
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(1, result.getBlocksCreated());
         assertEquals(1, result.getWarnings().size());
@@ -815,7 +863,7 @@ public class BlockGenerationServiceTest {
         // Deliberately no blockTimeslotRepository stub: a non-exclusive teacher must
         // never even attempt pinning, so it should never be consulted at all.
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(2, result.getBlocksCreated());
         assertTrue(result.getWarnings().isEmpty()); // no pin attempt at all, so no pin-failure warnings either
@@ -865,7 +913,7 @@ public class BlockGenerationServiceTest {
         existingSlot.setLengthHours(3);
         when(blockTimeslotRepository.findById("TS_EXISTING")).thenReturn(Optional.of(existingSlot));
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(1, result.getBlocksCreated());
         assertEquals(1, result.getWarnings().size());
@@ -894,7 +942,7 @@ public class BlockGenerationServiceTest {
         when(roomRepository.findById("ROOM1")).thenReturn(Optional.of(new RoomEntity("ROOM1", "Building A", "estándar")));
         // No matching BlockTimeslotEntity for day 1 / hour 7 / length 2 (unstubbed -> empty).
 
-        BlockGenerationService.GenerationResult result = service.generateBlocks();
+        BlockGenerationService.GenerationResult result = service.generateBlocks(true);
 
         assertEquals(1, result.getBlocksCreated());
         assertEquals(1, result.getWarnings().size());

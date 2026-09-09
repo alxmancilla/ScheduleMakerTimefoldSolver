@@ -33,9 +33,57 @@ public class BlockGenerationControllerTest {
     @MockBean
     private BlockGenerationService blockGenerationService;
 
+    /**
+     * No body at all - the shape every caller predating BlockGenerationRequest
+     * used, and what the UI sends with the pinning box unticked. Must route to
+     * the pinning-off overload.
+     */
+    @Test
+    public void generateBlocks_withNoBody_doesNotOptIntoPinning() throws Exception {
+        when(blockGenerationService.generateBlocks(false))
+                .thenReturn(new BlockGenerationService.GenerationResult(4, 0, List.of()));
+
+        mockMvc.perform(post("/api/admin/blocks/generate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blocksCreated").value(4));
+
+        org.mockito.Mockito.verify(blockGenerationService).generateBlocks(false);
+    }
+
+    @Test
+    public void generateBlocks_pinExclusiveTeacherBlocksTrue_isPassedThrough() throws Exception {
+        when(blockGenerationService.generateBlocks(true))
+                .thenReturn(new BlockGenerationService.GenerationResult(4, 0, List.of()));
+
+        mockMvc.perform(post("/api/admin/blocks/generate")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"pinExclusiveTeacherBlocks\":true}"))
+                .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(blockGenerationService).generateBlocks(true);
+    }
+
+    /** An explicit false, and a body that omits the field, both mean off. */
+    @Test
+    public void generateBlocks_explicitFalseOrOmittedField_bothMeanOff() throws Exception {
+        when(blockGenerationService.generateBlocks(false))
+                .thenReturn(new BlockGenerationService.GenerationResult(0, 0, List.of()));
+
+        mockMvc.perform(post("/api/admin/blocks/generate")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"pinExclusiveTeacherBlocks\":false}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/admin/blocks/generate")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(blockGenerationService, org.mockito.Mockito.times(2)).generateBlocks(false);
+    }
+
     @Test
     public void generateBlocks_returnsCounts() throws Exception {
-        when(blockGenerationService.generateBlocks())
+        when(blockGenerationService.generateBlocks(false))
                 .thenReturn(new BlockGenerationService.GenerationResult(12, 3, List.of()));
 
         mockMvc.perform(post("/api/admin/blocks/generate"))
@@ -47,7 +95,7 @@ public class BlockGenerationControllerTest {
 
     @Test
     public void generateBlocks_withWarnings_returnsThem() throws Exception {
-        when(blockGenerationService.generateBlocks())
+        when(blockGenerationService.generateBlocks(false))
                 .thenReturn(new BlockGenerationService.GenerationResult(0, 0,
                         List.of("Group 'G1': course 'Ghost' not found, skipped")));
 

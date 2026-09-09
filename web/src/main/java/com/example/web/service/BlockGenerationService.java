@@ -75,14 +75,22 @@ import java.util.Map;
  * When the resolved teacher's entire teaching load is this one (group,
  * course) pairing (no other group_course link uses them as default teacher,
  * and they have no pre-existing assignments at all), there's no real
- * placement decision left for the solver to make - each block's day/hour is
- * already forced by being the only room left in their calendar. In that case
- * (see tryPinExclusiveTeacherBlocks) the generated blocks are given a
- * concrete timeslot from the teacher's actual contiguous availability and
- * pinned outright, but only when every block also resolves a single
- * deterministic room and doesn't collide with anything the group already has
- * pinned - otherwise they're left exactly as generated, for the solver or a
- * human to place instead.
+ * placement decision left for the solver to make FROM THE TEACHER'S POINT OF
+ * VIEW - each block's day/hour is already forced by being the only room left
+ * in their calendar. In that case (see tryPinExclusiveTeacherBlocks) the
+ * generated blocks can be given a concrete timeslot from the teacher's actual
+ * contiguous availability and pinned outright, but only when every block also
+ * resolves a single deterministic room and doesn't collide with anything the
+ * group already has pinned - otherwise they're left exactly as generated, for
+ * the solver or a human to place instead.
+ *
+ * That behaviour is OPT-IN and off by default (2026-09-08): see
+ * generateBlocks(boolean). "No decision left" holds for the teacher but not
+ * for the GROUP - the placement is chosen greedily from the teacher's calendar
+ * with no awareness of the group's other blocks, and a pin can therefore
+ * manufacture a group idle gap that the solver can neither move nor score.
+ * Availability-aware SHAPING (decomposeHours) and the shared per-teacher
+ * calendar are unconditional; only placement/pinning is gated by the flag.
  *
  * Room defaulting: whenever a generated block would otherwise have no room
  * (no block-template preferredRoomName, no room-requirement
@@ -182,7 +190,35 @@ public class BlockGenerationService {
     private SemesterHourLimitRepository semesterHourLimitRepository;
 
     @Transactional
+    /**
+     * Generates blocks with exclusive-teacher pinning OFF - the default, and
+     * what the "Generate Blocks" button sends unless the box is ticked. See
+     * {@link #generateBlocks(boolean)} for why off is the default.
+     */
     public GenerationResult generateBlocks() {
+        return generateBlocks(false);
+    }
+
+    /**
+     * @param pinExclusiveTeacherBlocks when true, a (group, course) pairing
+     *        whose teacher has no other load at all also gets each block
+     *        placed into that teacher's actual availability and PINNED (see
+     *        {@link #tryPinExclusiveTeacherBlocks}). Opt-in, defaulting to
+     *        false, because it is the only part of block generation that makes
+     *        an irreversible commitment: a pin bypasses the solver's constraint
+     *        checking entirely, and the placement is chosen greedily from the
+     *        TEACHER's calendar with no awareness of the GROUP's other blocks.
+     *        Observed live on 5A-TEC: blocks pinned Monday 11:00-15:00 left a
+     *        10:00-11:00 hole the solver can neither move nor even score (a
+     *        pinned block is excluded from the idle-gap constraints). It also
+     *        buys very little - teacher availability, room type and the HARD
+     *        semester hour limit are all constraints the solver enforces
+     *        anyway, so this only removes blocks from the search (7 of 551 on
+     *        the live dataset). Availability-aware *shaping* and the shared
+     *        per-teacher calendar are unconditional and unaffected by this
+     *        flag; only placement/pinning is gated.
+     */
+    public GenerationResult generateBlocks(boolean pinExclusiveTeacherBlocks) {
         int created = 0;
         int skippedExisting = 0;
         List<String> warnings = new ArrayList<>();
@@ -234,7 +270,7 @@ public class BlockGenerationService {
         for (PendingPair p : pending) {
             if (p.defaultTeacherId() == null) {
                 created += generateBlocksForGroupCourse(p.group(), p.course(), null, groupCourseCountByTeacher, null,
-                        warnings, adjustments);
+                        warnings, adjustments, pinExclusiveTeacherBlocks);
                 continue;
             }
             byTeacher.computeIfAbsent(p.defaultTeacherId(), k -> new ArrayList<>()).add(p);
@@ -267,7 +303,8 @@ public class BlockGenerationService {
             }
             for (PendingPair p : pairs) {
                 created += generateBlocksForGroupCourse(p.group(), p.course(), p.defaultTeacherId(),
-                        groupCourseCountByTeacher, sharedCalendar, warnings, adjustments);
+                        groupCourseCountByTeacher, sharedCalendar, warnings, adjustments,
+                        pinExclusiveTeacherBlocks);
             }
         }
 
@@ -378,7 +415,7 @@ public class BlockGenerationService {
      */
     private int generateBlocksForGroupCourse(StudentGroupEntity group, CourseEntity course, String defaultTeacherId,
             Map<String, Integer> groupCourseCountByTeacher, TeacherCalendar sharedCalendar,
-            List<String> warnings, List<String> adjustments) {
+            List<String> warnings, List<String> adjustments, boolean pinExclusiveTeacherBlocks) {
         List<CourseBlockTemplateEntity> templates = resolveTemplates(course.getId(), group.getId());
         if (!templates.isEmpty()) {
             for (CourseBlockTemplateEntity template : templates) {
@@ -441,7 +478,10 @@ public class BlockGenerationService {
                 }
             }
         }
-        if (exclusiveTeacher && !generated.isEmpty()) {
+        // Opt-in only (see generateBlocks(boolean)) - everything above this point,
+        // including availability-aware shaping and the shared teacher calendar,
+        // runs regardless; this flag gates placement/pinning alone.
+        if (pinExclusiveTeacherBlocks && exclusiveTeacher && !generated.isEmpty()) {
             tryPinExclusiveTeacherBlocks(group, course, teacher, generated, warnings);
         }
         return created;
