@@ -9,6 +9,8 @@ import com.example.web.entity.SemesterHourLimitEntity;
 import com.example.web.entity.TeacherEntity;
 import com.example.web.repository.BlockTimeslotRepository;
 import com.example.web.repository.ComponentBlockRuleRepository;
+import com.example.web.entity.CourseBlockAssignmentCurrentEntity;
+import com.example.web.repository.CourseBlockAssignmentCurrentRepository;
 import com.example.web.repository.ConstraintConfigRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
@@ -55,6 +57,9 @@ public class AssignmentMoveValidationServiceTest {
     @Mock
     private ConstraintConfigRepository constraintConfigRepository;
 
+    @Mock
+    private CourseBlockAssignmentCurrentRepository assignmentCurrentRepository;
+
     @InjectMocks
     private AssignmentMoveValidationService service;
 
@@ -62,6 +67,18 @@ public class AssignmentMoveValidationServiceTest {
     private BlockTimeslotEntity target;
     private TeacherEntity teacher;
     private CourseEntity course;
+
+    /**
+     * The service compares against course_block_assignment_current (the RESOLVED
+     * schedule), not the raw input table, so every "other block" fixture has to
+     * be expressed as a view row. Mirrors what the view produces: a pinned row
+     * keeps its own timeslot, an unpinned one carries the latest run's.
+     */
+    private static CourseBlockAssignmentCurrentEntity current(CourseBlockAssignmentEntity e) {
+        return new CourseBlockAssignmentCurrentEntity(e.getId(), e.getGroupId(), e.getCourseId(),
+                e.getBlockLength(), Boolean.TRUE.equals(e.getPinned()), e.getTeacherId(),
+                e.getBlockTimeslotId(), e.getRoomName(), e.getSatisfiesRoomType(), e.getPreferredRoomHint());
+    }
 
     @Before
     public void setUp() {
@@ -86,7 +103,7 @@ public class AssignmentMoveValidationServiceTest {
 
         when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
         when(timeslotRepository.findById("TS_TARGET")).thenReturn(Optional.of(target));
-        when(assignmentRepository.findAll()).thenReturn(new ArrayList<>(List.of(assignment)));
+        when(assignmentCurrentRepository.findAll()).thenReturn(new ArrayList<>(List.of(current(assignment))));
         when(timeslotRepository.findAll()).thenReturn(new ArrayList<>(List.of(target)));
         when(teacherRepository.findById("T1")).thenReturn(Optional.of(teacher));
         when(courseRepository.findById("C1")).thenReturn(Optional.of(course));
@@ -125,10 +142,53 @@ public class AssignmentMoveValidationServiceTest {
         other.setCourseId("C2");
         other.setTeacherId("T1");
         other.setBlockTimeslotId("TS_TARGET");
-        when(assignmentRepository.findAll()).thenReturn(new ArrayList<>(List.of(assignment, other)));
+        when(assignmentCurrentRepository.findAll()).thenReturn(new ArrayList<>(List.of(current(assignment), current(other))));
 
         AssignmentMoveValidationResponse response = service.validate("A1", "TS_TARGET", false);
         assertTrue(response.getViolations().stream().anyMatch(v -> v.contains("Teacher double-booking")));
+    }
+
+    /**
+     * The regression this whole change exists for. A block that the SOLVER
+     * placed is unpinned, so its raw course_block_assignment row carries a null
+     * block_timeslot_id and only the resolved view knows where it actually sits.
+     * Validation used to read the raw table and skip every null-timeslot row,
+     * which meant it silently ignored every solver-placed block - measured on
+     * the live dataset at 34 of 551 blocks visible, so 94% of the schedule the
+     * scheduler was looking at could not produce a conflict, and Save was gated
+     * on a check that mostly saw nothing.
+     *
+     * <p>The two stubs below are deliberately inconsistent with each other, and
+     * that is the point: the raw repository reports this block as unplaced,
+     * the view reports where the solver put it. Reading the wrong one makes the
+     * conflict vanish, so this test fails if the data source is ever reverted.
+     */
+    @Test
+    public void conflictWithASolverPlacedUnpinnedBlock_isStillDetected() {
+        CourseBlockAssignmentEntity solverPlaced = new CourseBlockAssignmentEntity();
+        solverPlaced.setId("A2");
+        solverPlaced.setGroupId("G2");
+        solverPlaced.setCourseId("C2");
+        solverPlaced.setTeacherId("T1"); // same teacher as the block being moved
+        solverPlaced.setPinned(false);
+        solverPlaced.setBlockTimeslotId(null); // raw table: unpinned rows hold no slot
+
+        CourseBlockAssignmentCurrentEntity asResolved = new CourseBlockAssignmentCurrentEntity(
+                "A2", "G2", "C2", 1, false, "T1",
+                "TS_TARGET", // the view: this is where the latest run actually placed it
+                null, null, null);
+
+        // lenient(): the service must NOT touch the raw table any more, so strict
+        // stubbing would flag this as unused - which is exactly the property under
+        // test. Kept so the fixture still shows what the raw table would have said.
+        org.mockito.Mockito.lenient().when(assignmentRepository.findAll())
+                .thenReturn(new ArrayList<>(List.of(assignment, solverPlaced)));
+        when(assignmentCurrentRepository.findAll())
+                .thenReturn(new ArrayList<>(List.of(current(assignment), asResolved)));
+
+        AssignmentMoveValidationResponse response = service.validate("A1", "TS_TARGET", true);
+        assertTrue("a conflict with a solver-placed block must block the move",
+                response.getViolations().stream().anyMatch(v -> v.contains("Teacher double-booking")));
     }
 
     @Test
@@ -140,7 +200,7 @@ public class AssignmentMoveValidationServiceTest {
         other.setTeacherId("T2");
         other.setRoomName("R1");
         other.setBlockTimeslotId("TS_TARGET");
-        when(assignmentRepository.findAll()).thenReturn(new ArrayList<>(List.of(assignment, other)));
+        when(assignmentCurrentRepository.findAll()).thenReturn(new ArrayList<>(List.of(current(assignment), current(other))));
 
         AssignmentMoveValidationResponse response = service.validate("A1", "TS_TARGET", false);
         assertTrue(response.getViolations().stream().anyMatch(v -> v.contains("Room double-booking")));
@@ -217,7 +277,7 @@ public class AssignmentMoveValidationServiceTest {
         BlockTimeslotEntity otherSlot = new BlockTimeslotEntity(1, 10, 1);
         otherSlot.setId("TS_OTHER");
         sameDayOther.setBlockTimeslotId("TS_OTHER");
-        when(assignmentRepository.findAll()).thenReturn(new ArrayList<>(List.of(assignment, sameDayOther)));
+        when(assignmentCurrentRepository.findAll()).thenReturn(new ArrayList<>(List.of(current(assignment), current(sameDayOther))));
         when(timeslotRepository.findAll()).thenReturn(new ArrayList<>(List.of(target, otherSlot)));
 
         AssignmentMoveValidationResponse response = service.validate("A1", "TS_TARGET", false);
@@ -238,7 +298,7 @@ public class AssignmentMoveValidationServiceTest {
         BlockTimeslotEntity otherSlot = new BlockTimeslotEntity(1, 9, 1);
         otherSlot.setId("TS_OTHER");
         sameDayOther.setBlockTimeslotId("TS_OTHER");
-        when(assignmentRepository.findAll()).thenReturn(new ArrayList<>(List.of(assignment, sameDayOther)));
+        when(assignmentCurrentRepository.findAll()).thenReturn(new ArrayList<>(List.of(current(assignment), current(sameDayOther))));
         when(timeslotRepository.findAll()).thenReturn(new ArrayList<>(List.of(target, otherSlot)));
         when(constraintConfigRepository.existsById("Maximum blocks per course per group per day")).thenReturn(true);
 
@@ -262,7 +322,7 @@ public class AssignmentMoveValidationServiceTest {
         BlockTimeslotEntity otherSlot = new BlockTimeslotEntity(1, 11, 1);
         otherSlot.setId("TS_OTHER");
         sameDayOther.setBlockTimeslotId("TS_OTHER");
-        when(assignmentRepository.findAll()).thenReturn(new ArrayList<>(List.of(assignment, sameDayOther)));
+        when(assignmentCurrentRepository.findAll()).thenReturn(new ArrayList<>(List.of(current(assignment), current(sameDayOther))));
         when(timeslotRepository.findAll()).thenReturn(new ArrayList<>(List.of(target, otherSlot)));
 
         AssignmentMoveValidationResponse response = service.validate("A1", "TS_TARGET", false);

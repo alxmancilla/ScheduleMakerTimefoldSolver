@@ -117,6 +117,14 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
     (ts) => ts.dayOfWeek === dayOfWeek && ts.startHour === startHour,
   );
   const pinBlocked = !roomName;
+  // Moving a block anywhere new only means something if it's pinned: an
+  // unpinned block takes its position from the latest solver run, so the
+  // server ignores (and now rejects) a new slot without a pin. Force it on
+  // once day/hour actually differ, rather than letting the save silently do
+  // nothing - the same rule the endpoint enforces.
+  const slotChanged = dayOfWeek !== entry.dayOfWeek || startHour !== entry.startHour;
+  const pinForcedByMove = slotChanged && !pinBlocked;
+  const effectivePinned = pinForcedByMove ? true : pinned;
 
   // Re-validate (debounced) whenever the candidate day/hour/pinned changes.
   // Deliberately does NOT re-run when room/teacher change - the endpoint
@@ -136,7 +144,7 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
       try {
         const response = await validateAssignmentMove(entry.id, {
           blockTimeslotId: targetTimeslot.id,
-          pinned,
+          pinned: effectivePinned,
         });
         setViolations(response.data.violations || []);
         setWarnings(response.data.warnings || []);
@@ -150,7 +158,7 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
     }, VALIDATE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry.id, targetTimeslot?.id, pinned]);
+  }, [entry.id, targetTimeslot?.id, effectivePinned]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') onClose();
@@ -176,7 +184,7 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
           preferredRoomHint: a.preferredRoomHint,
         });
       } else {
-        await moveAssignment(entry.id, { blockTimeslotId: targetTimeslot.id, pinned });
+        await moveAssignment(entry.id, { blockTimeslotId: targetTimeslot.id, pinned: effectivePinned });
       }
       showToast(t('schedule.moveEditor.savedMessage'));
       onSaved();
@@ -256,8 +264,8 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
             <input
               id="move-editor-pinned"
               type="checkbox"
-              checked={pinned}
-              disabled={pinBlocked && !pinned}
+              checked={effectivePinned}
+              disabled={(pinBlocked && !pinned) || pinForcedByMove}
               onChange={(e) => setPinned(e.target.checked)}
             />
             {t('schedule.moveEditor.pinned')}
@@ -265,6 +273,11 @@ function AssignmentMoveEditor({ entry, timeslots, onClose, onSaved }) {
           {entry.pinned && (
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
               {formatPinProvenance(entry, t)}
+            </p>
+          )}
+          {pinForcedByMove && (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '4px' }}>
+              {t('schedule.moveEditor.pinRequiredForMove')}
             </p>
           )}
           {pinBlocked && !pinned && (

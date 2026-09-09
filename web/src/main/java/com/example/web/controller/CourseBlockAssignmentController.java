@@ -99,6 +99,28 @@ public class CourseBlockAssignmentController {
         CourseBlockAssignmentEntity assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment", id));
         boolean wasPinned = Boolean.TRUE.equals(assignment.getPinned());
+
+        // A move that doesn't pin has nowhere to be recorded (added 2026-09-08).
+        // course_block_assignment_current takes an unpinned row's placement from
+        // the latest schedule_run and ignores block_timeslot_id entirely, so
+        // writing a new slot on an unpinned row changed nothing a user could
+        // see: the editor reported success and the grid did not move. Rather
+        // than persist data nothing reads, reject the combination outright.
+        // Unpinning a block where it already sits stays legal - that's a
+        // release, not a move, and stampPinProvenance clears the now-meaningless
+        // timeslot along with the provenance fields.
+        boolean slotChanged = !request.getBlockTimeslotId().equals(assignment.getBlockTimeslotId());
+        if (!request.isPinned() && slotChanged && wasPinned) {
+            throw new IllegalArgumentException(
+                    "Cannot move a block without pinning it: an unpinned block takes its position from the "
+                            + "latest solver run, so the new slot would be ignored. Pin it to place it here, "
+                            + "or unpin it where it currently sits to hand it back to the solver.");
+        }
+        if (!request.isPinned() && !wasPinned) {
+            throw new IllegalArgumentException(
+                    "This block is not pinned, so its position is decided by the solver and cannot be set "
+                            + "manually. Pin it to place it explicitly.");
+        }
         assignment.setBlockTimeslotId(request.getBlockTimeslotId());
         assignment.setPinned(request.isPinned());
         stampPinProvenance(assignment, wasPinned, currentUsername());

@@ -495,6 +495,73 @@ public class CourseBlockAssignmentControllerTest {
                 .andExpect(jsonPath("$.pinnedAt").exists());
     }
 
+    /**
+     * A move that doesn't pin has nowhere to be recorded: the current-schedule
+     * view takes an unpinned row's position from the latest solver run and
+     * ignores block_timeslot_id entirely, so this used to return 200 while the
+     * grid didn't move. Rejected outright rather than persisting data nothing
+     * reads.
+     */
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void moveAssignment_changingSlotWithoutPinning_returns400() throws Exception {
+        assignment.setPinned(true);
+        assignment.setBlockTimeslotId("TS_OLD");
+        when(assignmentMoveValidationService.validate("A1", "TS1", false))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+
+        mockMvc.perform(put("/api/assignments/A1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", false))))
+                .andExpect(status().isBadRequest());
+
+        verify(assignmentRepository, never()).save(any(CourseBlockAssignmentEntity.class));
+    }
+
+    /** An already-unpinned block's position belongs to the solver - it can't be set by hand. */
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void moveAssignment_onAnAlreadyUnpinnedBlockWithoutPinning_returns400() throws Exception {
+        assignment.setPinned(false);
+        when(assignmentMoveValidationService.validate("A1", "TS1", false))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+
+        mockMvc.perform(put("/api/assignments/A1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", false))))
+                .andExpect(status().isBadRequest());
+
+        verify(assignmentRepository, never()).save(any(CourseBlockAssignmentEntity.class));
+    }
+
+    /**
+     * Releasing a block where it already sits stays legal - that's an unpin, not
+     * a move - and the now-meaningless timeslot is cleared with the provenance.
+     */
+    @Test
+    @WithMockUser(username = "scheduler_test", roles = "SCHEDULER")
+    public void moveAssignment_unpinningInPlace_isAllowedAndClearsTheTimeslot() throws Exception {
+        assignment.setPinned(true);
+        assignment.setBlockTimeslotId("TS1");
+        assignment.setPinSource("USER");
+        assignment.setPinnedBy("someone");
+        assignment.setPinnedAt(java.time.LocalDateTime.of(2026, 1, 1, 9, 0));
+        when(assignmentMoveValidationService.validate("A1", "TS1", false))
+                .thenReturn(new com.example.web.dto.AssignmentMoveValidationResponse(List.of(), List.of()));
+        when(assignmentRepository.findById("A1")).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.save(any(CourseBlockAssignmentEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(put("/api/assignments/A1/move")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("blockTimeslotId", "TS1", "pinned", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pinned").value(false))
+                .andExpect(jsonPath("$.blockTimeslotId").doesNotExist())
+                .andExpect(jsonPath("$.pinSource").doesNotExist());
+    }
+
     @Test
     public void moveAssignment_serverSideViolation_returns400AndDoesNotSave() throws Exception {
         // The frontend already blocks Save on a violation, but the server

@@ -816,6 +816,7 @@
       "startHour": "Start hour",
       "pinned": "Pinned",
       "pinBlockedNoRoom": "Can't pin: this block has no room assigned yet.",
+      "pinRequiredForMove": "Moving a block pins it: an unpinned block takes its position from the latest solver run, so a new slot would be ignored. Untick only to hand the block back to the solver where it currently sits.",
       "saving": "Saving...",
       "savedMessage": "Assignment updated.",
       "saveFailedPrefix": "Failed to save: ",

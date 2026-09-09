@@ -12,6 +12,8 @@ import com.example.web.entity.TeacherEntity;
 import com.example.web.exception.ResourceNotFoundException;
 import com.example.web.repository.ComponentBlockRuleRepository;
 import com.example.web.repository.ConstraintConfigRepository;
+import com.example.web.entity.CourseBlockAssignmentCurrentEntity;
+import com.example.web.repository.CourseBlockAssignmentCurrentRepository;
 import com.example.web.repository.CourseBlockAssignmentRepository;
 import com.example.web.repository.CourseRepository;
 import com.example.web.repository.BlockTimeslotRepository;
@@ -76,6 +78,21 @@ public class AssignmentMoveValidationService {
     @Autowired
     private CourseBlockAssignmentRepository assignmentRepository;
 
+    /**
+     * Deliberately the RESOLVED current schedule, not the raw input table
+     * (fixed 2026-09-08). course_block_assignment.block_timeslot_id is only
+     * ever meaningful for a pinned row - every unpinned row carries null there
+     * and takes its actual placement from the latest schedule_run - so reading
+     * the raw table made both list-based checks below skip every
+     * solver-placed block. Measured on the live dataset at the time: 34 of 551
+     * blocks visible, so 94% of the schedule the user is looking at was
+     * invisible to the very validation gating their Save button. Reading
+     * through course_block_assignment_current makes "what we validate against"
+     * and "what the grid displays" the same thing by construction.
+     */
+    @Autowired
+    private CourseBlockAssignmentCurrentRepository assignmentCurrentRepository;
+
     @Autowired
     private BlockTimeslotRepository timeslotRepository;
 
@@ -120,7 +137,7 @@ public class AssignmentMoveValidationService {
         int newEnd = newStart + newLength;
         Integer day = target.getDayOfWeek();
 
-        List<CourseBlockAssignmentEntity> all = assignmentRepository.findAll();
+        List<CourseBlockAssignmentCurrentEntity> all = assignmentCurrentRepository.findAll();
         Map<String, BlockTimeslotEntity> timeslotsById = timeslotRepository.findAll().stream()
                 .collect(Collectors.toMap(BlockTimeslotEntity::getId, t -> t));
 
@@ -134,9 +151,11 @@ public class AssignmentMoveValidationService {
 
     /** Teacher/group/room double-booking - ALWAYS hard, never configurable (see class doc). */
     private void checkDoubleBooking(CourseBlockAssignmentEntity assignment, int newStart, int newLength, Integer day,
-            List<CourseBlockAssignmentEntity> all, Map<String, BlockTimeslotEntity> timeslotsById,
+            List<CourseBlockAssignmentCurrentEntity> all, Map<String, BlockTimeslotEntity> timeslotsById,
             List<String> violations) {
-        for (CourseBlockAssignmentEntity other : all) {
+        for (CourseBlockAssignmentCurrentEntity other : all) {
+            // A null timeslot here means genuinely unplaced (no run has ever
+            // placed it), not merely unpinned - see the repository's javadoc.
             if (other.getId().equals(assignment.getId()) || other.getBlockTimeslotId() == null) {
                 continue;
             }
@@ -201,14 +220,14 @@ public class AssignmentMoveValidationService {
 
     /** Per-day block cap and same-day consecutiveness for this (group, course) pair, after the hypothetical move. */
     private void checkDayShape(CourseBlockAssignmentEntity assignment, String assignmentId, int newStart,
-            int newLength, Integer day, List<CourseBlockAssignmentEntity> all,
+            int newLength, Integer day, List<CourseBlockAssignmentCurrentEntity> all,
             Map<String, BlockTimeslotEntity> timeslotsById, List<String> violations, List<String> warnings) {
         if (assignment.getGroupId() == null || assignment.getCourseId() == null) {
             return;
         }
         List<int[]> sameDayBlocks = new ArrayList<>();
         sameDayBlocks.add(new int[] { newStart, newLength });
-        for (CourseBlockAssignmentEntity other : all) {
+        for (CourseBlockAssignmentCurrentEntity other : all) {
             if (other.getId().equals(assignmentId) || other.getBlockTimeslotId() == null) {
                 continue;
             }

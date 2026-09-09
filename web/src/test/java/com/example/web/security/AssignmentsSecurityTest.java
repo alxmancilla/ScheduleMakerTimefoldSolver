@@ -197,9 +197,14 @@ public class AssignmentsSecurityTest {
         when(assignmentRepository.findById("block_assignment_1")).thenReturn(java.util.Optional.of(assignment));
         when(assignmentRepository.save(org.mockito.ArgumentMatchers.any())).thenReturn(assignment);
 
+        // pinned:true because this test is about ACCESS (200 vs 403), and since
+        // 2026-09-08 a move that doesn't pin is rejected as incoherent (400) -
+        // an unpinned block takes its position from the latest solver run, so
+        // the new slot would be ignored. A 400 here would mask the authorization
+        // result this test actually exists to assert.
         mockMvc.perform(put("/api/assignments/block_assignment_1/move")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":false}"))
+                        .content("{\"blockTimeslotId\":\"block_1\",\"pinned\":true}"))
                 .andExpect(status().isOk());
     }
 

@@ -816,6 +816,7 @@
       "startHour": "Hora de inicio",
       "pinned": "Fijado",
       "pinBlockedNoRoom": "No se puede fijar: este bloque aún no tiene un aula asignada.",
+      "pinRequiredForMove": "Mover un bloque lo fija: un bloque sin fijar toma su posición de la última ejecución del solver, por lo que un nuevo horario se ignoraría. Desmarque solo para devolver el bloque al solver en su posición actual.",
       "saving": "Guardando...",
       "savedMessage": "Asignación actualizada.",
       "saveFailedPrefix": "Error al guardar: ",
