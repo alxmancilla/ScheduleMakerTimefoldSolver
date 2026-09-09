@@ -434,6 +434,26 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                     if (assignment.getGroup() == null || assignment.getRoom() == null) {
                         return false;
                     }
+                    // A teacher's required room OUTRANKS the group's curated range
+                    // (getMatchingRooms() tier 1) and makes the block room-fixed, so
+                    // penalizing it here charges for a placement no move can change -
+                    // MatchingLengthMoveFilter rejects every room move on a fixed
+                    // block. Added 2026-09-09: on the live dataset ALL 43 penalized
+                    // blocks were exactly this case, making the entire -86 an
+                    // unavoidable constant and the largest single line item in the
+                    // soft score. It never misled the SEARCH (a constant offset
+                    // doesn't change move deltas) but it did mask this constraint's
+                    // real signal - genuine group-range misses - completely, and
+                    // made the score unreadable for weight tuning.
+                    //
+                    // isTeacherRequiredRoomApplicable() rather than a raw name
+                    // comparison, for the same reason teacherRequiredRoomMustBeUsed
+                    // uses it: it's false when the required room doesn't satisfy this
+                    // block's satisfiesRoomType, in which case tier 1 was skipped and
+                    // the group's range legitimately governs after all.
+                    if (assignment.isTeacherRequiredRoomApplicable()) {
+                        return false;
+                    }
                     List<Room> acceptableRooms = assignment.getGroup().getAcceptableRooms(assignment.getSatisfiesRoomType());
                     if (acceptableRooms == null) {
                         return false;

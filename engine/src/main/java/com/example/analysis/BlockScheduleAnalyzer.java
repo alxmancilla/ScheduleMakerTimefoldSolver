@@ -468,7 +468,11 @@ public final class BlockScheduleAnalyzer {
         // version above.
         List<ViolationInstance> preferredRoomDetails = new ArrayList<>();
         for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
+            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null
+                    && !a.isTeacherRequiredRoomApplicable()) {
+                // Skipped when the teacher's required room governs: it outranks the
+                // group's range and makes the block room-fixed, so the penalty would be
+                // unavoidable - see SchoolConstraintProvider.groupPreferredRoomConstraint.
                 var acceptableRooms = a.getGroup().getAcceptableRooms(a.getSatisfiesRoomType());
                 if (acceptableRooms != null && !acceptableRooms.contains(a.getRoom())) {
                     preferredRoomDetails.add(ViolationInstance.of(blockAssignmentToString(a)
@@ -736,7 +740,11 @@ public final class BlockScheduleAnalyzer {
         // special Mixed-type exclusion.
         int preferredRoomViolations = 0;
         for (CourseBlockAssignment a : list) {
-            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null) {
+            if (!a.isPinned() && a.getGroup() != null && a.getRoom() != null
+                    && !a.isTeacherRequiredRoomApplicable()) {
+                // Skipped when the teacher's required room governs: it outranks the
+                // group's range and makes the block room-fixed, so the penalty would be
+                // unavoidable - see SchoolConstraintProvider.groupPreferredRoomConstraint.
                 var acceptableRooms = a.getGroup().getAcceptableRooms(a.getSatisfiesRoomType());
                 if (acceptableRooms != null && !acceptableRooms.contains(a.getRoom())) {
                     preferredRoomViolations++;

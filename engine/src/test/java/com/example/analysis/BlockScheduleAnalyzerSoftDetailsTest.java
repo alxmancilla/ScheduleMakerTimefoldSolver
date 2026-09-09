@@ -75,6 +75,85 @@ public class BlockScheduleAnalyzerSoftDetailsTest {
         assertEquals(1, softDetails(schedule).get(name).size());
     }
 
+    /**
+     * A block whose room is dictated by the teacher's requiredRoomName must NOT
+     * be penalised for missing the group's curated range: the teacher's room
+     * outranks that range (getMatchingRooms() tier 1) and makes the block
+     * room-fixed, so the penalty would be unavoidable by construction.
+     *
+     * <p>Found live 2026-09-09: all 43 penalised blocks on the real dataset were
+     * exactly this case, so the entire -86 was a constant the solver could never
+     * work off - the largest single line item in the soft score, and pure noise
+     * for weight tuning.
+     */
+    @Test
+    public void preferredRoom_notPenalisedWhenTheTeachersRequiredRoomGoverns() {
+        Room groupsRoom = new Room("R1", "A", "Standard");
+        Room teachersRoom = new Room("R2", "A", "Standard");
+        Map<String, List<Room>> ranges = new HashMap<>();
+        ranges.put("Standard", List.of(groupsRoom));
+        Group group = new Group("G1", "Test Group", new HashSet<>(), ranges);
+        Course course = new Course("1", "Test Course", "TEST", 2, "Core", "Standard", 4, Boolean.TRUE);
+        BlockTimeslot ts = new BlockTimeslot("slot1", DayOfWeek.MONDAY, 7, 1);
+
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", new HashSet<>(), new HashMap<>(), 40);
+        teacher.setRequiredRoomName("R2"); // outranks the group's curated range
+
+        CourseBlockAssignment a = new CourseBlockAssignment("a1", group, course, 1);
+        a.setTimeslot(ts);
+        a.setTeacher(teacher);
+        a.setRoom(teachersRoom); // exactly where tier 1 forces it
+        a.setSatisfiesRoomType("Standard");
+        a.setPinned(false);
+        a.setAllRooms(new ArrayList<>(List.of(groupsRoom, teachersRoom)));
+
+        SchoolSchedule schedule = scheduleOf(List.of(teacher), List.of(ts),
+                List.of(groupsRoom, teachersRoom), List.of(course), List.of(group), List.of(a));
+
+        String name = "Prefer group's preferred room";
+        assertEquals("the teacher's required room outranks the group's range - no penalty is payable",
+                0, softCounts(schedule).get(name).intValue());
+        assertEquals(0, softDetails(schedule).get(name).size());
+    }
+
+    /**
+     * The flip side: a required room that does NOT satisfy the block's room type
+     * was never applied (getMatchingRooms() falls through to the group's range),
+     * so the group's preference legitimately governs and the penalty stands.
+     * This is why the guard uses isTeacherRequiredRoomApplicable() rather than a
+     * bare name comparison.
+     */
+    @Test
+    public void preferredRoom_stillPenalisedWhenTheRequiredRoomNeverApplied() {
+        Room groupsRoom = new Room("R1", "A", "Standard");
+        Room outOfRange = new Room("R2", "A", "Standard");
+        Room wrongTypeRoom = new Room("LAB", "A", "Specialized - Computer Lab");
+        Map<String, List<Room>> ranges = new HashMap<>();
+        ranges.put("Standard", List.of(groupsRoom));
+        Group group = new Group("G1", "Test Group", new HashSet<>(), ranges);
+        Course course = new Course("1", "Test Course", "TEST", 2, "Core", "Standard", 4, Boolean.TRUE);
+        BlockTimeslot ts = new BlockTimeslot("slot1", DayOfWeek.MONDAY, 7, 1);
+
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", new HashSet<>(), new HashMap<>(), 40);
+        // A Computer Lab can't satisfy a Standard block, so tier 1 never fires.
+        teacher.setRequiredRoomName("LAB");
+
+        CourseBlockAssignment a = new CourseBlockAssignment("a1", group, course, 1);
+        a.setTimeslot(ts);
+        a.setTeacher(teacher);
+        a.setRoom(outOfRange);
+        a.setSatisfiesRoomType("Standard");
+        a.setPinned(false);
+        a.setAllRooms(new ArrayList<>(List.of(groupsRoom, outOfRange, wrongTypeRoom)));
+
+        SchoolSchedule schedule = scheduleOf(List.of(teacher), List.of(ts),
+                List.of(groupsRoom, outOfRange, wrongTypeRoom), List.of(course), List.of(group), List.of(a));
+
+        String name = "Prefer group's preferred room";
+        assertEquals(1, softCounts(schedule).get(name).intValue());
+        assertEquals(1, softDetails(schedule).get(name).size());
+    }
+
     // ---- Room capacity should fit group size ----
 
     @Test
