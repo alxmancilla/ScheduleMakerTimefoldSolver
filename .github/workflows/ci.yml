@@ -1,11 +1,7 @@
 name: CI
 
-# Runs the same two commands the README documents for local development
-# (`mvn test`, `npm test`) on every push and PR, so the test discipline both
-# sides of this project have builds up actually gets enforced instead of
-# being opt-in-only. Deliberately does NOT run `mvn -pl web verify` (the
-# Testcontainers-backed integration layer) - that needs Docker and is a
-# separate, heavier check, not part of what `mvn test` covers.
+# Four independent jobs, so a failure in one still shows the others' status
+# rather than the whole workflow going dark on the first red job.
 on:
   push:
     branches: ['**']
@@ -47,3 +43,41 @@ jobs:
 
       - run: npm ci
       - run: npm test
+      - run: npm run build
+
+  web-integration:
+    name: Backend (Testcontainers *IT)
+    runs-on: ubuntu-latest
+    # The Testcontainers-backed *IT layer (FK/CHECK enforcement, cascades,
+    # JPQL null-handling a mock can't verify - see AbstractPostgresIntegrationTest)
+    # bound to Failsafe (`mvn verify`), separate from the fast Docker-free
+    # `mvn test` job above. Needs only the Docker daemon ubuntu-latest runners
+    # already ship - Testcontainers starts and tears down its own disposable
+    # Postgres container, no service: block required.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: mvn -pl web verify
+        run: mvn -pl web verify
+
+  docker:
+    name: Docker build (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [engine, web, reporter]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build only - proves the reactor/Dockerfile stay in sync (this exact
+      # job would have caught the common module's Dockerfiles never being
+      # updated to COPY it once the reactor grew a fourth module, 2026-09-08).
+      # No push: these aren't published from CI.
+      - name: docker build
+        run: docker build -f ${{ matrix.module }}/Dockerfile -t scheduler-${{ matrix.module }}:ci .

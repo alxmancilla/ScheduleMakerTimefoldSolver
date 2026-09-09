@@ -150,7 +150,20 @@
 
     <build>
         <plugins>
-            <!-- Spring Boot Maven Plugin -->
+            <!-- Spring Boot Maven Plugin. classifier=exec (discovered 2026-09-08
+                 while wiring mvn -pl web verify into CI) keeps the executable jar
+                 out of the primary artifact slot: repackage otherwise overwrites
+                 target/scheduler-web-1.0.0.jar in place with the Spring Boot
+                 BOOT-INF/classes layout, and Failsafe's integration-test phase
+                 (which runs after package) builds its test classpath from that
+                 same primary-artifact file rather than target/classes - a plain
+                 classloader can't resolve BOOT-INF-nested classes, so every *IT
+                 failed with NoClassDefFoundError for an ordinary repository
+                 class that plainly existed in target/classes. With the
+                 classifier, target/scheduler-web-1.0.0.jar stays the plain jar
+                 Failsafe (and Docker's `mvn ... package` step, see Dockerfile)
+                 can use normally, and the executable jar is the separate
+                 scheduler-web-1.0.0-exec.jar. -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -159,6 +172,9 @@
                         <goals>
                             <goal>repackage</goal>
                         </goals>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

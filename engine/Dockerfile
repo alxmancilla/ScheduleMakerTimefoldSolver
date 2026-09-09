@@ -27,13 +27,16 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /src
 
-# Copy the reactor: the parent POM lists all three modules, so Maven must be able
+# Copy the reactor: the parent POM lists all four modules, so Maven must be able
 # to read every module POM to resolve the reactor (even when building only the
-# engine). Bring in all module POMs, but only the engine sources are needed.
+# engine). Bring in all module POMs, plus the sources for the engine and its
+# build dependency common (engine depends on scheduler-common - see -am below).
 COPY pom.xml ./
+COPY common/pom.xml ./common/pom.xml
 COPY engine/pom.xml ./engine/pom.xml
 COPY reporter/pom.xml ./reporter/pom.xml
 COPY web/pom.xml ./web/pom.xml
+COPY common/src ./common/src
 COPY engine/src ./engine/src
 
 # Build only the engine module (and its parent) into the shaded fat jar. The

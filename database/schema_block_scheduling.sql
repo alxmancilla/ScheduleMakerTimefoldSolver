@@ -139,13 +139,19 @@ CREATE TABLE room_type (
     name VARCHAR(50) PRIMARY KEY
 );
 
-COMMENT ON TABLE room_type IS 'Valid room/room-requirement classification values (estándar, taller, centro de cómputo, mixto).';
+COMMENT ON TABLE room_type IS 'Valid room/room-requirement classification values (Standard, Specialized - Workshop, Specialized - Computer Lab, Mixed).';
 
+-- English labels (renamed several times before settling here - see CLAUDE.md's
+-- Room Assignment section for the history: estándar/taller/centro de cómputo/
+-- mixto -> ... -> these four). Matches ROOM_TYPES in web-ui/src/constants.js
+-- and every hardcoded comparison in the Java code (RoomTypeCompatibility,
+-- SchoolConstraintProvider, etc.) - those were never Spanish-aware, so a fresh
+-- install seeded with the old values would silently mismatch every one of them.
 INSERT INTO room_type (name) VALUES
-    ('estándar'),
-    ('taller'),
-    ('centro de cómputo'),
-    ('mixto');
+    ('Standard'),
+    ('Specialized - Workshop'),
+    ('Specialized - Computer Lab'),
+    ('Mixed');
 
 -- ============================================================================
 -- COURSE DESIGNATION TABLE

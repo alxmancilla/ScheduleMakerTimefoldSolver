@@ -34,21 +34,26 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /src
 
-# Copy the reactor: the parent POM lists all three modules, so Maven must be able
+# Copy the reactor: the parent POM lists all four modules, so Maven must be able
 # to read every module POM to resolve the reactor. Bring in all module POMs, plus
-# the sources for the web module and its build dependency (engine is not required
-# by web, so only the web sources are needed).
+# the sources for the web module and its build dependency common (web depends on
+# scheduler-common - see -am below; engine is not required by web, so no engine
+# sources are needed).
 COPY pom.xml ./
+COPY common/pom.xml ./common/pom.xml
 COPY engine/pom.xml ./engine/pom.xml
 COPY reporter/pom.xml ./reporter/pom.xml
 COPY web/pom.xml ./web/pom.xml
+COPY common/src ./common/src
 COPY web/src ./web/src
 
 # Build only the web module (and its parent) into the Spring Boot executable jar.
-# The glob matches the repackaged artifact (the plain "original-" jar has a
-# different prefix and is left behind by spring-boot:repackage).
+# spring-boot-maven-plugin's repackage execution uses classifier=exec (see
+# web/pom.xml) so the executable jar is scheduler-web-<version>-exec.jar,
+# separate from the plain scheduler-web-<version>.jar left as the primary
+# artifact - the glob below matches only the executable one.
 RUN mvn -q -pl web -am -DskipTests package \
-    && cp web/target/scheduler-web-*.jar /web.jar
+    && cp web/target/scheduler-web-*-exec.jar /web.jar
 
 # ---- Runtime stage ----
 FROM eclipse-temurin:17-jre

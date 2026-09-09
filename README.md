@@ -261,6 +261,19 @@ try forking the Failsafe JVM under a different installed JDK (`-Djvm=/path/to/ja
 bleeding-edge JDK for the Maven/test process itself has been observed to make the same Docker
 Desktop connection flaky.
 
+If every `*IT` instead fails immediately with `NoClassDefFoundError`/`ClassNotFoundException` for
+an ordinary `web` class that plainly exists (e.g. `com.example.web.repository.RoomRepository`) —
+never even reaching a Docker-environment error — that's a different, now-fixed bug: `mvn verify`
+runs Failsafe's `integration-test` phase *after* `package`, and `spring-boot-maven-plugin`'s
+`repackage` goal used to overwrite `target/scheduler-web-<version>.jar` in place with the
+executable Spring Boot layout (`BOOT-INF/classes/...`); Failsafe then built its test classpath
+from that same file instead of `target/classes`, and a plain classloader can't resolve anything
+nested under `BOOT-INF`. Fixed 2026-09-08 by giving the `repackage` execution `<classifier>exec
+</classifier>` in `web/pom.xml`, so the plain jar stays at the primary artifact coordinate
+Failsafe (and Maven in general) expects, and the executable one is the separate
+`scheduler-web-<version>-exec.jar` — `web/Dockerfile`'s build stage was updated to `cp` that file
+specifically.
+
 ### Run the Solver
 ```bash
 mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
