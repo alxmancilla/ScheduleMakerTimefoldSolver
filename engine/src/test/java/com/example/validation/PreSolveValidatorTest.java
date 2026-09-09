@@ -400,6 +400,93 @@ public class PreSolveValidatorTest {
         assertTrue(r.getProblems().stream().anyMatch(p -> p.contains("G1") && p.contains("G2") && p.contains("2 block")));
     }
 
+    // ---- Capacity under a HARD semester hour limit: usable slots, not total ----
+
+    /**
+     * Reproduces the live case that motivated this check (GUSTAVO, 2026-09-09),
+     * scaled down. A teacher comfortably within their TOTAL availability can
+     * still be provably over-committed once a HARD semester hour limit is taken
+     * into account, because the late-day hours cannot legally hold the blocks
+     * in question.
+     */
+    @Test
+    public void teacherOverCapacityOnlyOnceAHardSemesterLimitApplies_isBlockingProblem() {
+        // 8h of availability (Mon 7-14), but semester-1 blocks must end by 11:00,
+        // so only hours 7,8,9,10 - 4h - can hold one.
+        Set<String> quals = new HashSet<>(Arrays.asList("Matemáticas"));
+        Map<DayOfWeek, Set<Integer>> avail = new HashMap<>();
+        Set<Integer> hours = new HashSet<>();
+        for (int h = 7; h < 15; h++) {
+            hours.add(h);
+        }
+        avail.put(DayOfWeek.MONDAY, hours);
+        Teacher teacher = new Teacher("T1", "Ada", "Lovelace", quals, avail, 40);
+
+        Course capped = new Course("2", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
+        capped.setLatestEndHour(11);
+        capped.setLatestEndHourSeverity("HARD");
+
+        Room room = new Room("AULA 1", "A", "estándar");
+        // 6h assigned: under the 8h total (so the plain capacity check passes),
+        // over the 4h usable below 11:00.
+        CourseBlockAssignment a1 = pinnedBlock("A1", 3, new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 3),
+                room, teacher, "estándar");
+        a1.setCourse(capped);
+        CourseBlockAssignment a2 = pinnedBlock("A2", 3, new BlockTimeslot("s2", DayOfWeek.MONDAY, 8, 3),
+                room, teacher, "estándar");
+        a2.setCourse(capped);
+        a2.setPinned(false);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1, a2));
+
+        assertFalse(r.isValid());
+        String problem = r.getProblems().stream()
+                .filter(p -> p.contains("must finish by")).findFirst()
+                .orElseThrow(() -> new AssertionError("expected a HARD-semester-limit capacity problem, got: "
+                        + r.getProblems()));
+        assertTrue(problem.contains("T1"));
+        assertTrue(problem.contains("6h/week"));
+        assertTrue(problem.contains("11:00"));
+        assertTrue(problem.contains("short by 2h"));
+        // The point of the check: total availability alone would have passed this.
+        assertTrue(problem.contains("8h"));
+    }
+
+    /** A SOFT limit is breakable, so it must not constrain capacity at all. */
+    @Test
+    public void softSemesterLimitDoesNotReduceUsableCapacity() {
+        Teacher teacher = qualifiedAvailableTeacher(); // Mon 7-14, 7h
+        Course capped = new Course("2", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
+        capped.setLatestEndHour(9);
+        capped.setLatestEndHourSeverity("SOFT");
+
+        Room room = new Room("AULA 1", "A", "estándar");
+        CourseBlockAssignment a1 = pinnedBlock("A1", 4, new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4),
+                room, teacher, "estándar");
+        a1.setCourse(capped);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1));
+        assertTrue("a SOFT limit is breakable and must not shrink capacity: " + r.getProblems(),
+                r.getProblems().stream().noneMatch(p -> p.contains("must finish by")));
+    }
+
+    /** Enough usable hours below the ceiling - nothing to report. */
+    @Test
+    public void withinCapacityUnderAHardSemesterLimit_noProblem() {
+        Teacher teacher = qualifiedAvailableTeacher(); // Mon 7-14
+        Course capped = new Course("2", "Matemáticas", "MAT", 1, "BASICAS", "estándar", 4, true);
+        capped.setLatestEndHour(12); // hours 7..11 usable = 5h
+        capped.setLatestEndHourSeverity("HARD");
+
+        Room room = new Room("AULA 1", "A", "estándar");
+        CourseBlockAssignment a1 = pinnedBlock("A1", 4, new BlockTimeslot("s1", DayOfWeek.MONDAY, 7, 4),
+                room, teacher, "estándar");
+        a1.setCourse(capped);
+
+        ValidationResult r = PreSolveValidator.validate(scheduleWith(a1));
+        assertTrue(r.getProblems().stream().noneMatch(p -> p.contains("must finish by")));
+    }
+
     // ---- Room-fixed capacity: two teachers sharing one required room ----
 
     private static Teacher fullWeekTeacher(String id, String lastName) {

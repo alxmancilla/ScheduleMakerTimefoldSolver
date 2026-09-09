@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -486,6 +487,98 @@ public final class PreSolveValidator {
                         teacher.getId(), assignedHours, availableHours, assignedHours - availableHours));
             }
         }
+        validateCapacityUnderHardSemesterLimits(assignments, problems);
+    }
+
+    /**
+     * The same pigeonhole argument as {@link #validateCapacity} above, but
+     * against the availability a teacher can ACTUALLY use rather than all of it.
+     * A course whose semester has a HARD {@code semester_hour_limit} may never
+     * end after that hour - {@code CourseBlockAssignment.getMatchingBlockTimeslots()}
+     * strips later slots from its value range outright - so for those blocks the
+     * teacher's late-day availability may as well not exist.
+     *
+     * <p>Comparing against total availability therefore passes teachers who are
+     * provably over-committed. Found live on 2026-09-09: GUSTAVO teaches 27h,
+     * all of it semester-1 courses, against 40h of declared availability - so
+     * the plain check passed comfortably. But semester 1 is capped at 12:00
+     * (HARD), and only 25 of his 40 available hours start before 12:00. 27h into
+     * 25 usable slots forces at least two collisions, and the solver duly
+     * produced exactly two teacher double-bookings, run after run, while his
+     * 12:00-15:00 sat empty every day because semester-1 blocks structurally
+     * cannot go there. The advisory validateSharedTeacherLoad missed him too
+     * (he is only 68% utilised on the raw numbers) while flagging three
+     * teachers the solver placed without trouble.
+     *
+     * <p>Generalises to a teacher whose courses carry different ceilings.
+     * The usable-slot sets are nested - anything a 12:00-capped course can use,
+     * a 14:00-capped one can use too - so it is enough to check each ceiling
+     * against the cumulative demand at or below it, cheapest form of Hall's
+     * condition on a chain. Blocks with no HARD ceiling are unconstrained here
+     * and are already covered by the total check above.
+     *
+     * <p>Blocking rather than advisory, like its parent: exceeding the count is
+     * a proof, not a heuristic.
+     */
+    private static void validateCapacityUnderHardSemesterLimits(List<CourseBlockAssignment> assignments,
+            List<String> problems) {
+        Map<Teacher, SortedMap<Integer, Integer>> hoursByCeiling = new LinkedHashMap<>();
+        for (CourseBlockAssignment a : assignments) {
+            Teacher teacher = a.getTeacher();
+            Integer ceiling = hardSemesterCeiling(a.getCourse());
+            if (teacher == null || ceiling == null) {
+                continue;
+            }
+            hoursByCeiling.computeIfAbsent(teacher, k -> new TreeMap<>())
+                    .merge(ceiling, a.getBlockLength(), Integer::sum);
+        }
+        for (Map.Entry<Teacher, SortedMap<Integer, Integer>> entry : hoursByCeiling.entrySet()) {
+            Teacher teacher = entry.getKey();
+            int cumulativeHours = 0;
+            for (Map.Entry<Integer, Integer> tier : entry.getValue().entrySet()) {
+                int ceiling = tier.getKey();
+                cumulativeHours += tier.getValue();
+                int usableHours = availableHoursStartingBefore(teacher, ceiling);
+                if (cumulativeHours > usableHours) {
+                    problems.add(String.format(
+                            "Teacher '%s' is assigned %dh/week of courses that must finish by %d:00 (a HARD "
+                                    + "semester hour limit), but only %dh of their availability starts early "
+                                    + "enough to hold one - short by %dh. At least one double-booking is "
+                                    + "unavoidable. Their remaining availability is unusable for these blocks, "
+                                    + "so total availability (%dh) is not the relevant capacity.",
+                            teacher.getId(), cumulativeHours, ceiling, usableHours,
+                            cumulativeHours - usableHours, teacher.getTotalAvailableHours()));
+                }
+            }
+        }
+    }
+
+    /** This course's HARD end-hour ceiling, or null when it has none (unset, or SOFT and therefore breakable). */
+    private static Integer hardSemesterCeiling(Course course) {
+        if (course == null || !"HARD".equals(course.getLatestEndHourSeverity())) {
+            return null;
+        }
+        return course.getLatestEndHour();
+    }
+
+    /**
+     * How many of this teacher's available hours could hold a block that must
+     * end by {@code ceiling}. An hour {@code h} is usable only if a block
+     * starting there ends by the ceiling; even a 1-hour block ends at h+1, so
+     * the usable hours are exactly those with {@code h < ceiling}. Counting
+     * hours rather than placeable blocks keeps this a lower bound on what is
+     * needed, which is what makes exceeding it a proof.
+     */
+    private static int availableHoursStartingBefore(Teacher teacher, int ceiling) {
+        int usable = 0;
+        for (Set<Integer> hours : teacher.getAvailabilityPerDay().values()) {
+            for (int hour : hours) {
+                if (hour < ceiling) {
+                    usable++;
+                }
+            }
+        }
+        return usable;
     }
 
     /** Per-block checks that mirror the solver's (pinned-excluded) hard rules. */
