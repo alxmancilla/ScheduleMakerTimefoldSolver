@@ -32,6 +32,20 @@ import com.example.domain.Teacher;
  * null" move, even though construction heuristic alone never produced this
  * (0 nulled out of 527). So this filter, not the value range, is what
  * actually makes a fixed block's room untouchable once local search runs.
+ *
+ * The same "set room to null" exploit applies one tier out, to blocks that
+ * AREN'T room-fixed (added 2026-09-08). Unassigning is strictly free score for
+ * any block: every room-related soft constraint skips a null room
+ * (groupPreferredRoomConstraint, preferBlockSpecifiedRoom,
+ * roomCapacityShouldFitGroupSize, nonStandardRoomsShouldFinishBy2pm all guard
+ * on getRoom() == null) and nothing penalizes the absence, so dropping the room
+ * zeroes those penalties outright. Observed on schedule_run #80 - the first
+ * solve in which the idle-gap constraints actually applied any pressure, after
+ * the day-joiner fix - where roomless blocks rose 25 -> 31 via moves like
+ * "{CC2 -> null}". An unassign is now rejected unless the block genuinely has
+ * no assignable room, which is the case allowsUnassigned exists for. Note this
+ * only closes the ChangeMove vector: a room SWAP merely relocates a null
+ * between two blocks, so it can't increase how many blocks lack a room.
  */
 public class MatchingLengthMoveFilter implements SelectionFilter<SchoolSchedule, Move<SchoolSchedule>> {
 
@@ -55,7 +69,25 @@ public class MatchingLengthMoveFilter implements SelectionFilter<SchoolSchedule,
             // toPlanningValue may be null here (an "unassign" move, only possible
             // because allowsUnassigned = true) - reject any change at all to a
             // fixed block's room, since nothing should ever move it once set.
-            return !assignment.isRoomFixed();
+            if (assignment.isRoomFixed()) {
+                return false;
+            }
+            // Same "set room to null" exploit, one tier out (added 2026-09-08):
+            // for a block that ISN'T room-fixed, unassigning is still strictly
+            // free score. Every room-related soft constraint skips a null room
+            // (groupPreferredRoomConstraint, preferBlockSpecifiedRoom,
+            // roomCapacityShouldFitGroupSize, nonStandardRoomsShouldFinishBy2pm
+            // all guard on getRoom() == null) and nothing penalizes the absence,
+            // so dropping the room zeroes those penalties outright and local
+            // search takes it. Observed on schedule_run #80, the first solve
+            // where idle-gap constraints actually applied any pressure: roomless
+            // blocks went 25 -> 31, via moves like "{CC2 -> null}". An unassign
+            // is only legitimate when the block has no assignable room at all,
+            // which is the case allowsUnassigned exists for.
+            if (changeMove.getToPlanningValue() == null) {
+                return assignment.getMatchingRooms().isEmpty();
+            }
+            return true;
         }
 
         Object toPlanningValue = changeMove.getToPlanningValue();
