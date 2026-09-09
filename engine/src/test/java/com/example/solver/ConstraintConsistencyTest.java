@@ -89,10 +89,10 @@ public class ConstraintConsistencyTest {
                                 // re-enabled.
                                 "Teacher exceeds max hours per week",
                                 "Minimize teacher idle gaps (availability-aware)",
-                                // "Minimize group idle gaps" - TEMP DISABLED 2026-08-24, see
-                                // SchoolConstraintProvider (replaced for first-semester groups
-                                // by "Minimize first-semester group idle gaps" below). Re-add
-                                // here when re-enabled.
+                                // Disabled 2026-08-24, RE-ENABLED 2026-09-08 at weight 3 - it
+                                // covers every group, with "Minimize first-semester group idle
+                                // gaps" below staying as a higher-weighted first-year overlay.
+                                "Minimize group idle gaps",
                                 "Prefer block's specified room",
                                 "Non-standard rooms should finish by 2pm",
                                 "Room capacity should fit group size",
@@ -169,12 +169,15 @@ public class ConstraintConsistencyTest {
                 // DISABLED and never counted in analyzeHardConstraintViolations'
                 // aggregate map, so this count itself is unchanged; only their
                 // (also-disabled) BlockScheduleAnalyzer detail computations and
-                // SchoolConstraintProvider methods were deleted.
+                // SchoolConstraintProvider methods were deleted. As of 2026-09-08:
+                // "Minimize group idle gaps" RE-ENABLED at weight 3 (it had been
+                // disabled 2026-08-24, leaving every non-first-semester group's idle
+                // gaps unminimized) - was 11 hard / 9 soft / 20 total before.
                 assertEquals("Expected 11 HARD constraints", 11, hardCount);
-                assertEquals("Expected 9 SOFT constraints", 9, softCount);
+                assertEquals("Expected 10 SOFT constraints", 10, softCount);
 
-                // Total should be 20 (11 hard + 9 soft)
-                assertEquals("Total constraint count mismatch", 20, hardCount + softCount);
+                // Total should be 21 (11 hard + 10 soft)
+                assertEquals("Total constraint count mismatch", 21, hardCount + softCount);
         }
 
         /**

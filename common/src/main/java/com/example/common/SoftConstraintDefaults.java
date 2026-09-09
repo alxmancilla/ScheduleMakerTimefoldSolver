@@ -46,6 +46,7 @@ public final class SoftConstraintDefaults {
         defaults.put("Teacher exceeds max hours per week", 5);
         defaults.put("Room capacity should fit group size", 4);
         defaults.put("Prefer block's specified room", 3);
+        defaults.put("Minimize group idle gaps", 3);
         defaults.put("Minimize teacher idle gaps (availability-aware)", 2);
         defaults.put("Prefer group's preferred room", 2);
         // unmodifiableMap (not Map.copyOf) so the LinkedHashMap's insertion

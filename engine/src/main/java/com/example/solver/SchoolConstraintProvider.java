@@ -76,12 +76,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                 preferSemesterHourLimits(constraintFactory), // SOFT (weight 6): SOFT-severity semester_hour_limit rows
                 teacherMaxHoursPerWeek(constraintFactory), // SOFT (weight 5): workload balance
                 roomCapacityShouldFitGroupSize(constraintFactory), // SOFT (weight 4): group shouldn't exceed room capacity
-                // TEMP DISABLED 2026-08-24 (per request - replaced for first-semester groups
-                // by minimizeSemesterOneGroupIdleGaps above; other groups' idle gaps are no
-                // longer minimized at all) - re-enable by uncommenting, along with its
-                // BlockScheduleAnalyzer mirror, GroupIdleGapAnalyzerTest's assertions, and
-                // ConstraintConsistencyTest's expected soft constraints/counts.
-                // minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
+                // Disabled 2026-08-24 (leaving every non-first-semester group's idle gaps
+                // unminimized), RE-ENABLED 2026-09-08 at weight 3: measured on the live
+                // dataset, that left 14 of 20 groups - every semester-3 and semester-5
+                // group - with no gap protection and ~22 real idle hours between them,
+                // against 6 for the first-year groups the scoped rule does cover. Weight
+                // stays below minimizeSemesterOneGroupIdleGaps' 6, so first-years remain
+                // the deliberate priority and this is a floor under everyone else.
+                minimizeGroupIdleGaps(constraintFactory), // SOFT (weight 3): student schedule quality
                 preferBlockSpecifiedRoom(constraintFactory), // SOFT (weight 3): prefer block's specified room (CC
                                                              // distribution)
                 minimizeTeacherIdleGaps(constraintFactory), // SOFT (weight 2): teacher satisfaction
@@ -555,10 +557,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && a1.getTeacher() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && BlockScheduleMath.availableGapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same teacher lies in
-                // the [earlierEnd, laterStart] span between a1 and a2.
+                // the [earlierEnd, laterStart] span between a1 and a2. The mid block
+                // counts whether or not it's PINNED (fixed 2026-09-08): a pinned block
+                // still occupies the teacher, so letting it break adjacency is the
+                // whole point - excluding it made the pair look adjacent and scored
+                // the pinned block's own teaching hours as idle time.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getTeacher(), CourseBlockAssignment::getTeacher),
-                        Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
+                        Joiners.filtering((a1, a2, mid) -> mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
                 .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize teacher idle gaps (availability-aware)")),
                         (a1, a2) -> BlockScheduleMath.availableGapHours(a1, a2))
@@ -608,7 +614,18 @@ public class SchoolConstraintProvider implements ConstraintProvider {
      * must still break adjacency - scoping the mid-check to semester-1 only
      * would have mistaken "occupied by another course" for "idle" and
      * inflated the gap across the intervening block's own occupied hours.
-     * WEIGHT: 4 (middle priority, slightly above the general-purpose 3 tier).
+     * The same reasoning applies to PINNED mid blocks, which the mid-check
+     * used to exclude (fixed 2026-09-08): a pinned class occupies the student
+     * exactly like any other, so it has to break adjacency too. It didn't,
+     * which made this constraint score pinned class time as idle - measured
+     * live on schedule_run #78, 2 of the 8 hours it reported for first-year
+     * groups were students sitting in a pinned class (e.g. 1A-PRO's Friday,
+     * genuinely back-to-back 07:00-12:00, was reported as a 2-hour gap
+     * because the pinned 08:00-10:00 block was invisible to adjacency).
+     * Pinned blocks still never form the penalized PAIR itself - the solver
+     * can't move them, so scoring them would be unactionable noise.
+     * WEIGHT: 6 (above the general-purpose 3 tier - first-years are the
+     * deliberate priority; minimizeGroupIdleGaps covers everyone at 3).
      */
     private Constraint minimizeSemesterOneGroupIdleGaps(ConstraintFactory constraintFactory) {
         return constraintFactory
@@ -623,10 +640,12 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && BlockScheduleMath.gapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same group (any
-                // semester) lies in the [earlierEnd, laterStart] span between a1/a2.
+                // semester, PINNED or not) lies in the [earlierEnd, laterStart] span
+                // between a1/a2. The pinned case was fixed 2026-09-08 for exactly the
+                // reason the semester case is scoped this way - see the javadoc above.
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
-                        Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
+                        Joiners.filtering((a1, a2, mid) -> mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
                 .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize first-semester group idle gaps")),
                         (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
@@ -652,12 +671,14 @@ public class SchoolConstraintProvider implements ConstraintProvider {
                         && a1.getGroup() != null && a1.getTimeslot() != null && a2.getTimeslot() != null
                         && BlockScheduleMath.gapHours(a1, a2) > 0)
                 // Keep only adjacent pairs: no third block of the same group lies in
-                // the [earlierEnd, laterStart] span between a1 and a2.
+                // the [earlierEnd, laterStart] span between a1 and a2 - PINNED or not
+                // (fixed 2026-09-08; see minimizeSemesterOneGroupIdleGaps' javadoc).
                 .ifNotExistsIncludingUnassigned(CourseBlockAssignment.class,
                         Joiners.equal((a1, a2) -> a1.getGroup(), CourseBlockAssignment::getGroup),
-                        Joiners.filtering((a1, a2, mid) -> !mid.isPinned() && mid.getTimeslot() != null
+                        Joiners.filtering((a1, a2, mid) -> mid.getTimeslot() != null
                                 && mid != a1 && mid != a2 && BlockScheduleMath.liesBetween(a1, a2, mid)))
-                .penalize(HardSoftScore.ofSoft(3), (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
+                .penalize(HardSoftScore.ofSoft(SoftConstraintDefaults.getDefault("Minimize group idle gaps")),
+                        (a1, a2) -> BlockScheduleMath.gapHours(a1, a2))
                 .asConstraint("Minimize group idle gaps");
     }
 

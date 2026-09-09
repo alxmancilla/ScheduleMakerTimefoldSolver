@@ -58,9 +58,11 @@ public class ConstraintConfigControllerTest {
 
         mockMvc.perform(get("/api/admin/constraint-config"))
                 .andExpect(status().isOk())
-                // 9 SOFT-by-default + 4 severity-configurable HARD constraints,
-                // regardless of how many have an override.
-                .andExpect(jsonPath("$.length()").value(13))
+                // 10 SOFT-by-default + 4 severity-configurable HARD constraints,
+                // regardless of how many have an override. (Was 9 SOFT until
+                // 2026-09-08, when "Minimize group idle gaps" was re-enabled and
+                // so became weight-editable here alongside the rest.)
+                .andExpect(jsonPath("$.length()").value(14))
                 .andExpect(jsonPath("$[0].constraintName").value("Non-standard rooms should finish by 2pm"))
                 .andExpect(jsonPath("$[0].defaultSeverity").value("SOFT"))
                 .andExpect(jsonPath("$[0].defaultWeight").value(10))

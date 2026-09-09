@@ -546,6 +546,9 @@ public final class BlockScheduleAnalyzer {
                 for (int i = 1; i < assigns.size(); i++) {
                     CourseBlockAssignment prev = assigns.get(i - 1);
                     CourseBlockAssignment curr = assigns.get(i);
+                    if (prev.isPinned() || curr.isPinned()) {
+                        continue; // matches the constraint: pinned pairs aren't penalized
+                    }
                     int gap = BlockScheduleMath.availableGapHours(prev, curr);
                     if (gap > 0) {
                         teacherIdleGapDetails.add(ViolationInstance.of(
@@ -590,12 +593,13 @@ public final class BlockScheduleAnalyzer {
         details.put("Prefer first-semester blocks to start early", semesterOneStartEarlyDetails);
 
         // Minimize first-semester group idle gaps (SOFT, weight 6) - mirrors
-        // the count version above: same full-day adjacency (any semester
-        // breaks it), only sums when BOTH framing blocks are semester-1.
+        // the count version above: same full-day adjacency (any semester, and
+        // PINNED or not, breaks it), only sums when BOTH framing blocks are
+        // semester-1 AND unpinned.
         List<ViolationInstance> semesterOneIdleGapDetails = new ArrayList<>();
         Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> fullDayForSemesterOneGapDetails = new HashMap<>();
         for (CourseBlockAssignment a : list) {
-            if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null) {
+            if (a.getGroup() == null || a.getTimeslot() == null) {
                 continue;
             }
             fullDayForSemesterOneGapDetails.computeIfAbsent(a.getGroup().getId(), k -> new HashMap<>())
@@ -608,7 +612,8 @@ public final class BlockScheduleAnalyzer {
                 for (int i = 1; i < assigns.size(); i++) {
                     CourseBlockAssignment prev = assigns.get(i - 1);
                     CourseBlockAssignment curr = assigns.get(i);
-                    if (isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
+                    if (!prev.isPinned() && !curr.isPinned()
+                            && isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
                         int gap = BlockScheduleMath.gapHours(prev, curr);
                         if (gap > 0) {
                             semesterOneIdleGapDetails.add(ViolationInstance.of(
@@ -638,36 +643,39 @@ public final class BlockScheduleAnalyzer {
         }
         details.put("Semester hour limits should be respected (soft)", semesterHourLimitSoftDetails);
 
-        // Minimize group idle gaps (SOFT) - Detailed - TEMP DISABLED 2026-08-24, see
-        // the count version's mirror above for why. Re-enable together with it.
-        // List<String> groupIdleGapsDetails = new ArrayList<>();
-        // Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayForDetails = new HashMap<>();
-        // for (CourseBlockAssignment a : list) {
-        //     if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
-        //         continue;
-        //     String groupKey = a.getGroup().getId();
-        //     DayOfWeek day = a.getTimeslot().getDayOfWeek();
-        //     groupDayForDetails.computeIfAbsent(groupKey, k -> new HashMap<>())
-        //             .computeIfAbsent(day, k -> new ArrayList<>())
-        //             .add(a);
-        // }
-        // for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayForDetails.values()) {
-        //     for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
-        //         assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
-        //         for (int i = 1; i < assigns.size(); i++) {
-        //             CourseBlockAssignment prev = assigns.get(i - 1);
-        //             CourseBlockAssignment curr = assigns.get(i);
-        //             int prevEnd = prev.getTimeslot().getStartHour() + prev.getTimeslot().getLengthHours();
-        //             int gap = curr.getTimeslot().getStartHour() - prevEnd;
-        //             if (gap > 0) {
-        //                 String reason = String.format("(gap=%d hours)", gap);
-        //                 groupIdleGapsDetails.add(blockAssignmentToString(prev) + "  <->  " +
-        //                         blockAssignmentToString(curr) + " " + reason);
-        //             }
-        //         }
-        //     }
-        // }
-        // details.put("Minimize group idle gaps", groupIdleGapsDetails);
+        // Minimize group idle gaps (SOFT, weight 3) - Detailed - mirrors the count
+        // version above (re-enabled 2026-09-08; see it for the pinned-adjacency rule).
+        List<ViolationInstance> groupIdleGapsDetails = new ArrayList<>();
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayForDetails = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getGroup() == null || a.getTimeslot() == null)
+                continue;
+            String groupKey = a.getGroup().getId();
+            DayOfWeek day = a.getTimeslot().getDayOfWeek();
+            groupDayForDetails.computeIfAbsent(groupKey, k -> new HashMap<>())
+                    .computeIfAbsent(day, k -> new ArrayList<>())
+                    .add(a);
+        }
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayForDetails.values()) {
+            for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
+                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+                for (int i = 1; i < assigns.size(); i++) {
+                    CourseBlockAssignment prev = assigns.get(i - 1);
+                    CourseBlockAssignment curr = assigns.get(i);
+                    if (prev.isPinned() || curr.isPinned()) {
+                        continue;
+                    }
+                    int gap = BlockScheduleMath.gapHours(prev, curr);
+                    if (gap > 0) {
+                        groupIdleGapsDetails.add(ViolationInstance.of(
+                                blockAssignmentToString(prev) + "  <->  "
+                                        + blockAssignmentToString(curr) + String.format(" (gap=%d hours)", gap),
+                                prev.getId(), curr.getId()));
+                    }
+                }
+            }
+        }
+        details.put("Minimize group idle gaps", groupIdleGapsDetails);
 
         // Prefer block's specified room (SOFT) - Detailed
         List<ViolationInstance> blockSpecifiedRoomDetails = new ArrayList<>();
@@ -850,43 +858,49 @@ public final class BlockScheduleAnalyzer {
                 for (int i = 1; i < assigns.size(); i++) {
                     CourseBlockAssignment prev = assigns.get(i - 1);
                     CourseBlockAssignment curr = assigns.get(i);
+                    // Pinned blocks stay in the list so they break adjacency (they
+                    // still occupy the teacher), but never form a penalized pair -
+                    // matching SchoolConstraintProvider.minimizeTeacherIdleGaps.
+                    if (prev.isPinned() || curr.isPinned()) {
+                        continue;
+                    }
                     idleGaps += BlockScheduleMath.availableGapHours(prev, curr);
                 }
             }
         }
         result.put("Minimize teacher idle gaps (availability-aware)", idleGaps);
 
-        // Minimize group idle gaps (SOFT, weight 3) - TEMP DISABLED 2026-08-24 (per
-        // request, replaced for first-semester groups by "Minimize first-semester
-        // group idle gaps" below; other groups' idle gaps are no longer minimized
-        // at all) - re-enable by uncommenting, along with SchoolConstraintProvider,
-        // GroupIdleGapAnalyzerTest's assertions, and ConstraintConsistencyTest's
-        // expected soft constraints/counts.
-        // int groupIdleGaps = 0;
-        // Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayAssignments = new HashMap<>();
-        // for (CourseBlockAssignment a : list) {
-        //     if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
-        //         continue;
-        //     String groupKey = a.getGroup().getId();
-        //     DayOfWeek day = a.getTimeslot().getDayOfWeek();
-        //     groupDayAssignments.computeIfAbsent(groupKey, k -> new HashMap<>())
-        //             .computeIfAbsent(day, k -> new ArrayList<>())
-        //             .add(a);
-        // }
-        // for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayAssignments.values()) {
-        //     for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
-        //         assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
-        //         for (int i = 1; i < assigns.size(); i++) {
-        //             int prevEnd = assigns.get(i - 1).getTimeslot().getStartHour()
-        //                     + assigns.get(i - 1).getTimeslot().getLengthHours();
-        //             int gap = assigns.get(i).getTimeslot().getStartHour() - prevEnd;
-        //             if (gap > 0) {
-        //                 groupIdleGaps += gap;
-        //             }
-        //         }
-        //     }
-        // }
-        // result.put("Minimize group idle gaps", groupIdleGaps);
+        // Minimize group idle gaps (SOFT, weight 3) - mirrors
+        // SchoolConstraintProvider.minimizeGroupIdleGaps. Disabled 2026-08-24,
+        // re-enabled 2026-09-08 (it covers every group; the semester-1 rule below
+        // stays as a higher-weighted overlay for first-years). Pinned blocks stay in
+        // the day list so they break adjacency - they still occupy the student - but
+        // never form a penalized pair, since the solver can't move them.
+        int groupIdleGaps = 0;
+        Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> groupDayAssignments = new HashMap<>();
+        for (CourseBlockAssignment a : list) {
+            if (a.getGroup() == null || a.getTimeslot() == null)
+                continue;
+            String groupKey = a.getGroup().getId();
+            DayOfWeek day = a.getTimeslot().getDayOfWeek();
+            groupDayAssignments.computeIfAbsent(groupKey, k -> new HashMap<>())
+                    .computeIfAbsent(day, k -> new ArrayList<>())
+                    .add(a);
+        }
+        for (Map<DayOfWeek, List<CourseBlockAssignment>> dayAssignments : groupDayAssignments.values()) {
+            for (List<CourseBlockAssignment> assigns : dayAssignments.values()) {
+                assigns.sort(Comparator.comparingInt(a -> a.getTimeslot().getStartHour()));
+                for (int i = 1; i < assigns.size(); i++) {
+                    CourseBlockAssignment prev = assigns.get(i - 1);
+                    CourseBlockAssignment curr = assigns.get(i);
+                    if (prev.isPinned() || curr.isPinned()) {
+                        continue;
+                    }
+                    groupIdleGaps += BlockScheduleMath.gapHours(prev, curr);
+                }
+            }
+        }
+        result.put("Minimize group idle gaps", groupIdleGaps);
 
         // Prefer first-semester blocks to start early (SOFT, weight 4) - mirrors
         // SchoolConstraintProvider.preferSemesterOneBlocksStartEarly: group unpinned
@@ -914,16 +928,19 @@ public final class BlockScheduleAnalyzer {
         }
         result.put("Prefer first-semester blocks to start early", semesterOneStartEarlyViolations);
 
-        // Minimize first-semester group idle gaps (SOFT, weight 4) - mirrors
+        // Minimize first-semester group idle gaps (SOFT, weight 6) - mirrors
         // SchoolConstraintProvider.minimizeSemesterOneGroupIdleGaps: same adjacent-gap
-        // logic as the (now disabled) generic group-idle-gaps rule, over the group's
-        // FULL day (any semester, so a higher-semester block correctly breaks
-        // adjacency instead of being mistaken for idle time), but only summing a gap
-        // when BOTH framing blocks are themselves semester-1.
+        // logic as the generic group-idle-gaps rule, over the group's FULL day (any
+        // semester, and PINNED or not, so a block the student is actually sitting in
+        // correctly breaks adjacency instead of being mistaken for idle time), but
+        // only summing a gap when BOTH framing blocks are themselves semester-1 and
+        // unpinned. Pinned blocks were excluded from the day list entirely until
+        // 2026-09-08, which scored their occupied hours as idle - see the constraint's
+        // javadoc for the live example that surfaced it.
         int semesterOneIdleGaps = 0;
         Map<String, Map<DayOfWeek, List<CourseBlockAssignment>>> fullDayAssignmentsForSemesterOneGaps = new HashMap<>();
         for (CourseBlockAssignment a : list) {
-            if (a.isPinned() || a.getGroup() == null || a.getTimeslot() == null)
+            if (a.getGroup() == null || a.getTimeslot() == null)
                 continue;
             String groupKey = a.getGroup().getId();
             DayOfWeek day = a.getTimeslot().getDayOfWeek();
@@ -937,7 +954,8 @@ public final class BlockScheduleAnalyzer {
                 for (int i = 1; i < assigns.size(); i++) {
                     CourseBlockAssignment prev = assigns.get(i - 1);
                     CourseBlockAssignment curr = assigns.get(i);
-                    if (isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
+                    if (!prev.isPinned() && !curr.isPinned()
+                            && isSemesterOneBlock(prev) && isSemesterOneBlock(curr)) {
                         semesterOneIdleGaps += BlockScheduleMath.gapHours(prev, curr);
                     }
                 }

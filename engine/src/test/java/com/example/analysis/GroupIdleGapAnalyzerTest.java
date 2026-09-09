@@ -41,16 +41,14 @@ public class GroupIdleGapAnalyzerTest {
         return a;
     }
 
-    // TEMP DISABLED 2026-08-24: "Minimize group idle gaps" is disabled in
-    // SchoolConstraintProvider (replaced for first-semester groups by "Minimize
-    // first-semester group idle gaps") - the key is absent from the analyzer's
-    // result map, so getOrDefault(..., 0) always returns 0 below. Re-enable by
-    // reverting to a plain .get(...) once the constraint is re-enabled, and
-    // restore each test's original expected (non-zero) value - see this file's
-    // git history.
+    // Plain .get(...) deliberately (restored 2026-09-08 when the constraint was
+    // re-enabled): if the key ever goes missing again because the constraint was
+    // disabled, this unboxes null and fails loudly rather than silently reporting
+    // 0 and letting every assertion below pass for the wrong reason - which is
+    // exactly what the getOrDefault(..., 0) stand-in did while it was disabled.
     private static int groupIdleGaps(SchoolSchedule schedule) {
         return BlockScheduleAnalyzer.analyzeSoftConstraintViolations(schedule)
-                .getOrDefault("Minimize group idle gaps", 0);
+                .get("Minimize group idle gaps");
     }
 
     @Test
@@ -62,7 +60,7 @@ public class GroupIdleGapAnalyzerTest {
                 block("A1", g, 7),
                 block("A2", g, 10),
                 block("A3", g, 13));
-        assertEquals(0, groupIdleGaps(schedule));
+        assertEquals(4, groupIdleGaps(schedule));
     }
 
     @Test
@@ -87,7 +85,7 @@ public class GroupIdleGapAnalyzerTest {
         tue2.setTimeslot(new BlockTimeslot("slot-B2", DayOfWeek.TUESDAY, 9, 1)); // Tuesday gap 8->9 = 1h
         tue2.setPinned(false);
         SchoolSchedule schedule = scheduleWith(mon1, mon2, tue1, tue2);
-        assertEquals(0, groupIdleGaps(schedule));
+        assertEquals(3, groupIdleGaps(schedule));
     }
 
     @Test
@@ -97,6 +95,48 @@ public class GroupIdleGapAnalyzerTest {
         CourseBlockAssignment a2 = block("A2", g, 10); // would create a 2h gap if counted
         a2.setPinned(true);
         SchoolSchedule schedule = scheduleWith(a1, a2);
+        assertEquals(0, groupIdleGaps(schedule));
+    }
+
+    /**
+     * Regression for the phantom-gap bug fixed 2026-09-08: a pinned block used to
+     * be dropped from the day entirely before adjacency was computed, so the two
+     * unpinned blocks around it looked adjacent and the pinned block's own
+     * occupied hours were scored as student idle time. Found live on
+     * schedule_run #78, where group 1A-PRO's genuinely back-to-back Friday
+     * (07:00-12:00) was reported as having a 2-hour gap. A pinned block occupies
+     * the student exactly like any other, so it must break adjacency.
+     */
+    @Test
+    public void pinnedBlockBreaksAdjacencyInsteadOfBeingCountedAsIdle() {
+        Group g = new Group("G1", "Group 1", new java.util.HashSet<>());
+        CourseBlockAssignment a1 = block("A1", g, 7); // 7-8, movable
+        CourseBlockAssignment pinnedMid = new CourseBlockAssignment("P", g, MATH, 2);
+        pinnedMid.setTimeslot(new BlockTimeslot("slot-P", DayOfWeek.MONDAY, 8, 2)); // 8-10, pinned
+        pinnedMid.setPinned(true);
+        CourseBlockAssignment a2 = block("A2", g, 10); // 10-11, movable
+        // The day is genuinely back-to-back 7-11. Before the fix this reported 2
+        // (the span 8->10 the pinned class actually occupies).
+        SchoolSchedule schedule = scheduleWith(a1, pinnedMid, a2);
+        assertEquals(0, groupIdleGaps(schedule));
+    }
+
+    /**
+     * The flip side: a pinned block breaking adjacency must not swallow idle time
+     * that genuinely exists. Only the pair itself is skipped (the solver can't
+     * move a pinned block), so a gap framed by one is currently not scored -
+     * an accepted under-count, deliberately much smaller than the over-count it
+     * replaced. Documented here so the behavior is deliberate, not incidental.
+     */
+    @Test
+    public void gapNextToAPinnedBlockIsNotScored() {
+        Group g = new Group("G1", "Group 1", new java.util.HashSet<>());
+        CourseBlockAssignment a1 = block("A1", g, 7); // 7-8, movable
+        CourseBlockAssignment pinnedLater = new CourseBlockAssignment("P", g, MATH, 2);
+        pinnedLater.setTimeslot(new BlockTimeslot("slot-P", DayOfWeek.MONDAY, 9, 2)); // 9-11, pinned
+        pinnedLater.setPinned(true);
+        // 8->9 is one real idle hour, but its only framing pair involves the pinned block.
+        SchoolSchedule schedule = scheduleWith(a1, pinnedLater);
         assertEquals(0, groupIdleGaps(schedule));
     }
 }

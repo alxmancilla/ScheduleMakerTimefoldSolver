@@ -31,7 +31,7 @@ teachers read-only access to their own resulting schedule).
 ## At a Glance
 
 - Block-based scheduling only (multi-hour consecutive blocks, 1-4 hours); hour-based scheduling has been fully removed
-- 11 hard / 12 soft constraints (9 soft active, 3 parked), kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`; 4 of the 11 hard constraints (and every active soft one) have a `SCHEDULER`/`ADMIN`-editable weight/severity via the Scheduler tab's Constraint Weights page, backed by `constraint_config`
+- 11 hard / 12 soft constraints (10 soft active, 2 parked), kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`; 4 of the 11 hard constraints (and every active soft one) have a `SCHEDULER`/`ADMIN`-editable weight/severity via the Scheduler tab's Constraint Weights page, backed by `constraint_config`
 - The schedule grid is interactive: a `SCHEDULER`/`ADMIN` can click a block to move it to a different day/hour, toggle pinned, or (also admin/scheduler) reassign room/teacher, validated live against the same hard constraints (`POST /api/assignments/{id}/validate-move`) before Save is allowed — opt-in, behind a confirm-protected "Enable schedule editing" toggle
 - Every solve's hard/soft constraint violations (not just scores) are persisted (`schedule_run_violation`) and browsable in a collapsible panel on the Schedule page (`SCHEDULER`/`ADMIN` only), each one linked back to the exact grid card(s) it's about (`schedule_run_violation_assignment`) — previously only visible in the downloaded PDF report
 - Calendar exceptions (holidays, exam days, half-days) are tracked from Settings → Calendar — record-keeping v1, not yet read by block generation or the solver (see [Known Limitations](#known-limitations))
@@ -75,7 +75,7 @@ Calendar, but that data doesn't gate block generation or the solver yet — see
 
 `SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
 `ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
-test run (11 hard defined, all active; 12 soft defined, 9 active - the ones
+test run (11 hard defined, all active; 12 soft defined, 10 active - the ones
 marked TEMP DISABLED below are currently parked by request, fully
 implemented and one line away from re-enabling). Four of the hard
 constraints below (marked ⚙) can be individually switched to SOFT severity
@@ -98,7 +98,7 @@ constraint's weight is likewise editable there, not a fixed code literal.
 10. **Maximum Blocks Per Course Per Group Per Day** ⚙ — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
 11. **Course Blocks Must Be Consecutive** ⚙ — a course's blocks on the same day must be back-to-back
 
-("Teacher Must Have a Break After Consecutive Hours" / "Group Must Have a Break After Consecutive Hours" existed here as TEMP DISABLED and were removed entirely, not just parked.)
+("Teacher Must Have a Break After Consecutive Hours" / "Group Must Have a Break After Consecutive Hours" existed here as TEMP DISABLED and were removed entirely, not just parked. Confirmed 2026-09-08 as a settled decision for this version: consecutive teaching/attendance is deliberately uncapped, so full-day unbroken runs are expected output, not a bug — see CLAUDE.md for the measured effect and what re-introducing a break rule would take.)
 
 #### Soft Constraints (weighted quality preferences)
 1. **Non-Standard Rooms Should Finish by 2pm** (default weight 10) — labs/workshops/computer centers
@@ -110,7 +110,7 @@ constraint's weight is likewise editable there, not a fixed code literal.
 7. **Prefer Block's Specified Room** (default weight 3) — `preferred_room_hint`
 8. **Minimize Teacher Idle Gaps** (default weight 2/hour, availability-aware, adjacent-pair only)
 9. **Prefer Group's Preferred Room** (default weight 2) — a room from the group's curated `group_room_range` for the block's room type
-10. ~~**Minimize Group Idle Gaps**~~ (weight 3/hour, adjacent-pair only) — **TEMP DISABLED**, replaced for first-semester groups by #3 above
+10. **Minimize Group Idle Gaps** (default weight 3/hour, adjacent-pair only) — all groups, every semester. Disabled 2026-08-24 in favor of the first-semester-only #3 above, re-enabled 2026-09-08 once that was measured to leave every semester-3/5 group (14 of 20) with no gap protection at all; the lower weight keeps #3 the priority for first-years
 11. ~~**Minimize Teacher Building Changes**~~ (weight 1) — **TEMP DISABLED** (not required anymore)
 12. ~~**Prefer Core 1h Blocks at the Same Time Across Days**~~ (weight 2) — **TEMP DISABLED** — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
 
