@@ -29,9 +29,15 @@ class RoomTypeLookupIT extends AbstractPostgresIntegrationTest {
 
     @Test
     void roomWithATypeNotInTheLookupTableIsRejected() {
-        roomRepository.save(new RoomEntity("BAD_ROOM", "EDIFICIO 1", "not_a_real_type"));
-
-        assertThrows(DataIntegrityViolationException.class, testEntityManager::flush);
+        // Flush through the repository, not TestEntityManager: Spring only
+        // translates a persistence exception into DataIntegrityViolationException
+        // across a repository proxy. A raw EntityManager.flush() surfaces
+        // Hibernate's own ConstraintViolationException instead, so asserting the
+        // Spring type there can never pass - and the repository is the layer
+        // production code (controllers) actually goes through anyway.
+        assertThrows(DataIntegrityViolationException.class,
+                () -> roomRepository.saveAndFlush(
+                        new RoomEntity("BAD_ROOM", "EDIFICIO 1", "not_a_real_type")));
     }
 
     @Test
