@@ -63,14 +63,8 @@ jobs:
           java-version: '17'
           cache: maven
 
-      # -am (also-make) is required, not optional: web depends on
-      # com.example:scheduler-common, so a bare `-pl web` puts only web in the
-      # reactor and Maven then tries to resolve scheduler-common:1.0.0 from
-      # Central, where it obviously doesn't exist. -am pulls in the parent and
-      # common (not engine/reporter - web depends on neither), so the reactor
-      # stays minimal. Same class of bug the docker job's comment describes.
-      - name: mvn -pl web -am verify
-        run: mvn -pl web -am verify
+      - name: mvn -pl web verify
+        run: mvn -pl web verify
 
   docker:
     name: Docker build (${{ matrix.module }})

@@ -32,10 +32,9 @@ class CourseDesignationLookupIT extends AbstractPostgresIntegrationTest {
         course.setAbbreviation("C1");
         course.setSemester(1);
         course.setDesignation("TYPO_DESIGNATION");
+        courseRepository.save(course);
 
-        // Repository, not TestEntityManager - see RoomTypeLookupIT for why.
-        assertThrows(DataIntegrityViolationException.class,
-                () -> courseRepository.saveAndFlush(course));
+        assertThrows(DataIntegrityViolationException.class, testEntityManager::flush);
     }
 
     @Test

@@ -2,15 +2,16 @@ package com.example.web.integration;
 
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
 
 import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
 
 /**
  * Base class for the "thin integration layer" of *IT tests that run against
@@ -51,38 +52,9 @@ public abstract class AbstractPostgresIntegrationTest {
 
     static {
         POSTGRES.start();
-        loadSchema();
-    }
-
-    /**
-     * Loads the schema with the container's own psql rather than Spring's
-     * ScriptUtils. ScriptUtils splits a script on ';' with no understanding of
-     * PostgreSQL dollar quoting, so it cuts the two $$...$$ bodies in
-     * schema_block_scheduling.sql (generate_block_timeslots(), and the DO block
-     * that adds course_block_assignment's two room FKs) apart at the semicolons
-     * inside them - "Unterminated dollar quote". That DO block creates
-     * fk_cba_satisfies_room_type, which is exactly what
-     * RoomTypeLookupIT.deletingARoomTypeStillInUseIsBlocked asserts, so a
-     * hand-rolled splitter here would be both fragile and self-defeating: psql
-     * is the parser this file is written for. ON_ERROR_STOP=1 keeps a mid-script
-     * failure loud instead of leaving a half-built schema for the tests to trip
-     * over later. -h forces TCP so the password is actually used, rather than
-     * depending on the image's local-socket trust rule.
-     */
-    private static void loadSchema() {
-        try {
-            POSTGRES.copyFileToContainer(
-                    MountableFile.forHostPath(findSchemaFile().toPath()), "/tmp/schema.sql");
-            Container.ExecResult result = POSTGRES.execInContainer(
-                    "sh", "-c",
-                    "PGPASSWORD='" + POSTGRES.getPassword() + "' psql -v ON_ERROR_STOP=1"
-                            + " -U " + POSTGRES.getUsername()
-                            + " -d " + POSTGRES.getDatabaseName()
-                            + " -h 127.0.0.1 -f /tmp/schema.sql");
-            if (result.getExitCode() != 0) {
-                throw new IllegalStateException(
-                        "psql exited " + result.getExitCode() + "\n" + result.getStderr());
-            }
+        try (Connection connection = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            ScriptUtils.executeSqlScript(connection, new org.springframework.core.io.FileSystemResource(findSchemaFile()));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load database/schema_block_scheduling.sql into the Testcontainers Postgres instance", e);
         }
