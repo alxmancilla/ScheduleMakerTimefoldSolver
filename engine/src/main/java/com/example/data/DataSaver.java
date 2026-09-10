@@ -1,0 +1,360 @@
+package com.example.data;
+
+import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
+import com.example.analysis.ViolationInstance;
+import com.example.domain.*;
+import java.sql.*;
+import java.util.*;
+
+/**
+ * DataSaver persists a solved SchoolSchedule as a new run in the schedule
+ * run history, rather than overwriting course_block_assignment in place.
+ * course_block_assignment is pure input from this point on -
+ * block_timeslot_id there is only ever meaningful for pinned = true rows.
+ * (Teacher and room are pre-assigned from database, only timeslot is solved,
+ * and even that is never written back onto course_block_assignment itself.)
+ *
+ * Each save inserts one schedule_run row (score + the effective solver time
+ * budget used), one schedule_run_result row per assignment - both its
+ * solved (or still-unassigned) timeslot AND a frozen copy of its input
+ * fields at that moment, so a past run's exact conditions stay inspectable
+ * even after course_block_assignment or the referenced teacher/room/course/
+ * group later change - and one schedule_run_violation row per individual
+ * hard/soft violation instance BlockScheduleAnalyzer's detailed analysis
+ * found (see {@link ScheduleRunViolationDetails}), so the web Schedule view
+ * can show the same detail the console/PDF report already does. Prunes
+ * schedule_run down to the most recent {@link #MAX_RETAINED_RUNS} rows after
+ * every insert - ON DELETE CASCADE cleans up the corresponding
+ * schedule_run_result/schedule_run_violation rows automatically.
+ * Anything that needs "the current schedule" (DataLoader, the web Schedule
+ * View, PDF reports) reads through the course_block_assignment_current view
+ * instead, which resolves pinned rows to their own input timeslot and every
+ * other row to the most recent run's result.
+ */
+public class DataSaver {
+
+    private static final int MAX_RETAINED_RUNS = 10;
+
+    private final String jdbcUrl;
+    private final String username;
+    private final String password;
+
+    /**
+     * Create a DataSaver with database connection parameters.
+     *
+     * @param jdbcUrl  JDBC URL (e.g.,
+     *                 "jdbc:postgresql://localhost:5432/school_schedule")
+     * @param username Database username
+     * @param password Database password
+     */
+    public DataSaver(String jdbcUrl, String username, String password) {
+        this.jdbcUrl = jdbcUrl;
+        this.username = username;
+        this.password = password;
+    }
+
+    /**
+     * Save a solved block-based schedule as a new schedule_run, then prune
+     * old runs beyond {@link #MAX_RETAINED_RUNS}.
+     *
+     * @param schedule                    The solved SchoolSchedule from the Timefold solver
+     * @param minutesSpentLimit           the effective local search time budget used for this run
+     *                                     (see SchoolSolverConfig.Built) - never null in practice,
+     *                                     since solverConfig.xml always defines one.
+     * @param unimprovedMinutesSpentLimit the effective give-up-if-stuck budget used for this run
+     * @param activeHardConstraintNames   the HARD constraint names active for this solve - typically
+     *                                     {@code BlockScheduleAnalyzer.analyzeHardConstraintViolations(schedule).keySet()},
+     *                                     already computed by the caller for reporting, so this is
+     *                                     the same ground truth rather than a second, hand-maintained
+     *                                     list that could drift out of sync with SchoolConstraintProvider
+     * @param activeSoftConstraintNames   the SOFT constraint names active for this solve, same source
+     * @param violationDetails            the detailed (per-offender) hard/soft violations for this
+     *                                     solve - typically {@code BlockScheduleAnalyzer
+     *                                     .analyzeHardConstraintViolationsDetailed(schedule)}/
+     *                                     {@code .analyzeSoftConstraintViolationsDetailed(schedule)},
+     *                                     already computed by the caller for reporting, same
+     *                                     single-source-of-truth rationale as the two Sets above.
+     *                                     Null is treated as "nothing to record" (no violation rows
+     *                                     inserted), so existing callers that predate this parameter
+     *                                     keep working unchanged.
+     * @param runMetadata                 random seed / environment mode / skip-validation / timing /
+     *                                     git commit / inferred termination reason for this run - see
+     *                                     {@link ScheduleRunMetadata}
+     * @throws SQLException if database access fails
+     */
+    public void saveSchedule(SchoolSchedule schedule, Long minutesSpentLimit, Long unimprovedMinutesSpentLimit,
+            Set<String> activeHardConstraintNames, Set<String> activeSoftConstraintNames,
+            ScheduleRunViolationDetails violationDetails, ScheduleRunMetadata runMetadata)
+            throws SQLException {
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+            conn.setAutoCommit(false); // Start transaction
+            try {
+                int runId = insertScheduleRun(conn, schedule.getScore(), minutesSpentLimit,
+                        unimprovedMinutesSpentLimit, runMetadata);
+                insertScheduleRunResults(conn, runId, schedule.getCourseBlockAssignments());
+                insertScheduleRunConstraints(conn, runId, activeHardConstraintNames, activeSoftConstraintNames);
+                insertScheduleRunViolations(conn, runId, violationDetails);
+                pruneOldRuns(conn);
+                conn.commit();
+                System.out.println("✓ Schedule run #" + runId + " saved (keeping the most recent "
+                        + MAX_RETAINED_RUNS + " runs)");
+            } catch (SQLException e) {
+                conn.rollback();
+                System.err.println("✗ Failed to save schedule. Changes rolled back.");
+                throw e;
+            }
+        }
+    }
+
+    private int insertScheduleRun(Connection conn, HardSoftScore score, Long minutesSpentLimit,
+            Long unimprovedMinutesSpentLimit, ScheduleRunMetadata runMetadata) throws SQLException {
+        String sql = "INSERT INTO schedule_run (hard_score, soft_score, minutes_spent_limit, "
+                + "unimproved_minutes_spent_limit, random_seed, environment_mode, skip_validation, "
+                + "finished_at, engine_git_commit, termination_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setInt(1, score != null ? score.hardScore() : 0);
+            stmt.setInt(2, score != null ? score.softScore() : 0);
+            stmt.setLong(3, minutesSpentLimit != null ? minutesSpentLimit : 5L);
+            stmt.setLong(4, unimprovedMinutesSpentLimit != null ? unimprovedMinutesSpentLimit : 2L);
+            if (runMetadata != null && runMetadata.randomSeed() != null) {
+                stmt.setLong(5, runMetadata.randomSeed());
+            } else {
+                stmt.setNull(5, Types.BIGINT);
+            }
+            stmt.setString(6, runMetadata != null ? runMetadata.environmentMode() : null);
+            stmt.setBoolean(7, runMetadata != null && runMetadata.skipValidation());
+            if (runMetadata != null && runMetadata.finishedAt() != null) {
+                stmt.setTimestamp(8, Timestamp.valueOf(runMetadata.finishedAt()));
+            } else {
+                stmt.setNull(8, Types.TIMESTAMP);
+            }
+            stmt.setString(9, runMetadata != null ? runMetadata.engineGitCommit() : null);
+            stmt.setString(10, runMetadata != null ? runMetadata.terminationReason() : null);
+            stmt.executeUpdate();
+            try (ResultSet keys = stmt.getGeneratedKeys()) {
+                if (keys.next()) {
+                    return keys.getInt(1);
+                }
+            }
+        }
+        throw new SQLException("Failed to obtain generated schedule_run id");
+    }
+
+    private void insertScheduleRunResults(Connection conn, int runId, List<CourseBlockAssignment> assignments)
+            throws SQLException {
+        String sql = "INSERT INTO schedule_run_result "
+                + "(schedule_run_id, assignment_id, block_timeslot_id, group_id, course_id, block_length, "
+                + "pinned, teacher_id, room_name, satisfies_room_type, preferred_room_hint) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        int unassignedCount = 0;
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            for (CourseBlockAssignment assignment : assignments) {
+                String blockTimeslotId = assignment.getTimeslot() != null ? assignment.getTimeslot().getId() : null;
+
+                if (blockTimeslotId == null) {
+                    unassignedCount++;
+                }
+
+                stmt.setInt(1, runId);
+                stmt.setString(2, assignment.getId());
+                stmt.setString(3, blockTimeslotId);
+                stmt.setString(4, assignment.getGroup() != null ? assignment.getGroup().getId() : null);
+                stmt.setString(5, assignment.getCourse() != null ? assignment.getCourse().getId() : null);
+                stmt.setInt(6, assignment.getBlockLength());
+                stmt.setBoolean(7, assignment.isPinned());
+                stmt.setString(8, assignment.getTeacher() != null ? assignment.getTeacher().getId() : null);
+                stmt.setString(9, assignment.getRoom() != null ? assignment.getRoom().getName() : null);
+                stmt.setString(10, assignment.getSatisfiesRoomType());
+                stmt.setString(11, assignment.getPreferredRoomHint());
+                stmt.addBatch();
+            }
+            stmt.executeBatch();
+        }
+
+        System.out.println("  Recorded " + assignments.size() + " assignment results for run #" + runId);
+        if (unassignedCount > 0) {
+            System.out.println("  ⚠ Warning: " + unassignedCount + " assignments remain unassigned");
+        }
+    }
+
+    /**
+     * Records which constraints were active for this run, so a later
+     * comparison across runs' scores can tell a genuine constraint-set
+     * change apart from ordinary solver-run variance.
+     */
+    private void insertScheduleRunConstraints(Connection conn, int runId, Set<String> hardNames,
+            Set<String> softNames) throws SQLException {
+        String sql = "INSERT INTO schedule_run_constraint (schedule_run_id, constraint_name, is_hard) VALUES (?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            for (String name : hardNames) {
+                stmt.setInt(1, runId);
+                stmt.setString(2, name);
+                stmt.setBoolean(3, true);
+                stmt.addBatch();
+            }
+            for (String name : softNames) {
+                stmt.setInt(1, runId);
+                stmt.setString(2, name);
+                stmt.setBoolean(3, false);
+                stmt.addBatch();
+            }
+            stmt.executeBatch();
+        }
+    }
+
+    /**
+     * Records every individual violation instance (not just which constraint
+     * names were active - see insertScheduleRunConstraints above) so the web
+     * Schedule view can show the same detail the console/PDF report already
+     * does. A constraint with zero offenders in {@code violationDetails}
+     * simply gets no rows here, same as it would in the console output.
+     */
+    private void insertScheduleRunViolations(Connection conn, int runId, ScheduleRunViolationDetails violationDetails)
+            throws SQLException {
+        if (violationDetails == null) {
+            return;
+        }
+        insertViolationRows(conn, runId, violationDetails.hard(), true);
+        insertViolationRows(conn, runId, violationDetails.soft(), false);
+    }
+
+    /**
+     * One row in schedule_run_violation per ViolationInstance, plus one row
+     * in schedule_run_violation_assignment per assignment id it carries (so
+     * the web Schedule view can link a violation back to the specific grid
+     * card(s) it's about). Each violation is its own INSERT (not one big
+     * batch across all of them, like the single-column schedule_run_constraint/
+     * schedule_run_result inserts elsewhere in this class) because its
+     * generated id is needed immediately afterward to insert its own link
+     * rows - correctness over batching efficiency, and violation counts per
+     * run are modest (tens, not thousands).
+     */
+    private void insertViolationRows(Connection conn, int runId, Map<String, List<ViolationInstance>> details,
+            boolean isHard) throws SQLException {
+        if (details == null) {
+            return;
+        }
+        String violationSql = "INSERT INTO schedule_run_violation (schedule_run_id, constraint_name, is_hard, description) "
+                + "VALUES (?, ?, ?, ?)";
+        String linkSql = "INSERT INTO schedule_run_violation_assignment (violation_id, assignment_id) VALUES (?, ?)";
+        for (Map.Entry<String, List<ViolationInstance>> entry : details.entrySet()) {
+            for (ViolationInstance instance : entry.getValue()) {
+                long violationId;
+                try (PreparedStatement stmt = conn.prepareStatement(violationSql, Statement.RETURN_GENERATED_KEYS)) {
+                    stmt.setInt(1, runId);
+                    stmt.setString(2, entry.getKey());
+                    stmt.setBoolean(3, isHard);
+                    stmt.setString(4, instance.description());
+                    stmt.executeUpdate();
+                    try (ResultSet keys = stmt.getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            throw new SQLException("Failed to obtain generated schedule_run_violation id");
+                        }
+                        violationId = keys.getLong(1);
+                    }
+                }
+                if (!instance.assignmentIds().isEmpty()) {
+                    try (PreparedStatement linkStmt = conn.prepareStatement(linkSql)) {
+                        for (String assignmentId : instance.assignmentIds()) {
+                            linkStmt.setLong(1, violationId);
+                            linkStmt.setString(2, assignmentId);
+                            linkStmt.addBatch();
+                        }
+                        linkStmt.executeBatch();
+                    }
+                }
+            }
+        }
+    }
+
+    private void pruneOldRuns(Connection conn) throws SQLException {
+        String sql = "DELETE FROM schedule_run WHERE id NOT IN "
+                + "(SELECT id FROM schedule_run ORDER BY created_at DESC LIMIT " + MAX_RETAINED_RUNS + ")";
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+        }
+    }
+
+    /**
+     * Fetch the current block schedule from database (resolved via
+     * course_block_assignment_current: pinned rows keep their own input
+     * timeslot, every other row gets the most recent schedule_run's result)
+     * and return it as a SchoolSchedule. Useful for verifying saved results.
+     *
+     * @return SchoolSchedule with the current resolved block assignments
+     * @throws SQLException if database access fails
+     */
+    public SchoolSchedule loadCurrentBlockSchedule() throws SQLException {
+        DataLoader loader = new DataLoader(jdbcUrl, username, password);
+        return loader.loadDataForBlockScheduling();
+    }
+
+    /**
+     * Get statistics about the current (resolved) block schedule.
+     *
+     * @return Map with block assignment statistics
+     * @throws SQLException if database access fails
+     */
+    public Map<String, Integer> getBlockScheduleStatistics() throws SQLException {
+        Map<String, Integer> stats = new HashMap<>();
+
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
+            // Total block assignments (same count on the base table or the view - the
+            // view is a 1:1 LEFT JOIN over course_block_assignment)
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery("SELECT COUNT(*) as count FROM course_block_assignment")) {
+                if (rs.next()) {
+                    stats.put("total_block_assignments", rs.getInt("count"));
+                }
+            }
+
+            // Assigned / unassigned block assignments: read through the resolved view,
+            // since course_block_assignment.block_timeslot_id itself is only meaningful
+            // for pinned rows now.
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(*) as count FROM course_block_assignment_current WHERE teacher_id IS NOT NULL AND block_timeslot_id IS NOT NULL AND room_name IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("assigned_block_assignments", rs.getInt("count"));
+                }
+            }
+
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(*) as count FROM course_block_assignment_current WHERE teacher_id IS NULL OR block_timeslot_id IS NULL OR room_name IS NULL")) {
+                if (rs.next()) {
+                    stats.put("unassigned_block_assignments", rs.getInt("count"));
+                }
+            }
+
+            // Unique teachers/rooms: teacher_id/room_name are untouched by this view
+            // (always input), so the base table is equally correct here.
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(DISTINCT teacher_id) as count FROM course_block_assignment WHERE teacher_id IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("unique_teachers_assigned", rs.getInt("count"));
+                }
+            }
+
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(DISTINCT block_timeslot_id) as count FROM course_block_assignment_current WHERE block_timeslot_id IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("unique_block_timeslots_used", rs.getInt("count"));
+                }
+            }
+
+            try (Statement stmt = conn.createStatement();
+                    ResultSet rs = stmt.executeQuery(
+                            "SELECT COUNT(DISTINCT room_name) as count FROM course_block_assignment WHERE room_name IS NOT NULL")) {
+                if (rs.next()) {
+                    stats.put("unique_rooms_used", rs.getInt("count"));
+                }
+            }
+        }
+
+        return stats;
+    }
+}

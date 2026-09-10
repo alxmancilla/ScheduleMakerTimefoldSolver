@@ -1,0 +1,89 @@
+name: CI
+
+# Four independent jobs, so a failure in one still shows the others' status
+# rather than the whole workflow going dark on the first red job.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (Maven)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # common + engine + reporter + web, all Mockito-mocked unit tests - no
+      # database needed. BlockSchedulingIntegrationTest's real-DB case is
+      # gated behind -Dit.db.url (unset here), so it self-skips.
+      - name: mvn test
+        run: mvn test
+
+  frontend:
+    name: Frontend (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: web-ui/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  web-integration:
+    name: Backend (Testcontainers *IT)
+    runs-on: ubuntu-latest
+    # The Testcontainers-backed *IT layer (FK/CHECK enforcement, cascades,
+    # JPQL null-handling a mock can't verify - see AbstractPostgresIntegrationTest)
+    # bound to Failsafe (`mvn verify`), separate from the fast Docker-free
+    # `mvn test` job above. Needs only the Docker daemon ubuntu-latest runners
+    # already ship - Testcontainers starts and tears down its own disposable
+    # Postgres container, no service: block required.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # -am (also-make) is required, not optional: web depends on
+      # com.example:scheduler-common, so a bare `-pl web` puts only web in the
+      # reactor and Maven then tries to resolve scheduler-common:1.0.0 from
+      # Central, where it obviously doesn't exist. -am pulls in the parent and
+      # common (not engine/reporter - web depends on neither), so the reactor
+      # stays minimal. Same class of bug the docker job's comment describes.
+      - name: mvn -pl web -am verify
+        run: mvn -pl web -am verify
+
+  docker:
+    name: Docker build (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [engine, web, reporter]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build only - proves the reactor/Dockerfile stay in sync (this exact
+      # job would have caught the common module's Dockerfiles never being
+      # updated to COPY it once the reactor grew a fourth module, 2026-09-08).
+      # No push: these aren't published from CI.
+      - name: docker build
+        run: docker build -f ${{ matrix.module }}/Dockerfile -t scheduler-${{ matrix.module }}:ci .

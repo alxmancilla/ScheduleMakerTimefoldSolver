@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.example</groupId>
+        <artifactId>schedule-maker-parent</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>scheduler-web</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Schedule Maker Web</name>
+    <description>Spring Boot REST API for schedule management</description>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Overrides spring-boot-dependencies' pinned Testcontainers 1.19.3
+                 (see the testcontainers.version property comment in the root pom)
+                 for every transitive Testcontainers module, not just the two
+                 declared directly below. -->
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Overrides spring-boot-dependencies' pinned Mockito 5.7.0 (with
+                 byte-buddy 1.14.10) - too old to instrument classes on newer
+                 JDKs (observed: every @MockBean-based test fails the whole
+                 module's ApplicationContext with "Mockito cannot mock this
+                 class" / "Could not modify all classes" on Java 26, then
+                 cascades into ~100 unrelated "ApplicationContext failure
+                 threshold exceeded" errors via Spring's test-context cache).
+                 Only web uses Mockito/mockito-junit-jupiter (transitively via
+                 spring-boot-starter-test); no other module is affected. -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy-agent</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Shared business rules (no framework/persistence deps) -->
+        <dependency>
+            <groupId>com.example</groupId>
+            <artifactId>scheduler-common</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter Web (includes REST, Jackson, Tomcat) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter Data JPA -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Spring Security (authentication + role-based authorization) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- OAuth2 Resource Server: Nimbus JOSE for issuing/validating JWTs
+             (JwtEncoder/JwtDecoder) with an HMAC secret. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter Validation (Jakarta Bean Validation) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- PostgreSQL JDBC Driver -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+
+        <!-- Apache POI: reads the .xlsx workbook uploaded via the admin Excel import -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers: real, disposable PostgreSQL for the *IT integration
+             tests (Failsafe, `mvn verify`, requires Docker) - never pulled in by
+             plain `mvn test` (Surefire), which stays Docker-free. Version pinned
+             explicitly rather than left to spring-boot-dependencies (1.19.3):
+             that docker-java client can't talk to newer Docker Engine/Desktop
+             releases (tested against Docker Engine 29.7.2, API 1.55) - gets a
+             malformed/empty response instead of a real connection. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Spring Boot Maven Plugin. classifier=exec (discovered 2026-09-08
+                 while wiring mvn -pl web verify into CI) keeps the executable jar
+                 out of the primary artifact slot: repackage otherwise overwrites
+                 target/scheduler-web-1.0.0.jar in place with the Spring Boot
+                 BOOT-INF/classes layout, and Failsafe's integration-test phase
+                 (which runs after package) builds its test classpath from that
+                 same primary-artifact file rather than target/classes - a plain
+                 classloader can't resolve BOOT-INF-nested classes, so every *IT
+                 failed with NoClassDefFoundError for an ordinary repository
+                 class that plainly existed in target/classes. With the
+                 classifier, target/scheduler-web-1.0.0.jar stays the plain jar
+                 Failsafe (and Docker's `mvn ... package` step, see Dockerfile)
+                 can use normally, and the executable jar is the separate
+                 scheduler-web-1.0.0-exec.jar. -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Failsafe: runs *IT.java integration tests during `mvn verify`,
+                 separately from Surefire's `mvn test` unit-test run. Keeps the
+                 Testcontainers/Docker dependency out of the fast, default
+                 `mvn test` path documented in CLAUDE.md/README.md. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

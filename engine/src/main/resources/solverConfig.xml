@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<solver>
+    <solutionClass>com.example.domain.SchoolSchedule</solutionClass>
+    <!-- UPDATED: Changed from CourseAssignment to CourseBlockAssignment for block-based scheduling -->
+    <entityClass>com.example.domain.CourseBlockAssignment</entityClass>
+    <scoreDirectorFactory>
+        <constraintProviderClass>com.example.solver.SchoolConstraintProvider</constraintProviderClass>
+    </scoreDirectorFactory>
+
+    <!-- Phase 1: Construction Heuristic -->
+    <!-- FIRST_FIT_DECREASING: Assigns values to planning variables in decreasing difficulty order.
+         Uses BlockLengthDifficultyComparator to schedule scarce-availability teachers and longer
+         blocks (4h, 3h) first, leaving shorter blocks (1h, 2h) to fill gaps. This reduces
+         fragmentation.
+
+         CourseBlockAssignment.getMatchingBlockTimeslots() (an entity-scoped, blockLength-filtered
+         @ValueRangeProvider) means every value this phase considers for a block already has the
+         right length - there is no separate pre-fill phase assigning most blocks before this one
+         runs, so the difficulty-first ordering above actually governs placement as designed. -->
+    <constructionHeuristic>
+        <constructionHeuristicType>FIRST_FIT_DECREASING</constructionHeuristicType>
+    </constructionHeuristic>
+
+    <!-- Phase 2: Local Search (Improvement) -->
+    <!-- Uses multiple algorithms for better exploration:
+         - Late Acceptance: Good for escaping local optima
+         - Tabu Search: Prevents cycling back to recent solutions -->
+    <localSearch>
+        <!-- Parallelize move evaluation across CPU cores (docker-compose provisions
+             4 for this service specifically). AUTO picks a thread count from the
+             available processors at startup. -->
+        <moveThreadCount>AUTO</moveThreadCount>
+        <unionMoveSelector>
+            <!-- Change 1 variable (timeslot). Candidate values already come from
+                 CourseBlockAssignment's entity-scoped, blockLength-filtered value
+                 range, so this can never generate a length-mismatched move; the
+                 filter below only has teacher availability left to reject. -->
+            <changeMoveSelector>
+                <filterClass>com.example.solver.MatchingLengthMoveFilter</filterClass>
+            </changeMoveSelector>
+            <!-- Swap assignments between two entities. Unlike ChangeMove, a swap
+                 doesn't consult either entity's own value range - it just trades
+                 whatever timeslot each one currently holds - so this filter is
+                 still the only thing preventing a swap from handing a block a
+                 wrong-length or teacher-unavailable timeslot. -->
+            <swapMoveSelector>
+                <filterClass>com.example.solver.MatchingLengthSwapFilter</filterClass>
+            </swapMoveSelector>
+            <!-- Pillar swap: swap groups of assignments with same value -->
+            <!-- <pillarSwapMoveSelector/> -->
+        </unionMoveSelector>
+        <acceptor>
+            <!-- Late Acceptance: accepts moves based on score from N steps ago -->
+            <!-- Optimized to 10000 for better performance while maintaining exploration -->
+            <lateAcceptanceSize>10000</lateAcceptanceSize>
+            <!-- Tabu Search: prevents cycling back to recent solutions -->
+            <entityTabuSize>7</entityTabuSize>
+        </acceptor>
+        <forager>
+            <acceptedCountLimit>1</acceptedCountLimit>
+        </forager>
+        <termination>
+            <!-- Stop when we find a feasible solution (0 hard violations) -->
+            <bestScoreLimit>0hard/0soft</bestScoreLimit>
+            <!-- Or after 100 minutes total -->
+            <minutesSpentLimit>5</minutesSpentLimit>
+            <!-- Or after 15 minutes without improvement (allows more patience to escape local optima) -->
+            <unimprovedMinutesSpentLimit>2</unimprovedMinutesSpentLimit>
+        </termination>
+    </localSearch>
+</solver>

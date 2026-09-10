@@ -1,0 +1,861 @@
+{
+  "common": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "actions": "Actions",
+    "yes": "Yes",
+    "no": "No",
+    "noneOption": "-- None --",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "daysFull": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday"
+    },
+    "confirm": "Confirm",
+    "pinProvenance": {
+      "byUser": "Pinned by {{username}} on {{date}}",
+      "bySystem": "Pinned automatically by the system on {{date}}",
+      "noHistory": "Pinned (before pin history was tracked)"
+    },
+    "pagination": {
+      "showing": "Showing {{start}}-{{end}} of {{total}}",
+      "previous": "< Previous",
+      "next": "Next >",
+      "pageOf": "Page {{page}} of {{pageCount}}"
+    }
+  },
+  "nav": {
+    "schedule": "Timetable",
+    "setup": "Setup",
+    "teachers": "Teachers",
+    "courses": "Courses",
+    "rooms": "Rooms",
+    "groups": "Groups",
+    "assignments": "Assignments",
+    "tools": "Tools",
+    "reports": "Reports",
+    "courseCoverage": "Course Coverage",
+    "teacherAvailability": "Teacher Availability",
+    "import": "Import / Export",
+    "validation": "Validation",
+    "scheduler": "Scheduler",
+    "admin": "Admin",
+    "settings": "Settings",
+    "users": "Users",
+    "logout": "Logout",
+    "language": "Language",
+    "mySchedule": "My Timetable",
+    "toggleMenu": "Toggle menu"
+  },
+  "login": {
+    "title": "Sign in",
+    "username": "Username:",
+    "password": "Password:",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "invalidCredentials": "Invalid username or password.",
+    "failedPrefix": "Login failed: "
+  },
+  "teachers": {
+    "title": "Teachers",
+    "addTeacher": "+ Add Teacher",
+    "editTeacher": "Edit Teacher",
+    "newTeacher": "New Teacher",
+    "loading": "Loading teachers...",
+    "loadFailedPrefix": "Failed to load teachers: ",
+    "saveFailedPrefix": "Failed to save teacher: ",
+    "deleteFailedPrefix": "Failed to delete teacher: ",
+    "confirmDelete": "Are you sure you want to delete this teacher?",
+    "capacityWarningsTitle": "Saved, but worth checking:",
+    "fields": {
+      "id": "ID:",
+      "name": "Name:",
+      "lastName": "Last Name:",
+      "maxHoursPerWeek": "Max Hours Per Week:",
+      "requiredRoom": "Required Room (optional):",
+      "qualifications": "Courses:",
+      "availability": "Availability:"
+    },
+    "requiredRoomHint": "If set, this teacher is always placed in this room, overriding the group's preferred room, whenever a block's room type allows it.",
+    "qualificationsPlaceholder": "Type at least 2 letters to search courses, then select one to add",
+    "add": "Add",
+    "noQualifications": "No courses added",
+    "checkAll": "Check All",
+    "uncheckAll": "Uncheck All",
+    "table": {
+      "id": "ID",
+      "name": "Name",
+      "lastName": "Last Name",
+      "maxHoursWeek": "Max Hours/Week",
+      "workload": "Workload",
+      "qualifications": "Courses",
+      "requiredRoom": "Required Room",
+      "actions": "Actions"
+    },
+    "available": "available",
+    "unavailable": "unavailable",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri"
+    },
+    "savedMessage": "Teacher saved",
+    "deletedMessage": "Teacher deleted",
+    "searchPlaceholder": "Search by name..."
+  },
+  "courses": {
+    "title": "Courses",
+    "addCourse": "+ Add Course",
+    "editCourse": "Edit Course",
+    "newCourse": "New Course",
+    "loading": "Loading courses...",
+    "loadFailedPrefix": "Failed to load courses: ",
+    "saveFailedPrefix": "Failed to save course: ",
+    "deleteFailedPrefix": "Failed to delete course: ",
+    "confirmDelete": "Are you sure you want to delete this course?",
+    "fields": {
+      "id": "ID:",
+      "name": "Name:",
+      "abbreviation": "Abbreviation:",
+      "semester": "Semester:",
+      "designation": "Designation:",
+      "roomRequirement": "Room Requirement:",
+      "requiredHoursPerWeek": "Required Hours Per Week:",
+      "active": "Active:"
+    },
+    "designationPlaceholder": "-- Select a designation --",
+    "roomRequirements": {
+      "title": "Room Requirements (dual)",
+      "description": "For courses that need hours split across multiple room types (e.g. 4h in a computer center + 1h in a standard room). Leave empty to just use the single Room Requirement above.",
+      "formNote": "Ignored — dual room requirements are configured below and take precedence over this field.",
+      "dualBadge": "dual",
+      "addRequirement": "+ Add Requirement",
+      "editRequirement": "Edit Requirement",
+      "newRequirement": "New Requirement",
+      "loadFailedPrefix": "Failed to load room requirements: ",
+      "saveFailedPrefix": "Failed to save room requirement: ",
+      "deleteFailedPrefix": "Failed to delete room requirement: ",
+      "confirmDelete": "Are you sure you want to delete this room requirement?",
+      "fields": {
+        "roomType": "Room Type:",
+        "hoursRequired": "Hours Required:",
+        "priority": "Priority:",
+        "preferredRoom": "Preferred Room (optional):"
+      },
+      "table": {
+        "roomType": "Room Type",
+        "hoursRequired": "Hours",
+        "priority": "Priority",
+        "preferredRoom": "Preferred Room"
+      },
+      "none": "No dual room requirements — this course just uses the single Room Requirement above.",
+      "savedMessage": "Room requirement saved",
+      "deletedMessage": "Room requirement deleted"
+    },
+    "blockTemplates": {
+      "title": "Block Templates (custom)",
+      "description": "Explicit, hand-authored blocks for this course instead of letting the generic decomposition derive them. Leave Group empty to apply to every group taking this course. A group's own template for a given block index overrides the \"all groups\" one.",
+      "addTemplate": "+ Add Template",
+      "editTemplate": "Edit Template",
+      "newTemplate": "New Template",
+      "loadFailedPrefix": "Failed to load block templates: ",
+      "saveFailedPrefix": "Failed to save block template: ",
+      "deleteFailedPrefix": "Failed to delete block template: ",
+      "confirmDelete": "Are you sure you want to delete this block template?",
+      "fields": {
+        "group": "Group (optional):",
+        "blockIndex": "Block Index:",
+        "blockLength": "Block Length (hours):",
+        "roomType": "Room Type (optional):",
+        "preferredRoom": "Preferred Room (optional):",
+        "preferredDay": "Preferred Day (optional):",
+        "pinAssignment": "Pin Assignment",
+        "preferredTimeslot": "Preferred Timeslot (optional):"
+      },
+      "pinHint": "Pinned templates require a preferred timeslot.",
+      "pinnedRequiresTimeslotError": "A pinned template must specify a preferred timeslot",
+      "table": {
+        "group": "Group",
+        "blockIndex": "Index",
+        "blockLength": "Length",
+        "roomType": "Room Type",
+        "preferredRoom": "Preferred Room",
+        "preferredDay": "Day",
+        "pinned": "Pinned",
+        "timeslot": "Timeslot"
+      },
+      "allGroups": "All Groups",
+      "none": "No block templates — this course uses the generic decomposition above.",
+      "savedMessage": "Block template saved",
+      "deletedMessage": "Block template deleted"
+    },
+    "table": {
+      "id": "ID",
+      "name": "Name",
+      "semester": "Semester",
+      "roomReq": "Room Req.",
+      "hoursWeek": "Hours/Week",
+      "active": "Active"
+    },
+    "savedMessage": "Course saved",
+    "deletedMessage": "Course deleted",
+    "searchPlaceholder": "Search by ID or name...",
+    "tabs": {
+      "details": "Details",
+      "roomRequirements": "Room Requirements",
+      "blockTemplates": "Block Templates"
+    },
+    "precedenceNote": "How this course’s blocks are decided: Block Templates take priority over Room Requirements, which take priority over the legacy Room Requirement field on the Details tab. Only the highest-priority source with data for a given block is used."
+  },
+  "rooms": {
+    "title": "Rooms",
+    "addRoom": "+ Add Room",
+    "editRoom": "Edit Room",
+    "newRoom": "New Room",
+    "loading": "Loading rooms...",
+    "loadFailedPrefix": "Failed to load rooms: ",
+    "saveFailedPrefix": "Failed to save room: ",
+    "deleteFailedPrefix": "Failed to delete room: ",
+    "confirmDelete": "Are you sure you want to delete this room?",
+    "fields": {
+      "name": "Name:",
+      "building": "Building:",
+      "type": "Type:",
+      "capacity": "Capacity (optional):"
+    },
+    "table": {
+      "name": "Name",
+      "building": "Building",
+      "type": "Type",
+      "capacity": "Capacity",
+      "utilization": "Utilization"
+    },
+    "savedMessage": "Room saved",
+    "deletedMessage": "Room deleted",
+    "searchPlaceholder": "Search by name or building...",
+    "capacityPlaceholder": "e.g. 30"
+  },
+  "groups": {
+    "title": "Student Groups",
+    "addGroup": "+ Add Group",
+    "editGroup": "Edit Group",
+    "newGroup": "New Group",
+    "loading": "Loading groups...",
+    "loadFailedPrefix": "Failed to load groups: ",
+    "saveFailedPrefix": "Failed to save group: ",
+    "deleteFailedPrefix": "Failed to delete group: ",
+    "confirmDelete": "Are you sure you want to delete this group?",
+    "fields": {
+      "id": "ID:",
+      "name": "Name:",
+      "studentCount": "Student Count (optional):"
+    },
+    "table": {
+      "id": "ID",
+      "name": "Name",
+      "studentCount": "Students"
+    },
+    "roomRanges": {
+      "title": "Room Ranges",
+      "description": "Which rooms this group can use, per room type - e.g. a handful of equivalent classrooms for Core courses. A room type with no rows here is unrestricted (any room of that type may be used). One row means the group is fixed to that single room; two or more rows means the solver can freely pick among them.",
+      "addRange": "+ Add Room",
+      "editRange": "Edit Room Range",
+      "newRange": "New Room Range",
+      "loadFailedPrefix": "Failed to load this group's room ranges: ",
+      "saveFailedPrefix": "Failed to save room range: ",
+      "deleteFailedPrefix": "Failed to delete room range: ",
+      "confirmDelete": "Remove this room from the group's range?",
+      "fields": {
+        "roomType": "Room Type:",
+        "roomName": "Room:"
+      },
+      "table": {
+        "roomType": "Room Type",
+        "roomName": "Room"
+      },
+      "none": "This group has no curated room ranges yet - any room of the matching type may be used.",
+      "savedMessage": "Room range saved",
+      "deletedMessage": "Room range deleted"
+    },
+    "courses": {
+      "title": "Courses",
+      "description": "Which courses this group takes (drives \"Generate Blocks\"). Previously only settable by re-importing the Excel file.",
+      "addCourse": "Add",
+      "selectPlaceholder": "-- Select a course --",
+      "loadFailedPrefix": "Failed to load this group's courses: ",
+      "addFailedPrefix": "Failed to add course: ",
+      "removeFailedPrefix": "Failed to remove course: ",
+      "confirmRemove": "Remove this course from the group? (Existing schedule blocks are not affected, only future \"Generate Blocks\" runs.)",
+      "table": {
+        "course": "Course",
+        "teacher": "Teacher"
+      },
+      "none": "This group has no courses yet.",
+      "addedMessage": "Course added to group",
+      "removedMessage": "Course removed from group",
+      "noQualifiedTeacherShort": "no qualified teacher",
+      "noQualifiedTeacherHint": "No teacher currently has this course as a qualification. Add it in Teachers before this course can be assigned a block.",
+      "noBlocksYet": "no blocks yet",
+      "noBlocksYetHint": "No blocks yet - pick a teacher and it will be applied automatically once you run \"Generate Blocks\" (Settings).",
+      "teacherUpdatedMessage": "Teacher assigned to this course's blocks",
+      "teacherUpdateFailedPrefix": "Failed to assign teacher: ",
+      "defaultTeacherSavedMessage": "Teacher pre-assigned - will apply when blocks are generated"
+    },
+    "savedMessage": "Group saved",
+    "deletedMessage": "Group deleted",
+    "searchPlaceholder": "Search by ID or name...",
+    "studentCountPlaceholder": "e.g. 28"
+  },
+  "assignments": {
+    "title": "Course Block Assignments",
+    "addAssignment": "+ Add Assignment",
+    "editAssignment": "Edit Assignment",
+    "newAssignment": "New Assignment",
+    "loading": "Loading assignments...",
+    "loadFailedPrefix": "Failed to load assignments: ",
+    "saveFailedPrefix": "Failed to save assignment: ",
+    "deleteFailedPrefix": "Failed to delete assignment: ",
+    "confirmDelete": "Are you sure you want to delete this assignment?",
+    "showing": "Showing {{filtered}} of {{total}} assignments",
+    "exportFailedPrefix": "Failed to export assignments: ",
+    "importFailedPrefix": "Failed to import assignments: ",
+    "backup": {
+      "title": "Export / Import",
+      "description": "Export every assignment to a spreadsheet, or import one to update assignments by ID (rows not in the file are left untouched).",
+      "exportButton": "Export Assignments",
+      "exporting": "Exporting...",
+      "importButton": "Import Assignments",
+      "importing": "Importing...",
+      "importedSummary": "Imported {{count}} assignment(s).",
+      "rejected": "Import rejected - no changes were made:"
+    },
+    "filters": {
+      "all": "All",
+      "assigned": "Assigned",
+      "unassigned": "Unassigned",
+      "pinned": "Pinned"
+    },
+    "fields": {
+      "id": "Assignment ID:",
+      "idPatternTitle": "Only letters, numbers, hyphens, and underscores",
+      "group": "Group:",
+      "groupPlaceholder": "-- Select a group --",
+      "course": "Course:",
+      "coursePlaceholder": "-- Select a course --",
+      "blockLength": "Block Length (hours):",
+      "teacher": "Teacher (optional):",
+      "blockTimeslot": "Block Timeslot (optional):",
+      "room": "Room (optional):",
+      "satisfiesRoomType": "Satisfies Room Type (optional):",
+      "preferredRoom": "Preferred Room (optional):",
+      "pin": "Pin Assignment:"
+    },
+    "pinHint": "Pinned assignments require a block timeslot.",
+    "pinnedRequiresTimeslotError": "A pinned assignment must have a block timeslot",
+    "cannotSavePinned": "Cannot save: pinned assignments require a block timeslot.",
+    "table": {
+      "id": "ID",
+      "group": "Group",
+      "course": "Course",
+      "blockLength": "Block Length",
+      "teacher": "Teacher",
+      "schedule": "Schedule",
+      "room": "Room",
+      "pinned": "Pinned"
+    },
+    "savedMessage": "Assignment saved",
+    "deletedMessage": "Assignment deleted",
+    "searchPlaceholder": "Search by group, course, teacher, or room...",
+    "preferredRoomHint": "Defaults to the selected group's preferred room, if it has one; pick a different room to override.",
+    "roomFilteredHint": "Showing only rooms that satisfy \"{{type}}\".",
+    "satisfiesRoomTypeHint": "Defaults to the selected course's room requirement, if it has one; pick a different type to override.",
+    "courseFilteredHint": "Showing only courses the selected group takes.",
+    "teacherFilteredHint": "Showing only teachers qualified for the selected course."
+  },
+  "courseCoverage": {
+    "title": "Course Coverage",
+    "description": "For every group/course pair, how many hours are actually scheduled against how many are required. Complete = fully scheduled, Partial = some hours scheduled, Not Scheduled = no blocks generated yet.",
+    "loading": "Loading course coverage...",
+    "loadFailedPrefix": "Failed to load course coverage: ",
+    "searchPlaceholder": "Search by group, course, or teacher...",
+    "showing": "Showing {{filtered}} of {{total}} pairs",
+    "none": "No matching pairs",
+    "noTeacher": "No teacher assigned",
+    "filters": {
+      "all": "All",
+      "complete": "Complete",
+      "partial": "Partial",
+      "notScheduled": "Not Scheduled"
+    },
+    "table": {
+      "group": "Group",
+      "course": "Course",
+      "requiredHours": "Required Hrs",
+      "scheduledHours": "Scheduled Hrs",
+      "status": "Status",
+      "teacher": "Teacher",
+      "rooms": "Rooms"
+    }
+  },
+  "teacherAvailability": {
+    "title": "Teacher Availability",
+    "description": "Each teacher's declared weekly availability, condensed into one row - hour ranges per day, at a glance.",
+    "loading": "Loading teacher availability...",
+    "loadFailedPrefix": "Failed to load teacher availability: ",
+    "searchPlaceholder": "Search by teacher name...",
+    "none": "No matching teachers",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "table": {
+      "teacher": "Teacher"
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "refresh": "Refresh",
+    "generatePdfs": "Generate PDFs",
+    "generating": "Generating…",
+    "loading": "Loading reports...",
+    "loadFailedPrefix": "Failed to load reports: ",
+    "genFailedPrefix": "Failed to start report generation: ",
+    "openFailedPrefix": "Failed to open ",
+    "description": "Each \"Generate PDFs\" run keeps its own set of files instead of overwriting the last one, so past runs stay here to compare against newer ones.",
+    "scheduleRun": "Schedule run:",
+    "latestScheduleRun": "Latest (current schedule)",
+    "scheduleRunOption": "Run #{{id}} — {{timestamp}} ({{hard}}h / {{soft}}s)",
+    "lastGeneration": "Last generation: ",
+    "finishedSuffix": " — finished {{timestamp}}",
+    "runningSuffix": " — a new run is being generated now.",
+    "noFilesInRun": "No files in this run",
+    "noReportsYet": "No reports generated yet",
+    "table": {
+      "report": "Report",
+      "size": "Size"
+    },
+    "opening": "Opening…",
+    "view": "View"
+  },
+  "importExcel": {
+    "title": "Import Excel",
+    "description": "Upserts base problem data (Teachers, Courses, Rooms, Groups, Group_Courses sheets) by ID/name — existing rows are updated, new ones created. Does not touch timeslots or the solved schedule; run the solver afterward to assign the imported courses/groups.",
+    "importing": "Importing…",
+    "importButton": "Import Excel",
+    "failedPrefix": "Failed to import file: ",
+    "importedSummary": "Imported: {{teachers}} teachers, {{courses}} courses, {{rooms}} rooms, {{groups}} groups, {{groupCourses}} group-course links.",
+    "rejected": "Import rejected — nothing was written. Fix these and re-upload:",
+    "exportTitle": "Export Excel",
+    "exportDescription": "Downloads the current data as an .xlsx workbook in the exact format Import Excel expects, for a full export -> edit -> re-import round trip. Export everything, or just one entity (Groups also includes Group_Courses). Does not include timeslots or the solved schedule.",
+    "exportButton": "Export Excel",
+    "exporting": "Exporting...",
+    "exportFailedPrefix": "Failed to export: ",
+    "exportAll": "All",
+    "exportTeachers": "Teachers",
+    "exportCourses": "Courses",
+    "exportRooms": "Rooms",
+    "exportGroups": "Groups"
+  },
+  "preSolveValidation": {
+    "title": "Pre-Solve Validation",
+    "runValidation": "Run Validation",
+    "running": "Running…",
+    "description": "Runs PreSolveValidator by itself, without solving — the same blocking checks that run before every solve (invalid pinned data, plus whole-schedule facts like a teacher assigned more hours than they have availability for). Takes seconds, not minutes, and never writes anything to the database.",
+    "startFailedPrefix": "Failed to start validation: ",
+    "state": "State:",
+    "started": "Started:",
+    "finished": "Finished:",
+    "resultPassed": "✓ No blocking problems found",
+    "resultProblems": "⚠ Blocking problems found — see the report below",
+    "resultFailed": "✗ Validation run failed to complete — see the log below"
+  },
+  "schedulerSettings": {
+    "title": "Scheduler",
+    "description": "Run and configure the solver, and tune constraint weights."
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Admin-only configuration for values used across the scheduler.",
+    "loading": "Loading settings...",
+    "solver": {
+      "title": "Solver",
+      "startEngine": "Start Engine",
+      "running": "Running…",
+      "description": "Runs the solver as a background process (scripts/run-engine.sh) and writes results straight to the database. This can take up to a few minutes.",
+      "startFailedPrefix": "Failed to start engine: ",
+      "minutesSpentLimit": "Total time limit (minutes)",
+      "unimprovedMinutesSpentLimit": "Give up if stuck for (minutes)",
+      "limitsDescription": "Applies to this run only — solverConfig.xml itself isn't changed. Leave the defaults (5 / 2) unless you have a reason to run longer or shorter. Total time can go up to 120 minutes, give-up-if-stuck up to 60.",
+      "skipValidation": "Run anyway, even if pre-solve validation finds blocking problems",
+      "skipValidationHint": "Pre-solve validation catches data that makes at least one violation mathematically certain (e.g. a teacher assigned more hours than they have availability for) and normally stops the run before it starts. Its findings still print to the log either way — this only lets the solve proceed past them. Use for testing/debugging only.",
+      "randomizeSeed": "Explore with a new random seed",
+      "randomizeSeedHint": "The solver's search normally uses the same fixed seed every run, so re-solving unchanged data tends to land back on the same arrangement. This generates a fresh seed for this run only and prints it to the log below, so you can replay this exact search later by entering it as a fixed seed.",
+      "fixedSeed": "Or replay a specific seed:",
+      "fixedSeedPlaceholder": "e.g. 8317420591",
+      "state": "State:",
+      "started": "Started:",
+      "finished": "Finished:",
+      "exitCode": "Exit code:"
+    },
+    "complianceSnapshots": {
+      "title": "Compliance Snapshots",
+      "refresh": "Refresh",
+      "description": "Admin-only. A calendario-incumplimientos.pdf snapshot is generated automatically right after each successful engine run, capturing that run's constraint violations at the moment it finished. Stored separately from the Reports tab and visible only to ADMIN.",
+      "loadFailedPrefix": "Failed to load compliance snapshots: ",
+      "openFailedPrefix": "Failed to open ",
+      "none": "No compliance snapshots yet — run the solver above to generate one.",
+      "table": {
+        "run": "Run",
+        "file": "File"
+      },
+      "opening": "Opening…",
+      "view": "View"
+    },
+    "generateBlocks": {
+      "pinExclusiveTeacherBlocks": "Also pin blocks for teachers with no other classes",
+      "pinExclusiveTeacherBlocksHint": "Off by default. When a teacher's only load is this one group+course, place its blocks straight into their free hours and pin them. Pinned blocks are fixed permanently and skip the solver's checks — and because the slot is chosen from the teacher's calendar alone, it can leave the group idle time the solver can neither move nor detect. Availability-aware block sizing runs either way.",
+      "title": "Generate Blocks",
+      "button": "Generate Blocks",
+      "generating": "Generating…",
+      "description": "Creates the unassigned schedule blocks the solver needs, one per (group, course) pair in Group_Courses, decomposing each course's required hours into 1-2 hour blocks. Only fills gaps — a (group, course) pair that already has blocks is left untouched, so this is safe to re-run after importing new groups/courses. Run this after the Import tab and before Start Engine.",
+      "failedPrefix": "Failed to generate blocks: ",
+      "resultSummary": "Created {{created}} block(s); skipped {{skipped}} pair(s) that already had blocks.",
+      "clearTimeslots": {
+        "title": "Clear Unpinned Timeslots",
+        "button": "Clear Unpinned Timeslots",
+        "clearing": "Clearing…",
+        "description": "Unassigns the timeslot on every block that isn't pinned, leaving pinned placements untouched. Teacher and room assignments are not affected. Use this to discard a solve (or a bad manual edit) before running the engine again.",
+        "confirm": "Clear the timeslot on every unpinned block? Pinned blocks won't be touched. This can't be undone.",
+        "failedPrefix": "Failed to clear timeslots: ",
+        "resultSummary": "Cleared the timeslot on {{count}} unpinned block(s)."
+      }
+    },
+    "timeslots": {
+      "title": "Timeslots",
+      "addTimeslot": "+ Add Timeslot",
+      "editTimeslot": "Edit Timeslot",
+      "newTimeslot": "New Timeslot",
+      "loadFailedPrefix": "Failed to load timeslots: ",
+      "saveFailedPrefix": "Failed to save timeslot: ",
+      "deleteFailedPrefix": "Failed to delete timeslot: ",
+      "confirmDelete": "Delete {{day}} {{start}}:00-{{end}}:00?",
+      "fields": {
+        "day": "Day:",
+        "startHour": "Start Hour:",
+        "length": "Length (hours):",
+        "endsAt": "Ends at:"
+      },
+      "exceedsDayBounds": " — exceeds the school day (max 15:00)",
+      "table": {
+        "day": "Day",
+        "start": "Start",
+        "end": "End",
+        "length": "Length (h)"
+      },
+      "none": "No timeslots defined",
+      "savedMessage": "Timeslot saved",
+      "deletedMessage": "Timeslot deleted"
+    },
+    "databaseBackups": {
+      "title": "Database Backups",
+      "exportButton": "Export Whole Database",
+      "running": "Running…",
+      "description": "Dumps the entire PostgreSQL database (scripts/db-export.sh) to a timestamped .sql file, so it can be recreated on any other Postgres instance. This can take a moment for a large database.",
+      "exportFailedPrefix": "Failed to start export: ",
+      "importFailedPrefix": "Failed to start restore: ",
+      "importConfirm": "Restore the database from \"{{filename}}\"? A safety backup of the CURRENT database is taken automatically first, but this replaces every table's data right now, while the app may still be using it. This can't be undone from here.",
+      "lastOperation": "Last operation:",
+      "filesTitle": "Backup Files",
+      "filesDescription": "Every .sql file under database/backups/, newest first. \"Restore\" runs scripts/db-import.sh, which always takes its own pre_restore_*.sql safety backup first.",
+      "loadFailedPrefix": "Failed to load backup files: ",
+      "downloadFailedPrefix": "Failed to download ",
+      "none": "No backup files yet — export the database above to create one.",
+      "table": {
+        "filename": "Filename",
+        "size": "Size",
+        "modified": "Modified"
+      },
+      "download": "Download",
+      "restore": "Restore"
+    },
+    "term": {
+      "title": "Current Term",
+      "description": "A free-text label shown in the header for everyone (e.g. \"Fall 2026\"). Purely organizational - the solver never reads it.",
+      "fields": {
+        "label": "Term Label:"
+      },
+      "placeholder": "e.g. Fall 2026",
+      "saving": "Saving...",
+      "savedMessage": "Term saved",
+      "saveFailedPrefix": "Failed to save term: ",
+      "loadFailedPrefix": "Failed to load term: "
+    },
+    "auditLog": {
+      "title": "Recent Activity",
+      "description": "The most recent 200 write actions (create/update/delete), logged automatically for accountability.",
+      "refresh": "Refresh",
+      "none": "No activity logged yet.",
+      "loadFailedPrefix": "Failed to load activity log: ",
+      "table": {
+        "when": "When",
+        "user": "User",
+        "method": "Method",
+        "path": "Path",
+        "status": "Status"
+      }
+    },
+    "blockRules": {
+      "title": "Block Rules",
+      "description": "Sets the preferred block size (1-4h) used to decompose a course's weekly hours when generating blocks, and the max blocks per day the solver allows for the same course/group, per course designation. A designation with no rule here defaults to 2h blocks and 2 blocks/day.",
+      "addRule": "+ Add Rule",
+      "editRule": "Edit Block Rule",
+      "newRule": "New Block Rule",
+      "loadFailedPrefix": "Failed to load block rules: ",
+      "saveFailedPrefix": "Failed to save block rule: ",
+      "deleteFailedPrefix": "Failed to reset block rule: ",
+      "confirmDelete": "Reset {{component}} to the defaults (2h blocks, 2 blocks/day)?",
+      "savedMessage": "Block rule saved",
+      "deletedMessage": "Block rule reset to default",
+      "none": "No custom block rules configured — every designation uses the default 2h block size and 2 blocks/day.",
+      "resetToDefault": "Reset to Default",
+      "saving": "Saving...",
+      "sizeHint": "Blocks are packed greedily at this size, with a smaller trailing block for any leftover hours.",
+      "maxBlocksPerDayHint": "The solver will not place more than this many blocks of the same course, for the same group, on one day.",
+      "marginDaysDefault": "Default (1)",
+      "marginDaysHint": "How many spare distinct days a generated shape must leave beyond the bare minimum before it's accepted as safe. Higher is more cautious (favors more, shorter blocks spread across more days); lower accepts tighter shapes. Leave on Default unless this component keeps showing up in violation reports.",
+      "fields": {
+        "component": "Designation:",
+        "preferredBlockSize": "Preferred Block Size (hours):",
+        "maxBlocksPerDay": "Max Blocks Per Day:",
+        "marginDays": "Margin Days:"
+      },
+      "table": {
+        "component": "Designation",
+        "preferredBlockSize": "Preferred Block Size",
+        "maxBlocksPerDay": "Max Blocks/Day",
+        "marginDays": "Margin Days"
+      }
+    },
+    "constraintWeights": {
+      "title": "Constraint Weights",
+      "description": "Tune how strongly each soft (preference) constraint influences the solver's score, or - for the few Hard constraints marked configurable below - switch them to Soft at a chosen weight. Most Hard constraints (double-booking, data integrity, etc.) are never adjustable here - they must always hold, since relaxing them could produce a schedule that isn't just worse but physically impossible. A change applies on the next solve, no redeploy needed.",
+      "loadFailedPrefix": "Failed to load constraint weights: ",
+      "saveFailedPrefix": "Failed to save constraint weight: ",
+      "savedMessage": "Constraint weight saved",
+      "resetMessage": "Constraint weight reset to default",
+      "none": "No soft constraints found.",
+      "overridden": "(overridden)",
+      "saving": "Saving...",
+      "hardToSoftHint": "Hard by default. Setting a weight and saving switches this to Soft.",
+      "resetToHard": "Reset to Hard",
+      "severities": {
+        "HARD": "Hard",
+        "SOFT": "Soft"
+      },
+      "table": {
+        "constraint": "Constraint",
+        "severity": "Severity",
+        "defaultWeight": "Default Weight",
+        "currentWeight": "Current Weight"
+      }
+    },
+    "semesterHourLimits": {
+      "title": "Semester Hour Limits",
+      "description": "Configure, per semester, the latest hour a block may end. HARD is a genuine guarantee — the solver can never place a block past it. SOFT allows it, but penalizes the overrun (tune that penalty's weight in Constraint Weights, under \"Semester hour limits should be respected (soft)\"). A semester with no limit configured here is unrestricted.",
+      "addLimit": "+ Add Limit",
+      "editLimit": "Edit Semester Hour Limit",
+      "newLimit": "New Semester Hour Limit",
+      "warningsTitle": "Saved, but worth checking:",
+      "loadFailedPrefix": "Failed to load semester hour limits: ",
+      "saveFailedPrefix": "Failed to save semester hour limit: ",
+      "deleteFailedPrefix": "Failed to delete semester hour limit: ",
+      "confirmDelete": "Remove the hour limit for semester {{semester}}? Its blocks will become unrestricted.",
+      "savedMessage": "Semester hour limit saved",
+      "deletedMessage": "Semester hour limit removed",
+      "none": "No semester hour limits configured — every semester is unrestricted.",
+      "saving": "Saving...",
+      "hardHint": "HARD: blocks of this semester can never be assigned a timeslot ending after this hour — the solver structurally excludes it.",
+      "softHint": "SOFT: blocks of this semester may still end after this hour, but the solver is penalized for it, proportional to the overrun.",
+      "severities": {
+        "HARD": "Hard",
+        "SOFT": "Soft"
+      },
+      "fields": {
+        "semester": "Semester:",
+        "latestEndHour": "Latest End Hour:",
+        "severity": "Severity:"
+      },
+      "table": {
+        "semester": "Semester",
+        "latestEndHour": "Latest End Hour",
+        "severity": "Severity"
+      }
+    },
+    "calendar": {
+      "title": "Calendar",
+      "description": "Track the school's holiday, exam, and half-day dates. Record-keeping only for now — not yet used by block generation or the solver.",
+      "addException": "+ Add Exception",
+      "editException": "Edit Calendar Exception",
+      "newException": "New Calendar Exception",
+      "loadFailedPrefix": "Failed to load calendar exceptions: ",
+      "saveFailedPrefix": "Failed to save calendar exception: ",
+      "deleteFailedPrefix": "Failed to delete calendar exception: ",
+      "confirmDelete": "Delete the calendar exception for {{date}}?",
+      "savedMessage": "Calendar exception saved",
+      "deletedMessage": "Calendar exception deleted",
+      "none": "No calendar exceptions configured yet.",
+      "saving": "Saving...",
+      "fields": {
+        "date": "Date:",
+        "type": "Type:",
+        "label": "Label:",
+        "endHour": "Classes End At:"
+      },
+      "types": {
+        "HOLIDAY": "Holiday",
+        "HALF_DAY": "Half Day",
+        "EXAM_DAY": "Exam Day"
+      },
+      "table": {
+        "date": "Date",
+        "type": "Type",
+        "label": "Label"
+      }
+    }
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "+ Add User",
+    "editUserPrefix": "Edit User: ",
+    "newUser": "New User",
+    "loading": "Loading users...",
+    "loadFailedPrefix": "Failed to load users: ",
+    "saveFailedPrefix": "Failed to save user: ",
+    "deleteFailedPrefix": "Failed to delete user: ",
+    "confirmDelete": "Delete user \"{{username}}\"?",
+    "description": "Admin-only. Manages who can sign in and with which role (ADMIN, SCHEDULER, WRITER, READER, TEACHER). You can't delete your own account, and the last remaining enabled ADMIN can't be deleted, demoted, or disabled.",
+    "fields": {
+      "username": "Username:",
+      "password": "Password:",
+      "role": "Role:",
+      "enabled": "Enabled",
+      "preferredLanguage": "Preferred Language:",
+      "linkedTeacher": "Linked Teacher (optional):"
+    },
+    "resetPassword": "Reset Password",
+    "resetPasswordFor": "New password for {{username}}:",
+    "resetFailedPrefix": "Failed to reset password: ",
+    "selfDeleteTooltip": "Can't delete your own account",
+    "table": {
+      "username": "Username",
+      "role": "Role",
+      "enabled": "Enabled",
+      "language": "Language",
+      "created": "Created",
+      "linkedTeacher": "Linked Teacher"
+    },
+    "you": " (you)",
+    "noUsers": "No users found",
+    "savedMessage": "User saved",
+    "deletedMessage": "User deleted",
+    "passwordResetMessage": "Password reset"
+  },
+  "schedule": {
+    "title": "Timetable View",
+    "gridView": "Grid View",
+    "listView": "List View",
+    "run": "Run:",
+    "latestRun": "Latest (current timetable)",
+    "runOption": "Run #{{id}} — {{timestamp}} ({{hard}}h / {{soft}}s)",
+    "pastRunNotice": "Viewing a past run — this is not the current timetable.",
+    "group": "Group:",
+    "teacher": "Teacher:",
+    "allTeachers": "All Teachers",
+    "clearTeacherFilter": "Clear Teacher Filter",
+    "showing": "Showing {{filtered}} of {{total}} assignments",
+    "groupSuffix": " | Group: {{name}}",
+    "teacherSuffix": " | Teacher: {{name}}",
+    "loading": "Loading timetable...",
+    "loadFailedPrefix": "Failed to load timetable: ",
+    "noData": "No timetable data",
+    "hour": "Hour",
+    "list": {
+      "day": "Day",
+      "time": "Time",
+      "course": "Course",
+      "group": "Group",
+      "teacher": "Teacher",
+      "room": "Room",
+      "pinned": "Pinned"
+    },
+    "noAssignments": "No assignments found for the selected filters",
+    "pinnedLabel": "PINNED",
+    "conflictLabel": "CONFLICT - overlapping bookings",
+    "moveEditor": {
+      "day": "Day",
+      "startHour": "Start hour",
+      "pinned": "Pinned",
+      "pinBlockedNoRoom": "Can't pin: this block has no room assigned yet.",
+      "pinRequiredForMove": "Moving a block pins it: an unpinned block takes its position from the latest solver run, so a new slot would be ignored. Untick only to hand the block back to the solver where it currently sits.",
+      "saving": "Saving...",
+      "savedMessage": "Assignment updated.",
+      "saveFailedPrefix": "Failed to save: ",
+      "validating": "Checking...",
+      "violationsHeading": "This move can't be saved:",
+      "warningsHeading": "This move is allowed, but worth noting:",
+      "validationFailedPrefix": "Could not check this move: ",
+      "room": "Room",
+      "teacher": "Teacher",
+      "roomTeacherNotLiveValidated": "Room/teacher changes aren't checked live the way day/hour is - review carefully before saving."
+    },
+    "editMode": {
+      "toggleLabel": "Enable timetable editing",
+      "confirmEnable": "Turning this on lets clicking a block move or pin it, directly changing the live timetable. Enable editing?",
+      "unavailableForPastRun": "Editing is only available on the latest timetable, not a past run.",
+      "activeNotice": "Editing is ON — clicking a block opens the move/pin editor."
+    },
+    "violations": {
+      "summary": "{{hard}} hard, {{soft}} soft violation(s) for this run",
+      "hardHeading": "Hard constraint violations",
+      "softHeading": "Soft constraint violations",
+      "none": "No violations recorded for this run.",
+      "loadFailedPrefix": "Failed to load violations: ",
+      "clickToHighlight": "Click to highlight the affected block(s) in the grid",
+      "cardBadgeLabel": "{{hard}} hard, {{soft}} soft violation(s) for this block",
+      "noneForFilter": "No violations of this severity for this run.",
+      "severityFilter": {
+        "label": "Show:",
+        "all": "All",
+        "hardOnly": "Hard only",
+        "softOnly": "Soft only"
+      }
+    }
+  },
+  "mySchedule": {
+    "title": "My Timetable",
+    "loading": "Loading your timetable...",
+    "loadFailedPrefix": "Failed to load your timetable: ",
+    "noTeacherLinked": "Your account isn't linked to a teacher record yet. Ask an admin to link it in Users.",
+    "none": "No blocks scheduled yet."
+  }
+}

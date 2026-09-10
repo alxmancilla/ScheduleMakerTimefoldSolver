@@ -16,8 +16,55 @@ release.properties
 .DS_Store
 *.class
 
+# web ui
+web-ui/node_modules/
+web-ui/dist/
+# Local Vite env overrides (tracked templates: .env.example/.development/.production)
+web-ui/.env.local
+web-ui/.env.*.local
+
 # Datasets
 database/datasets/
+# pg_dump backups taken before destructive local DB operations
+database/backups/
+database/migrations/*
+# Track the RBAC schema migration (app_user table) and the semester-to-integer
+# migration even though ad-hoc local migrations under this directory stay ignored.
+!database/migrations/add_app_users.sql
+!database/migrations/course_semester_to_integer.sql
+!database/migrations/add_user_preferred_language.sql
+!database/migrations/add_room_capacity_and_group_size.sql
+!database/migrations/add_school_term.sql
+!database/migrations/add_schedule_audit_log.sql
+!database/migrations/add_teacher_role.sql
+!database/migrations/add_component_block_rules.sql
+!database/migrations/add_group_course_default_teacher.sql
+!database/migrations/add_teacher_required_room.sql
+!database/migrations/remove_electromecanica_electronica_room_types.sql
+!database/migrations/rename_laboratorio_to_dual.sql
+!database/migrations/rename_dual_to_mixto.sql
+!database/migrations/rename_assignment_preferred_room_to_hint.sql
+!database/migrations/add_room_rename_cascade.sql
+!database/migrations/add_room_type_and_course_component_lookup_tables.sql
+!database/migrations/rename_basicas_to_core_add_elective.sql
+!database/migrations/rename_course_component_to_designation.sql
+!database/migrations/rename_room_types_to_readable_labels.sql
+!database/migrations/rename_digital_add_specialized_designation.sql
+!database/migrations/consolidate_non_core_digital_designations_to_specialized.sql
+!database/migrations/add_calendar_exception.sql
+!database/migrations/add_schedule_run_history.sql
+!database/migrations/add_schedule_run_input_snapshot.sql
+!database/migrations/add_pinned_requires_room_check.sql
+!database/migrations/add_dual_designation.sql
+!database/migrations/trim_course_designations_to_four.sql
+!database/migrations/add_group_room_ranges.sql
+!database/migrations/add_constraint_config.sql
+!database/migrations/add_semester_hour_limit.sql
+!database/migrations/fix_course_block_assignment_current_room_name.sql
+!database/migrations/add_schedule_run_metadata.sql
+!database/migrations/backfill_group_course_default_teacher.sql
+!database/migrations/drop_schedule_run_result_assignment_cascade.sql
+md_files/
 
 # Build artifacts
 *.jar
@@ -25,3 +72,18 @@ database/datasets/
 
 # Logs
 *.log
+
+# Local secrets / config (keep only the .example templates tracked)
+database.properties
+
+# Generated PDF reports
+calendario-bloques-incumplimientos.pdf
+calendario-bloques-por-grupo.pdf
+calendario-bloques-por-maestro.pdf
+calendario-incumplimientos.pdf
+calendario-por-grupo.pdf
+calendario-por-maestro.pdf
+# Output dir for the admin-triggered "Generate PDFs" button (web/ReportRunnerService)
+/reports/
+# Admin-only compliance-snapshot PDFs, generated automatically after each engine run (web/EngineRunnerService)
+/admin-reports/

@@ -1,0 +1,79 @@
+# Multi-stage build for the web module (Spring Boot REST API).
+#
+# Unlike the engine and reporter (one-shot batch workers), the web module is a
+# long-running service: it serves the REST API on port 8080, backed by the same
+# PostgreSQL database. The React frontend in web-ui/ talks to it.
+#
+# Build (from the repository root, so the parent POM is in context):
+#   docker build -f web/Dockerfile -t scheduler-web .
+#
+# Run with deterministic resource limits (recommended):
+#   docker run --rm \
+#     --cpus=2 --memory=1g \
+#     -p 8080:8080 \
+#     -e DB_URL=jdbc:postgresql://<host>:5432/school_schedule \
+#     -e DB_USER=<user> -e DB_PASSWORD=<pass> \
+#     -e CORS_ALLOWED_ORIGINS=https://app.example.com \
+#     -e JWT_SECRET=<random-32+-byte-secret> \
+#     -e ADMIN_BOOTSTRAP_PASSWORD=<initial-admin-password> \
+#     scheduler-web
+#
+# Security env vars (see application.properties for defaults):
+#   JWT_SECRET                 HMAC (HS256) signing secret, >=32 bytes. A dev-only
+#                              default is used if unset; MUST be overridden in prod.
+#   JWT_TTL_SECONDS            Token lifetime in seconds (default 28800 = 8h).
+#   ADMIN_BOOTSTRAP_USERNAME   Initial admin username (default "admin").
+#   ADMIN_BOOTSTRAP_PASSWORD   When the app_user table is empty, seeds this ADMIN
+#                              user. No user is created if left blank.
+#
+# The JVM heap auto-sizes to a fraction of the container's memory limit via
+# -XX:MaxRAMPercentage (see JAVA_OPTS below), so setting --memory alone gives a
+# deterministic heap ceiling. Override JAVA_OPTS to tune further.
+
+# ---- Build stage ----
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /src
+
+# Copy the reactor: the parent POM lists all four modules, so Maven must be able
+# to read every module POM to resolve the reactor. Bring in all module POMs, plus
+# the sources for the web module and its build dependency common (web depends on
+# scheduler-common - see -am below; engine is not required by web, so no engine
+# sources are needed).
+COPY pom.xml ./
+COPY common/pom.xml ./common/pom.xml
+COPY engine/pom.xml ./engine/pom.xml
+COPY reporter/pom.xml ./reporter/pom.xml
+COPY web/pom.xml ./web/pom.xml
+COPY common/src ./common/src
+COPY web/src ./web/src
+
+# Build only the web module (and its parent) into the Spring Boot executable jar.
+# spring-boot-maven-plugin's repackage execution uses classifier=exec (see
+# web/pom.xml) so the executable jar is scheduler-web-<version>-exec.jar,
+# separate from the plain scheduler-web-<version>.jar left as the primary
+# artifact - the glob below matches only the executable one.
+RUN mvn -q -pl web -am -DskipTests package \
+    && cp web/target/scheduler-web-*-exec.jar /web.jar
+
+# ---- Runtime stage ----
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+
+# Non-root runtime user.
+RUN useradd --system --create-home --uid 10001 appuser
+COPY --from=build /web.jar /app/web.jar
+RUN chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8080
+
+# Default config; override at run time. JAVA_OPTS sets a deterministic heap
+# ceiling relative to the container memory limit, so the JVM does not size itself
+# off the whole host.
+ENV DB_URL=jdbc:postgresql://localhost:5432/school_schedule \
+    DB_USER=mancilla \
+    DB_PASSWORD="" \
+    CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173" \
+    JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/web.jar"]

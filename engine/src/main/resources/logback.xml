@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console appender -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root logger - default level INFO -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+
+    <!-- Timefold Solver - DEBUG level to see what's happening -->
+    <logger name="ai.timefold.solver" level="DEBUG" />
+    
+    <!-- Local Search phase - TRACE level for maximum detail -->
+    <logger name="ai.timefold.solver.core.impl.localsearch" level="DEBUG" />
+    
+    <!-- Move evaluation - see what moves are being tried -->
+    <logger name="ai.timefold.solver.core.impl.heuristic.move" level="DEBUG" />
+    
+    <!-- Score calculation - see constraint violations -->
+    <logger name="ai.timefold.solver.core.impl.score" level="INFO" />
+    
+    <!-- Custom phases - see our custom logic -->
+    <logger name="com.example.solver" level="DEBUG" />
+    
+    <!-- Main application -->
+    <logger name="com.example" level="INFO" />
+</configuration>
+

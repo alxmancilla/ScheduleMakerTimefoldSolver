@@ -1,253 +1,409 @@
-# School Scheduling Solution with Timefold Solver
+# School Timeslot Optimizer with Timefold Solver
 
-A comprehensive Java 17 application for school schedule generation using **Timefold Solver 1.13.0**. This solution implements complex constraint optimization for assigning teachers, courses, timeslots, and rooms while respecting hard constraints and optimizing soft preferences.
+A Java 17 application that places pre-assigned teacher/course blocks into weekly timeslots using **Timefold Solver 1.29.0**. Each `CourseBlockAssignment` arrives with its teacher and course already assigned; the solver always solves the block's `timeslot`, and also solves its `room` for the handful of blocks nobody has already assigned one to. It optimizes timeslot (and, where needed, room) placement while respecting hard constraints and soft preferences.
 
-## Current Status
+> **Scope note:** Teacher is **not** a planning variable — it's a fixed input pre-assigned from the database (the `teacher` `@PlanningVariable` annotation is intentionally commented out). `room` **is** a planning variable, but its value range collapses to a singleton for any block whose group has a single-room curated range for that block's room type, or whose teacher has a compatible required room, so those stay effectively fixed too — a group range with 2+ rooms narrows the value range without fixing it, and only genuinely roomless blocks (or a group range with no rows for that type) are freely solved across every matching room. This is primarily a **timeslot optimizer** over pre-assigned teacher blocks, with room assignment layered on for the cases nobody's decided yet — not a full teacher/room scheduler.
 
-✅ **Build & Tests: PASSING** — Compiles successfully with Timefold 1.13.0 (1 test passing)  
-✅ **API Compatibility:** Fixed imports and method calls for Timefold 1.13.0  
-🏗️ **Core Implementation:** 17 domain/solver classes, 18 Java source files  
-⏱️ **Solver Config:** 2 minutes time limit, 1 minute unimproved limit, best score limit: `0hard/*soft`
+> **Schedule run history:** `course_block_assignment` is pure input — the solver never writes to it. Each solve inserts a `schedule_run` (score + timestamp) and one `schedule_run_result` row per assignment, then prunes to the most recent 10 runs. Anything showing "the current schedule" reads through the `course_block_assignment_current` view (pinned rows resolve to their own input timeslot; everything else resolves to the latest run), which also gives the solver warm-starting for free.
 
-## Project Overview
+## Purpose
 
-### Problem Definition
-Generate a weekly school timetable that assigns:
-- **Teachers** to course hours (with qualifications and availability)
-- **Courses** to student groups (with required hours per week)
-- **Timeslots** (Monday–Friday, 7:00–15:00 hours)
-- **Rooms** (standard classrooms and labs)
+This project targets **cohort-based, pre-staffed, semester-driven schools** — institutions
+that already know which teacher and which room a course uses (vocational/technical secondary
+schools are the primary fit), and whose real scheduling problem is purely combinatorial: given
+every course block's teacher, room, and course (assigned separately, e.g. by an administrator
+or a prior planning step), find a weekly placement that avoids every double-booking and honors
+teacher availability, qualifications, and rest requirements, while also optimizing for schedule
+quality (minimal idle gaps, room preferences, workload balance).
 
-### Constraints
+Building that weekly bell schedule by hand doesn't scale past a handful of groups — every added
+course, teacher, or room multiplies the ways two things can collide. This project automates
+that combinatorial core rather than the staffing/room-assignment problem, which these schools
+have typically already solved by the time scheduling starts.
 
-#### Hard Constraints (Must be satisfied)
-1. **Teacher Qualification** — Teacher must be qualified for assigned course
-2. **Teacher Availability** — Teacher must be available at assigned timeslot
-3. **No Teacher Double-Booking** — Teacher cannot teach two courses simultaneously
-4. **No Room Double-Booking** — Room cannot host two courses simultaneously
-5. **Room Type Match** — Lab courses must use lab rooms; standard courses must use standard rooms
-6. **Group Time Conflict** — Student group cannot have two courses at the same time
-7. **Non-Lab Room Consistency** — All non-lab courses for a group prefer same room (hard, with lab exception)
+**Goal:** eliminate scheduling conflicts and minimize the manual effort of building and
+maintaining a term timetable.
 
-#### Soft Constraints (Quality optimization, weighted preferences)
-1. **Teacher Continuity** (weight 3) — Prefer same teacher for all hours of a course
-2. **Minimize Idle Gaps** (weight 1) — Reduce gaps between teacher's courses (same day)
-3. **Minimize Building Changes** (weight 1) — Reduce teacher building switches (same day)
-4. **Prefer Group Room** (weight 3) — Groups prefer their pre-assigned room when specified
+**Primary users:** school administrators and academic planners who own the master
+timetable — not students or teachers browsing it (though the web app's `TEACHER` role gives
+teachers read-only access to their own resulting schedule).
+
+## At a Glance
+
+- Block-based scheduling only (multi-hour consecutive blocks, 1-4 hours); hour-based scheduling has been fully removed
+- 11 hard / 12 soft constraints (10 soft active, 2 parked), kept in sync with `BlockScheduleAnalyzer` by `ConstraintConsistencyTest`; 4 of the 11 hard constraints (and every active soft one) have a `SCHEDULER`/`ADMIN`-editable weight/severity via the Scheduler tab's Constraint Weights page, backed by `constraint_config`
+- The schedule grid is interactive: a `SCHEDULER`/`ADMIN` can click a block to move it to a different day/hour, toggle pinned, or (also admin/scheduler) reassign room/teacher, validated live against the same hard constraints (`POST /api/assignments/{id}/validate-move`) before Save is allowed — opt-in, behind a confirm-protected "Enable schedule editing" toggle
+- Every solve's hard/soft constraint violations (not just scores) are persisted (`schedule_run_violation`) and browsable in a collapsible panel on the Schedule page (`SCHEDULER`/`ADMIN` only), each one linked back to the exact grid card(s) it's about (`schedule_run_violation_assignment`) — previously only visible in the downloaded PDF report
+- Calendar exceptions (holidays, exam days, half-days) are tracked from Settings → Calendar — record-keeping v1, not yet read by block generation or the solver (see [Known Limitations](#known-limitations))
+- Dual room requirements and custom block templates are fully manageable from the web UI, not just the database
+- Web app: JWT auth with `READER`/`WRITER`/`SCHEDULER`/`ADMIN`/`TEACHER` roles, bilingual (EN/ES) UI, a mobile-friendly schedule layout, Excel import/export, PDF reporting — see [Authentication & Roles](#authentication--roles)
+- Solver termination: best score `0hard/0soft`, or 5 minutes, or 2 minutes without improvement (see `solverConfig.xml`)
+
+## How It Works
+
+Each course block already carries its **teacher** (with qualifications and per-day
+availability), **room** (standard classroom or specialized lab), and **course** — the solver
+assigns only the block's **timeslot** (day + start hour + length, Monday–Friday 7:00–15:00).
+Teacher, room, and course are fixed inputs, validated against the chosen timeslot by the
+constraints below rather than chosen by the solver.
+
+Blocks are 1-4 consecutive hours; how a course's weekly hours decompose into blocks is
+controlled by the course's component type — a size configurable per component from Settings →
+Block Rules (`component_block_rule`), defaulting to 2h — or, per course/group, an explicit
+`course_block_template` override managed in the Courses tab.
+
+Since teacher and room aren't solver-assigned, `BlockGenerationService` ("Generate Blocks")
+pre-fills them wherever a more specific override doesn't already provide one: a block's room
+defaults first to a teacher's `required_room_name` (if that teacher is already pre-assigned to
+the block, and their required room's type fits), then to the group's curated `group_room_range`
+for that block's room type, but only when it resolves to exactly one compatible room (a range of
+2+ rooms has no single deterministic default, so the block is left roomless for the solver/manual
+assignment instead) — each gated by room-type compatibility so a bad default is never applied. A
+teacher can be
+pre-assigned to a (group, course) pairing before any blocks exist via `group_course.
+default_teacher_id`, applied automatically the next time blocks are generated. Assigning a
+teacher afterward (Groups tab, Assignments tab, or the API) also re-applies their required room
+if one is set, regardless of the group's preference.
+
+`BlockTimeslot` is a **recurring weekly template** (day-of-week + start hour + length), not tied
+to a calendar date — the same Monday 8:00 slot applies every week of the term. Calendar
+exceptions (holidays, exam days, half-days) are tracked separately as real dates via Settings →
+Calendar, but that data doesn't gate block generation or the solver yet — see
+[Known Limitations](#known-limitations).
+
+## Constraints
+
+`SchoolConstraintProvider` and `BlockScheduleAnalyzer` are kept in lockstep by
+`ConstraintConsistencyTest`, so this list is guaranteed accurate as of the last
+test run (11 hard defined, all active; 12 soft defined, 10 active - the ones
+marked TEMP DISABLED below are currently parked by request, fully
+implemented and one line away from re-enabling). Four of the hard
+constraints below (marked ⚙) can be individually switched to SOFT severity
+by a `SCHEDULER`/`ADMIN` via the Scheduler tab's Constraint Weights page
+(`constraint_config` table) — the three double-booking rules are
+deliberately excluded from this, since they encode outcomes that can't
+actually happen in reality, not judgment calls. Every active soft
+constraint's weight is likewise editable there, not a fixed code literal.
+
+#### Hard Constraints (must be satisfied)
+1. **Block Length Must Match Timeslot Length**
+2. **Teacher Qualification** ⚙ — teacher must be qualified for the assigned course
+3. **Teacher Availability for Entire Block** ⚙
+4. **No Teacher Double-Booking**
+5. **No Room Double-Booking**
+6. **Room Type Must Satisfy Course Requirement** — uses `assignment.satisfiesRoomType`, not `course.roomRequirement` (dual room requirement support)
+7. **Teacher's Required Room Must Be Used** — a block's room must match its teacher's `requiredRoomName` when one is set; not excluded for pinned blocks (a data-integrity check, since a non-pinned block's room is already structurally guaranteed correct)
+8. **Semester Hour Limits Must Be Respected** — a block whose course's semester has a HARD-severity `semester_hour_limit` row (Settings → Semester Hour Limits, keyed by semester) may never be assigned a timeslot ending after that limit; not excluded for pinned blocks (same data-integrity precedent as #7 above). Generalized from an earlier hardcoded "semester 1 must finish by 2pm" rule into this per-semester, HARD-or-SOFT-configurable one.
+9. **Group Cannot Have Two Courses at Same Time**
+10. **Maximum Blocks Per Course Per Group Per Day** ⚙ — per-component configurable (`component_block_rule` / Settings → Block Rules), defaults to 2 for a component with no rule
+11. **Course Blocks Must Be Consecutive** ⚙ — a course's blocks on the same day must be back-to-back
+
+("Teacher Must Have a Break After Consecutive Hours" / "Group Must Have a Break After Consecutive Hours" existed here as TEMP DISABLED and were removed entirely, not just parked. Confirmed 2026-09-08 as a settled decision for this version: consecutive teaching/attendance is deliberately uncapped, so full-day unbroken runs are expected output, not a bug — see CLAUDE.md for the measured effect and what re-introducing a break rule would take.)
+
+#### Soft Constraints (weighted quality preferences)
+1. **Non-Standard Rooms Should Finish by 2pm** (default weight 10) — labs/workshops/computer centers
+2. **Prefer First-Semester Blocks to Start Early** (default weight 6) — a group's earliest unpinned `course.semester == 1` block each day should start at 7:00; penalty is the deviation in hours
+3. **Minimize First-Semester Group Idle Gaps** (default weight 6/hour, adjacent-pair only) — same logic as #6 below, but only counts a gap when both framing blocks are semester-1 (a higher-semester block in between still correctly breaks adjacency)
+4. **Semester Hour Limits Should Be Respected** (default weight 6) — the SOFT-severity counterpart to hard constraint #8 above: the solver may still place a block past its semester's limit, penalized proportionally to how far past
+5. **Teacher Exceeds Max Hours Per Week** (default weight 5)
+6. **Room Capacity Should Fit Group Size** (default weight 4) — opt-in: only fires when both `room.capacity` and `student_group.student_count` are set
+7. **Prefer Block's Specified Room** (default weight 3) — `preferred_room_hint`
+8. **Minimize Teacher Idle Gaps** (default weight 2/hour, availability-aware, adjacent-pair only)
+9. **Prefer Group's Preferred Room** (default weight 2) — a room from the group's curated `group_room_range` for the block's room type
+10. **Minimize Group Idle Gaps** (default weight 3/hour, adjacent-pair only) — all groups, every semester. Disabled 2026-08-24 in favor of the first-semester-only #3 above, re-enabled 2026-09-08 once that was measured to leave every semester-3/5 group (14 of 20) with no gap protection at all; the lower weight keeps #3 the priority for first-years
+11. ~~**Minimize Teacher Building Changes**~~ (weight 1) — **TEMP DISABLED** (not required anymore)
+12. ~~**Prefer Core 1h Blocks at the Same Time Across Days**~~ (weight 2) — **TEMP DISABLED** — a `Core` course's 1-hour blocks (one per day, same group) prefer to share a start hour; penalty is deviation from the most common ("mode") hour
 
 ## Features
 
-- **Flexible Teacher Management**: Teachers have a stable `id`, qualifications, a per-day availability map (hours available per DayOfWeek), and a `maxHoursPerWeek` workload limit.
-- **Multi-Room Scheduling**: Support for standard classrooms and specialized labs (room `type` and `building`).
-- **Group Constraints**: Prevent concurrent course scheduling for student groups and support optional preferred rooms.
-- **Pre-filled Excel Template**: `ExcelTemplateGenerator` now pre-fills a workbook from the demo data (teachers, courses, rooms, timeslots, groups, assignments) and includes teacher `id` and serialized per-day availability.
-- **PDF Reports**: `MainApp` uses `PdfReporter` to write three paginated PDF reports: violations, schedule-by-teacher, and schedule-by-group.
-- **Prioritization Strategies for Teachers**: Two strategies implemented to prefer assigning teachers with smaller weekly capacity:
-  - Heuristic bias: demo teachers are sorted ascending by `maxHoursPerWeek` (affects solver value ordering).
-  - Dynamic soft reward: a constraint (`preferTeachersWithLessCapacity`) rewards assignments to teachers with remaining capacity (scaled by a tunable `SCALE`).
-- **Scalable Architecture**: Timefold Constraint Streams for declarative, composable constraints.
-- **Comprehensive Reporting**: Console analysis and PDF outputs (violations and schedules).
+### Solver / engine
+- Multi-hour consecutive blocks (1-4 hours), with pinning support for locking specific blocks to a teacher/room/timeslot
+- Dual room requirements (a course can split its hours across multiple room types) and custom per-course/per-group block templates — both database-driven and web-UI-manageable
+- Per-component block-sizing and max-blocks-per-day rules (`component_block_rule`), configurable from Settings → Block Rules instead of hardcoded
+- Smart room/teacher defaulting for generated blocks: a teacher's required room and a group's curated room range (per room type, `group_room_range`) are applied automatically wherever a more specific override doesn't already provide one and the choice is unambiguous
+- Optional room-capacity awareness (`room.capacity` vs. `student_group.student_count`)
+- 4 room types: Standard, Mixed (doubles as Standard or Specialized - Workshop), Specialized - Workshop, Specialized - Computer Lab
+- PostgreSQL-backed: schema, reporting views, and data loading scripts
+- Three PDF reports (violations, by-teacher, by-group) via Constraint Streams-based analysis
+- Every solve's hard/soft constraint weight/severity overrides live in `constraint_config`, read by both the solver (`ConstraintWeightOverrides`) and the web UI (the Scheduler tab's Constraint Weights page) from one canonical default list (`common.SoftConstraintDefaults`) — no redeploy needed to retune a weight
+- `PreSolveValidator` runs before every solve (CLI and web-triggered) and also standalone from a "Run Validation" tools page — ten proven-fact checks block the solve outright, an eleventh (shared-teacher-load simulation) is an advisory warning
+
+### Web app
+- Role-based access control (`READER`/`WRITER`/`SCHEDULER`/`ADMIN`/`TEACHER`) over stateless JWT — see [Authentication & Roles](#authentication--roles)
+- Full CRUD for teachers (incl. an optional required-room override), courses (incl. dual room requirements, block templates), rooms, groups (incl. group-course management, a per-course-teacher pre-assignment, and a warning when a course has no qualified teacher) — `WRITER`+; course block assignments are `SCHEDULER`/`ADMIN`-only to write, `READER`+ to view
+- The Schedule grid is clickable for `SCHEDULER`/`ADMIN` (opt-in, confirm-protected): move a block to a different day/hour, toggle pinned, or reassign room/teacher, validated live against hard constraints before Save; a collapsible panel on the same page shows every hard/soft violation persisted for the selected run, each linked to and highlighting the exact grid card(s) it's about
+- Bilingual UI (English/Spanish, `react-i18next`) with a per-user language preference, and a mobile-friendly stacked-day-list layout for the schedule views below a phone-width breakpoint
+- Scheduler (`SCHEDULER`/`ADMIN`, its own nav entry — not nested under "Admin"): triggering/configuring the solver, constraint weights
+- Admin (`ADMIN` only): user management, timeslot management, current-term label, calendar exceptions (holidays/exam days/half-days), semester hour limits, database backup/restore, write-activity audit log, block generation, per-component block rules
+- Tools (`WRITER`+, i.e. `WRITER`/`SCHEDULER`/`ADMIN`): PDF reports, course coverage and teacher availability at-a-glance views, Excel import/export, and standalone pre-solve validation
+- Excel import/export (`POST`/`GET /api/import/excel`) — the same `.xlsx` layout both ways, for a full export → edit → re-import round trip
+- Teacher self-service: a `TEACHER`-role account sees only its own schedule
+- Search, pagination, toast notifications, and confirm dialogs throughout
 
 ## Project Structure
 
+Maven multi-module build: an aggregator `pom.xml` at the root with four
+modules, plus the standalone `web-ui/` React frontend. `engine` and `web`
+integrate with each other only through the shared PostgreSQL database (no
+module-to-module dependency between them) but both depend on `common` for
+shared business rules — the one exception to "modules only talk through the
+database," used specifically to avoid hand-syncing the same rule twice.
+
 ```
-src/
-├── main/java/com/example/
-│   ├── MainApp.java                    # Entry point; runs solver and prints results
-│   ├── domain/
-│   │   ├── Teacher.java                # Teacher with qualifications and availability
-│   │   ├── Course.java                 # Course with room requirement and hours
-│   │   ├── Room.java                   # Room with building and type (standard/lab)
-│   │   ├── Timeslot.java               # Timeslot with day and hour
-│   │   ├── Group.java                  # Student group with courses and optional preferred room
-│   │   ├── CourseAssignment.java       # @PlanningEntity: teacher, timeslot, room assignment
-│   │   └── SchoolSchedule.java         # @PlanningSolution: problem and solution holder
-│   ├── solver/
-│   │   ├── SchoolConstraintProvider.java # All constraint definitions (hard & soft)
-│   │   └── SchoolSolverConfig.java     # Solver configuration (termination, time limits)
-│   └── data/
-│       └── DemoDataGenerator.java      # Generates demo dataset (teachers, courses, rooms, groups)
-└── test/
-    └── java/com/example/AppTest.java
+.
+├── pom.xml                              # Aggregator/parent POM
+├── common/                              # scheduler-common: shared business rules, plain Java,
+│   │                                     # no framework/persistence deps
+│   └── src/main/java/com/example/common/
+│       ├── RoomTypeCompatibility.java   # e.g. does room type X satisfy requirement Y
+│       ├── CalendarPacking.java         # day-by-day bin-packing (block shaping/placement)
+│       ├── BlockTimingMath.java         # same-day overlap / chain-break math
+│       ├── SoftConstraintDefaults.java  # canonical soft-constraint name -> default weight list
+│       └── ConfigurableHardConstraints.java  # which HARD constraints an admin may soften
+├── engine/                              # scheduler-engine: Timefold + JDBC, no Spring
+│   └── src/main/java/com/example/
+│       ├── MainBlockSchedulingApp.java  # Entry point: load -> solve -> save
+│       ├── domain/                      # Teacher, Course, Room, Group, BlockTimeslot,
+│       │                                 # CourseBlockAssignment (@PlanningEntity),
+│       │                                 # RoomRequirement, BlockTemplate, SchoolSchedule
+│       ├── solver/                      # SchoolConstraintProvider, SchoolSolverConfig,
+│       │                                 # custom moves/filters/comparators
+│       ├── analysis/                    # BlockScheduleAnalyzer (mirrors the constraints)
+│       ├── validation/                  # PreSolveValidator (blocking checks before every solve:
+│       │                                 # invalid pinned data + whole-schedule capacity facts)
+│       ├── data/                        # DataLoader, DataSaver, DemoDataGenerator
+│       └── util/                        # Excel import/export helpers
+├── reporter/                            # scheduler-reporter: depends on engine as a library
+│   └── src/main/java/com/example/reporter/
+│       └── PdfReportApp.java            # Reads the solved schedule, generates 3 PDFs
+├── web/                                 # scheduler-web: Spring Boot REST API + JWT/RBAC
+│   └── src/main/java/com/example/web/
+│       ├── controller/                  # One controller per resource (Teachers, Courses,
+│       │                                 # Rooms, Groups, Assignments, Schedule, Auth, Users,
+│       │                                 # Timeslots, Engine, Reports, Import, Term,
+│       │                                 # CalendarException, AuditLog, ...)
+│       ├── entity/ + repository/        # JPA entities and Spring Data repositories
+│       ├── dto/                         # Request/response DTOs with bean validation
+│       ├── security/                    # SecurityConfig (JWT + RBAC), AuditLogInterceptor
+│       ├── service/                     # BlockGenerationService, ExcelImportService,
+│       │                                 # ExcelExportService, EngineRunnerService, ...
+│       └── exception/                   # GlobalExceptionHandler
+├── web-ui/                              # React + Vite SPA (unchanged by the module split)
+│   └── src/
+│       ├── components/                  # One component per tab (Teachers, Courses, Rooms,
+│       │                                 # Groups, Assignments, Schedule, MySchedule, Settings,
+│       │                                 # Users, Reports, Import, Login)
+│       ├── auth/                        # AuthContext, ProtectedRoute/AdminRoute/SchedulerRoute/
+│       │                                 # WriteRoute, AdminOnly/ScheduleEditOnly/WriteOnly
+│       ├── ui/                          # Shared ToastContext, ConfirmContext, Pagination
+│       └── i18n/                        # en.json / es.json (react-i18next)
+├── database/
+│   ├── schema_block_scheduling.sql      # Canonical PostgreSQL schema (block-based only,
+│   │                                     # includes all reporting views)
+│   ├── migrations/                      # Incremental migrations applied on top of the
+│   │                                     # schema (app_user/RBAC, room capacity, school_term,
+│   │                                     # audit log, TEACHER role, calendar_exception, ...)
+│   └── datasets/                        # Demo and production seed data
+└── scripts/                             # run-engine.sh, run-reporter.sh helper scripts
 ```
 
 ## Build Instructions
 
 ### Prerequisites
-- **Java 17+**
-- **Maven 3.8+**
+- **Java 17+**, **Maven 3.8+**, **PostgreSQL 12+**
 
-### Compile
+### Database Setup
+
+```bash
+createdb -U mancilla school_schedule
+psql -U mancilla -d school_schedule -f database/schema_block_scheduling.sql
+
+# Then load one dataset:
+psql -U mancilla -d school_schedule -f database/datasets/load_demo_data_blocks.sql        # demo
+psql -U mancilla -d school_schedule -f database/datasets/load_final_dataset_blocks.sql    # production
+```
+Reporting views are created automatically as part of the schema load.
+
+All modules read the database connection from `DB_URL` / `DB_USER` / `DB_PASSWORD`
+environment variables (default: `jdbc:postgresql://localhost:5432/school_schedule`,
+user `mancilla`, empty password).
+
+### Compile & Test
 ```bash
 mvn clean compile
-```
-
-### Run Solver
-```bash
-mvn exec:java -Dexec.mainClass="com.example.MainApp"
-```
-
-This will:
-1. Generate demo data (22 teachers, 11 courses, 7 groups, 11 rooms, 40 timeslots)
-2. Run the solver (up to 15 minutes or until optimal score reached)
-3. Print the solved schedule grouped by day, teacher, and group
-4. Display constraint violation analysis
-
-### Run Tests
-```bash
 mvn test
 ```
 
-## Demo Data
+`mvn test` (Surefire) is unit tests only, no external dependencies, and should always be green
+(`web`: 487 tests, 0 failures, 0 errors). If you see `web` tests failing in bulk with "Mockito
+cannot mock this class" / "Could not modify all classes" cascading into dozens of unrelated
+"ApplicationContext failure threshold exceeded" errors, that's `spring-boot-dependencies`
+3.2.1's pinned Mockito 5.7.0/byte-buddy 1.14.10 being too old to instrument classes on your JDK —
+already fixed here by overriding `mockito.version`/`byte-buddy.version` in the root `pom.xml` and
+importing them in `web/pom.xml`'s `dependencyManagement`; bump those two properties further if a
+newer JDK regresses again.
 
-### Teachers (22 total)
-- Qualified for specific courses
-- Available on specific days/hours
-- Examples: GUSTAVO MELO (Lengua y Comunicación), MONICA E. DIEGO (Inglés), DIANA R. LLUCK (Pensamiento Matemático)
-
-### Courses (11 total)
-- **Standard courses** (3–4 hours/week): Lengua y Comunicación, Inglés, Pensamiento Matemático, Humanidades, Ciencias Sociales
-- **Lab courses** (3 hours/week): Cultura Digital, La Materia y Sus Interacciones
-- **Extracurricular** (1–2 hours): Club de Ajedrez, Activación Física, Tutorias, Recursos Socioemocionales
-
-### Rooms (11 total)
-- **Standard** (6): Room 101–102 (Building A), Room 301 (Building B), Room 401–402 (Building C)
-- **Lab** (2): Lab 201–202 (Building A), Lab 302 (Building B)
-
-### Groups (7 total)
-- **Grupo 1o C**: Assigned courses + optional preferred room (Room 101)
-- **Grupo 1o G**: Assigned courses (flexible room)
-- Plus 5 additional groups
-
-### Timeslots (40 total)
-- Monday–Friday, 7:00–14:00 hours
-- One timeslot per hour
-
-## Solution Output
-
-### Score Format
-`XhardYsoft`
-- **X** = number of hard violations (0 = feasible)
-- **Y** = accumulated soft penalty (lower is better)
-
-### Example Run Output
+The `web` module also has a thin **integration test layer** against a real, disposable PostgreSQL
+container (Testcontainers) covering the handful of behaviors a mocked repository can't verify —
+FK/cascade enforcement, JPQL null-handling. It's bound to Failsafe (`*IT.java`, the `verify`
+phase), not Surefire, so it never runs as part of plain `mvn test`:
+```bash
+# Requires Docker running
+mvn -pl web verify
 ```
-=== School Schedule Solver ===
-Initial problem:
-  Teachers: 22
-  Courses: 11
-  Rooms: 11
-  Timeslots: 40
-  Groups: 7
-  Course Assignments: 77
+If this fails immediately with `Could not find a valid Docker environment` even though `docker
+info` works fine from a terminal, it's very likely Testcontainers' bundled docker-java client
+failing to talk to a newer Docker Desktop/Engine than it was built against (seen with Docker
+Engine 29.7.2 / API 1.55 against Testcontainers 1.19.3, the version `spring-boot-dependencies`
+3.2.1 pins — fixed here by pinning `testcontainers.version` and importing `testcontainers-bom`
+directly in `web/pom.xml`, see the comments there). If it still fails intermittently after that,
+try forking the Failsafe JVM under a different installed JDK (`-Djvm=/path/to/java`) — a
+bleeding-edge JDK for the Maven/test process itself has been observed to make the same Docker
+Desktop connection flaky.
 
-Solving...
+If every `*IT` instead fails immediately with `NoClassDefFoundError`/`ClassNotFoundException` for
+an ordinary `web` class that plainly exists (e.g. `com.example.web.repository.RoomRepository`) —
+never even reaching a Docker-environment error — that's a different, now-fixed bug: `mvn verify`
+runs Failsafe's `integration-test` phase *after* `package`, and `spring-boot-maven-plugin`'s
+`repackage` goal used to overwrite `target/scheduler-web-<version>.jar` in place with the
+executable Spring Boot layout (`BOOT-INF/classes/...`); Failsafe then built its test classpath
+from that same file instead of `target/classes`, and a plain classloader can't resolve anything
+nested under `BOOT-INF`. Fixed 2026-09-08 by giving the `repackage` execution `<classifier>exec
+</classifier>` in `web/pom.xml`, so the plain jar stays at the primary artifact coordinate
+Failsafe (and Maven in general) expects, and the executable one is the separate
+`scheduler-web-<version>-exec.jar` — `web/Dockerfile`'s build stage was updated to `cp` that file
+specifically.
 
-=== Solved Schedule ===
-Score: 0hard/-36soft
-
-=== Hard Constraint Violations (by rule) ===
-- Teacher must be qualified: 0
-- Teacher must be available at timeslot: 0
-- No teacher double-booking: 0
-- No room double-booking: 0
-- Room type must satisfy course requirement: 0
-- Group cannot have two courses at same time: 0
-- Group non-lab courses must use same room: 0
-
-=== Schedule by Day ===
-MONDAY:
-  Lun 8-9: LENGUA Y COMUNICACIÓN I (Group: Grupo 1o C, Teacher: GUSTAVO MELO, Room: Room 101)
-  ...
+### Run the Solver
+```bash
+mvn -pl engine exec:java -Dexec.mainClass="com.example.MainBlockSchedulingApp"
+```
+Loads data → validates → solves → saves the assignments back to PostgreSQL → prints a
+constraint violation summary. `PreSolveValidator` runs right after loading and, if it finds
+any blocking problem (invalid pinned data, or a whole-schedule capacity fact like a teacher
+assigned more hours than they have availability for), aborts before solving starts —
+`SKIP_PRESOLVE_VALIDATION=true` proceeds anyway (validation still prints its findings either
+way; the flag only changes whether they abort the run). `SOLVER_MINUTES_LIMIT` /
+`SOLVER_UNIMPROVED_MINUTES_LIMIT` override the local search time budget for one run without
+touching `solverConfig.xml`. PDF reports are generated separately by the **reporter** module,
+which reads the persisted schedule from the database:
+```bash
+mvn -pl reporter exec:java -Dexec.mainClass="com.example.reporter.PdfReportApp"
 ```
 
-## Recent Changes
+### Run as Workers / Containers
 
-### January 2, 2026 (Current Release)
+The engine and reporter are one-shot batch jobs (not daemons); the web app is a long-running
+service. Each module has a fat-jar build (`mvn -pl <module> -am -DskipTests package` →
+`<module>/target/scheduler-<module>-1.0.0.jar`), a `Dockerfile`, and a helper script
+(`scripts/run-engine.sh`, `scripts/run-reporter.sh`) that reads `DB_URL`/`DB_USER`/
+`DB_PASSWORD` from the environment and exits non-zero on failure (safe for cron/orchestrators).
 
-- **Timefold 1.13.0 Validation & Fixes**
-  - Fixed syntax error in [src/main/java/com/example/solver/CourseAssignmentMoveFilter.java](src/main/java/com/example/solver/CourseAssignmentMoveFilter.java) (missing semicolon, wrong package).
-  - Updated imports to use correct Timefold 1.13.0 API: `ai.timefold.solver.core.impl.heuristic.selector.common.decorator.SelectionFilter`.
-  - Fixed method call: changed `getAssignments()` to `getCourseAssignments()` on `SchoolSchedule`.
-  - Cleaned up invalid code in `DemoDataGenerator.generateDemoData()` (removed undefined variables and logger references).
-  - All tests pass (`mvn test` returns 1 test, 0 failures, BUILD SUCCESS).
+```bash
+# One-shot solve, via the helper script or a container
+DB_URL=... DB_USER=... DB_PASSWORD=... ./scripts/run-engine.sh
+docker build -f engine/Dockerfile -t scheduler-engine . && docker run --rm -e DB_URL=... scheduler-engine
 
-### November 2025
+# Or all three services via Docker Compose (see docker-compose.yml for CPU/memory limits)
+docker compose up -d web                # long-running REST API on :8080
+docker compose run --rm engine          # one-shot solve
+docker compose run --rm reporter        # one-shot PDF generation (./reports)
+```
+The solver is the most resource-hungry component — give it at least 4 CPUs / 8 GB (see
+`docker-compose.yml` / `engine/Dockerfile` for the tuned defaults).
 
-- Domain model refactor
-  - `Teacher` now has a stable `id:String`, a per-day availability map (`Map<DayOfWeek, Set<Integer>> availabilityPerDay`) and `maxHoursPerWeek` (default 20).
-  - `Course` now has an `id:String` and retains `requiredHoursPerWeek`.
+## Web UI
 
-- Excel & Reporting
-  - `ExcelTemplateGenerator` now pre-fills workbooks with demo data.
-  - `PdfReporter` generates three paginated reports: violations, by-teacher, and by-group.
+A React + Spring Boot web interface manages the full problem — teachers, courses, rooms,
+student groups, and course block assignments — plus admin functions, without touching the
+database directly.
 
-- Constraint improvements
-  - Hard constraints: teacher qualification, availability, no double-booking, room type matching, group time conflicts.
-  - Soft constraints: teacher continuity, idle gap minimization, building change reduction, group room preferences.
+```bash
+# Terminal 1 - backend (http://localhost:8080)
+mvn -pl web spring-boot:run
+
+# Terminal 2 - frontend (http://localhost:3000, proxies /api to the backend)
+cd web-ui && npm install && npm run dev
+```
+
+See [`web-ui/README.md`](web-ui/README.md) and [`WEB_UI_SETUP.md`](WEB_UI_SETUP.md) for the
+full feature list, REST API endpoint reference, Docker/production deployment, and
+troubleshooting.
+
+### Authentication & Roles
+
+Stateless JWT auth; every `/api/**` endpoint except `POST /api/auth/login` requires
+`Authorization: Bearer <token>`.
+
+| Role        | Permissions                                                         |
+|-------------|-----------------------------------------------------------------------|
+| `READER`    | `GET` only.                                                          |
+| `WRITER`    | `READER` + create/update/delete on domain entities (teachers, courses, rooms, groups). **Not** course block assignments/schedule editing (see `SCHEDULER` below) or anything under `/api/admin/**`. |
+| `SCHEDULER` | `WRITER` + full read/write on course block assignments (the schedule itself — general CRUD, Excel export/import, and the grid's move/pin/room/teacher editor), plus solver triggering/config and constraint weights (`/api/admin/engine/**`, `/api/admin/constraint-config/**`). Everything else under `/api/admin/**` (users, audit log, DB backup, and most of Settings) stays `ADMIN`-only. |
+| `ADMIN`     | `SCHEDULER` + full access, including user management and everything else under `/api/admin/**`. |
+| `TEACHER`   | Scoped to itself only: its own schedule, its own identity/language, and the term label — **not** general domain data. An admin links a `TEACHER` account to a teacher record from the Users tab. |
+
+**First-time setup** — apply the users migration (creates `app_user`; not part of the schema
+file itself), then boot with `ADMIN_BOOTSTRAP_PASSWORD` set to seed the first admin:
+```bash
+psql -U mancilla -d school_schedule -f database/migrations/add_app_users.sql
+ADMIN_BOOTSTRAP_PASSWORD=change-me JWT_SECRET=$(openssl rand -hex 32) mvn -pl web spring-boot:run
+```
+Log in at `http://localhost:3000/login`; create additional users via the `ADMIN`-only Users tab.
+
+See [WEB_UI_SETUP.md](WEB_UI_SETUP.md#authentication--roles) for the full endpoint reference,
+security config env vars, and upgrade-migration details for existing databases.
+
+### Temporary Public Sharing
+
+```bash
+brew install cloudflared            # one-time
+mvn -pl web spring-boot:run &       # backend
+(cd web-ui && npm run dev) &        # frontend
+cloudflared tunnel --url http://localhost:3000
+```
+Prints a public `https://*.trycloudflare.com` URL that proxies through Vite's `/api` proxy —
+no separate tunnel needed for port 8080. Use a strong `JWT_SECRET` and admin password before
+sharing, and tear the tunnel down when done (`pkill -f "cloudflared tunnel"`).
 
 ## Architecture
 
-### Technology Stack
-- **Java 17** — Modern language features and performance
-- **Timefold Solver 1.x** — Constraint Streams API for declarative constraint modeling
-- **Maven** — Build automation and dependency management
-- **HardSoftScore** — Two-level scoring (hard feasibility, soft quality)
-
-### Constraint Implementation
-- **Timefold Constraint Streams** — Programmatic, composable constraints
-- **No-arg Constructors** — Required by Timefold for reflection
-- **@PlanningEntity/@PlanningSolution** — Domain model annotations
-- **@PlanningVariable** — Decision variables (teacher, timeslot, room)
-- **@PlanningId** — Unique identifier for entity comparison
-
-### Solver Configuration
-- **Construction Heuristic** — Greedy initialization phase
-- **Local Search** — Iterative improvement (Tabu Search, Simulated Annealing)
-- **Termination Conditions:**
-  - Best score limit: `0hard/*soft` (stop if all hard constraints satisfied)
-  - Time limit: 15 minutes
-  - Unimproved limit: 5 minutes without improvement
+- **Java 17**, **Timefold Solver 1.29.0** (Constraint Streams), **PostgreSQL 12+**, **Maven**, **Apache PDFBox**, **HardSoftScore** (two-level: hard feasibility, soft quality)
+- **Domain model**: `CourseBlockAssignment` (`@PlanningEntity`), `BlockTimeslot`, `Teacher`, `Course`, `Room`, `Group`, `SchoolSchedule` (`@PlanningSolution`)
+- **Solver phases**: custom construction heuristic phases, then local search (Late Acceptance + Tabu Search); termination per `solverConfig.xml` (best score `0hard/0soft`, 5 min limit, 2 min unimproved limit)
 
 ## Known Limitations
 
-1. **Capacity Constraints** — Rooms have no capacity limits (assumes single course per timeslot)
-2. **Soft Constraint Scaling** — Pairwise soft constraints (forEachUniquePair) scale as O(n²); consider refactoring for very large problem sizes
-3. **No Multi-Teacher Courses** — Each course hour is assigned to exactly one teacher
-4. **Fixed Timeslots** — Timeslots cannot be adjusted; only room/teacher assignments are flexible
+1. **Room capacity is opt-in and soft** — even when `room.capacity`/`student_group.student_count` are both set, it's a soft penalty (weight 4), not a hard block
+2. **Teachers and rooms are pre-assigned** — the solver only assigns timeslots (see the Scope note above)
+3. **No multi-teacher courses** — each block has exactly one teacher
+4. **Soft constraints scale O(n²)** (pairwise) — may need optimization for much larger datasets
+5. **Calendar exceptions aren't wired into scheduling yet** — `BlockTimeslot` is a recurring weekly template (day-of-week + hour), not tied to actual dates; the `calendar_exception` table (Settings → Calendar) tracks holidays/exam days/half-days for the first time, but that data isn't yet read by block generation, the solver, or the PDF reports, and the "current term" label is still display-only, not a scheduling boundary. Turning this into an enforced constraint requires resolving the larger architectural question of whether `BlockTimeslot` moves from a recurring weekly template to a dated multi-week calendar.
 
 ## Future Enhancements
 
-- [ ] Room capacity constraints
-- [ ] Teacher workload balancing
-- [ ] Student preferences (elective course scheduling)
-- [ ] Lunch break constraints
-- [ ] Rest period constraints (no back-to-back courses for teachers)
-- [ ] Multi-day course hour patterns (instead of weekly repetition)
-- [ ] Integration with calendar systems (iCal export)
-
-## Testing & Validation
-
-### Constraint Analysis Report
-See `CONSTRAINT_ANALYSIS_REPORT.md` for detailed analysis of:
-- Hard constraint satisfaction
-- Soft constraint optimization
-- Violation breakdown
-- Root cause analysis
-
-### Running Diagnostics
-To analyze constraint violations in the current solution, modify `MainApp.java` to call:
-```java
-Map<String, Integer> violations = analyzeHardConstraintViolations(solvedSchedule);
-violations.forEach((k, v) -> System.out.println("- " + k + ": " + v));
-```
+- [ ] Wire calendar exceptions into block generation/solving (e.g. exclude holiday dates, cap half-days at their `end_hour`)
+- [ ] Dynamic teacher/room assignment (currently pre-assigned)
+- [ ] Teacher workload balancing across weeks
+- [ ] Student preferences for elective courses
+- [ ] Multi-week scheduling patterns (dated calendar instead of a recurring weekly template)
+- [ ] Calendar system integration (iCal/Google Calendar export)
+- [x] Real-time constraint violation feedback during manual edits — done: the Schedule grid's move/pin editor validates live against hard constraints (`POST /api/assignments/{id}/validate-move`), and a persisted per-run violations panel (`SCHEDULER`/`ADMIN` only) is browsable on the same page
+- [x] Extend grid editing beyond move/pin to room/teacher reassignment — done: `AssignmentMoveEditor` gained admin/scheduler-only room/teacher fields, going through the full `PUT /api/assignments/{id}` (not live-validated, unlike day/hour/pinned)
+- [x] Link a persisted violation directly to its grid cell — done: `ViolationInstance` carries each violation's own `assignmentIds` through to `schedule_run_violation_assignment`; the Schedule grid badges/highlights the exact card(s) and scrolls to them when a violation description is clicked
+- [ ] Schedule approval/publish gate (`SCHEDULER`/`ADMIN` approve before `READER`/`WRITER`/`TEACHER` can see it) — today every solve *and* every hand-edit (move/pin/room/teacher) is immediately visible to every role with read access, with no draft/pending state at all. Proposed approach (lighter than full draft/what-if versioning): a `schedule_publication` singleton (mirrors `school_term`'s pattern) pointing at a `schedule_run`; a publish action snapshots the *current live state* (solved + hand-edited since the last solve) into a fresh run/result set and repoints the singleton; `ScheduleController`'s no-`runId` default resolves to that published run for non-scheduler roles (`SCHEDULER`/`ADMIN` keep seeing true live), reusing the existing `schedule_run_result` snapshot/`?runId=` mechanism rather than building a parallel draft-editing surface. No auto-republish on further edits - publishing is a deliberate, separate action.
 
 ## Contributing
 
-To modify constraints or data:
-1. Edit `SchoolConstraintProvider.java` for constraint logic
-2. Edit `DemoDataGenerator.java` for data initialization
-3. Run `mvn clean compile` and `mvn exec:java -Dexec.mainClass="com.example.MainApp"` to verify
+1. **Constraints**: edit `engine/.../solver/SchoolConstraintProvider.java`, keeping `engine/.../analysis/BlockScheduleAnalyzer.java` in sync — `ConstraintConsistencyTest` fails the build if they drift
+2. **A rule needed by both `engine` and `web`**: put it in `common/` instead of writing it twice — that's the whole reason the module exists (see `RoomTypeCompatibility` for the pattern)
+3. **Schema**: update `database/schema_block_scheduling.sql` (fresh-install shape) and add a corresponding file under `database/migrations/` for existing databases
+4. **Dataset**: modify `database/datasets/load_final_dataset_blocks.sql`, then reload it
+5. **A hand-maintained set of valid string values reused across several columns** (like room type or course designation): make it a lookup table with FKs into it instead — see `room_type`/`course_designation` for the pattern. Turns a rename into one `UPDATE` and turns a typo into a loud FK violation instead of a silent orphaned value.
+6. **Test**: `mvn test` (all four modules) for unit tests; see [Compile & Test](#compile--test) for the Testcontainers-backed integration layer (requires Docker) — add to it when a change relies on real DB behavior (a constraint, cascade, or JPQL null-handling) a mock can't verify. Run a solver pass too if you touched constraints
+7. **Web API/UI**: see [Project Structure](#project-structure) for where each concern lives (`web/.../controller`, `entity`, `dto`, `security`; `web-ui/src/components`, `api.js`, `i18n/{en,es}.json`)
+
+For the change history, use `git log` rather than this file.
 
 ## License
 
@@ -257,4 +413,3 @@ This project is provided as-is for educational and scheduling purposes.
 
 - [Timefold Solver Documentation](https://timefold.ai/)
 - [Constraint Streams Guide](https://docs.timefold.ai/timefold-solver/latest/use-cases-and-examples)
-- School Scheduling Problem (classical OR problem)
